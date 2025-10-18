@@ -1,0 +1,13 @@
+# Impostazioni di base del sito
+title: ACTuscolano
+description: >-
+  Breve descrizione del tuo sito o blog.
+
+# Specifica il tema Jekyll che vuoi usare (ad esempio, il tema Minimal)
+theme: jekyll-theme-minimal 
+
+# Configurazione del permalink (opzionale, ma consigliato per i blog)
+# permalink: /:title/
+
+# Configurazione di base per GitHub Pages (NON CAMBIARE)
+baseurl: "" # Lascia vuoto se è un sito utente (username.github.io) o alla radice del repo
