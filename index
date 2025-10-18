@@ -1,5 +1,6 @@
 ---
-layout: default # O 'page' o 'home', a seconda del tema
+layout: default 
+title: Gestione Squadra Calcio a Otto
 ---
 
 <!DOCTYPE html>
