@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Squadra Calcio a Otto</title>
+    <!-- Caricamento di Tailwind CSS per lo styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'futsal-green': '#10b981', // emerald-500
+                        'futsal-dark': '#0f172a', // slate-900
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Stili personalizzati per migliorare l'estetica mobile */
+        .card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    
+    <!-- Contenitore Principale -->
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-futsal-dark mb-2">⚽ Gestione Calcio a Otto 🥅</h1>
+            <p class="text-gray-500">Registra e monitora i dati dei tuoi giocatori.</p>
+        </header>
+
+        <!-- Barra di Stato e ID Utente -->
+        <div id="status-bar" class="mb-6 p-3 bg-futsal-dark text-white rounded-lg shadow-lg text-sm flex flex-col sm:flex-row justify-between items-center">
+            <span id="loading-indicator" class="flex items-center">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-futsal-green" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Caricamento dati...
+            </span>
+            <span id="user-id-display" class="mt-2 sm:mt-0 text-xs">ID Utente: <span class="font-mono text-futsal-green"></span></span>
+        </div>
+        
+        <!-- Area Modulo Aggiunta Giocatore -->
+        <section class="card bg-white p-6 rounded-xl mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-futsal-dark">Aggiungi Nuovo Giocatore</h2>
+            <form id="add-player-form" class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <input type="text" id="playerName" placeholder="Nome (Es: Rossi M.)" required class="p-3 border border-gray-300 rounded-lg md:col-span-2 focus:ring-futsal-green focus:border-futsal-green">
+                
+                <input type="number" id="playerNumber" placeholder="Numero" min="1" max="99" class="p-3 border border-gray-300 rounded-lg focus:ring-futsal-green focus:border-futsal-green">
+                
+                <select id="playerPosition" required class="p-3 border border-gray-300 rounded-lg focus:ring-futsal-green focus:border-futsal-green">
+                    <option value="" disabled selected>Posizione</option>
+                    <option value="Portiere">Portiere</option>
+                    <option value="Difensore">Difensore</option>
+                    <option value="Centrocampista">Centrocampista</option>
+                    <option value="Attaccante">Attaccante</option>
+                </select>
+
+                <input type="number" id="playerGoals" placeholder="Gol (0)" min="0" value="0" class="p-3 border border-gray-300 rounded-lg focus:ring-futsal-green focus:border-futsal-green">
+                <input type="number" id="playerAssists" placeholder="Assist (0)" min="0" value="0" class="p-3 border border-gray-300 rounded-lg focus:ring-futsal-green focus:border-futsal-green">
+
+                <button type="submit" class="md:col-span-6 bg-futsal-green hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition duration-200">
+                    Aggiungi alla Rosa
+                </button>
+            </form>
+        </section>
+
+        <!-- Area Modulo Statistiche Squadra -->
+        <section class="card bg-white p-6 rounded-xl mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold text-futsal-dark">Rosa Completa e Statistiche</h2>
+                <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                    Svuota Rosa
+                </button>
+            </div>
+            
+            <!-- Tabella Giocatori -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posizione</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gol</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assist</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="player-list" class="bg-white divide-y divide-gray-200">
+                        <!-- I giocatori verranno inseriti qui da JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Messaggio per Rosa Vuota -->
+            <p id="empty-roster-message" class="text-center text-gray-500 mt-4 hidden">Nessun giocatore registrato. Aggiungine uno!</p>
+        </section>
+    </div>
+
+    <!-- Modale per Messaggi (es. Conferma Eliminazione) -->
+    <div id="modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-2xl w-full max-w-sm m-4">
+            <h3 id="modal-title" class="text-xl font-bold mb-4 text-futsal-dark"></h3>
+            <p id="modal-message" class="mb-6 text-gray-700"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition duration-200">Annulla</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition duration-200">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Firebase e Logica Applicativa -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, onSnapshot, 
+            addDoc, deleteDoc, updateDoc, setDoc, 
+            query, writeBatch, setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Configurazione Firebase e Variabili Globali
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof _firebase_config !== 'undefined' ? JSON.parse(_firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId = null;
+        let playerCollectionRef;
+
+        setLogLevel('Debug');
+
+        // Riferimenti DOM
+        const form = document.getElementById('add-player-form');
+        const playerListContainer = document.getElementById('player-list');
+        const resetBtn = document.getElementById('reset-button');
+        const emptyMessage = document.getElementById('empty-roster-message');
+        const statusDisplay = document.getElementById('status-bar');
+        const userIdDisplay = document.querySelector('#user-id-display span');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // Riferimenti Modale
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+
+
+        // --- Funzioni di Utilità ---
+
+        /**
+         * Mostra un modale di conferma e restituisce una Promise che si risolve con true se confermato, false altrimenti.
+         * @param {string} title - Titolo del modale.
+         * @param {string} message - Messaggio da visualizzare.
+         * @returns {Promise<boolean>}
+         */
+        function showConfirmationModal(title, message) {
+            return new Promise(resolve => {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modalConfirmBtn.textContent = 'Sì, procedi';
+                modalConfirmBtn.classList.remove('bg-futsal-green');
+                modalConfirmBtn.classList.add('bg-red-500'); // Forza rosso per conferma distruttiva
+                
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                const confirmHandler = () => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                    modalConfirmBtn.removeEventListener('click', confirmHandler);
+                    modalCancelBtn.removeEventListener('click', cancelHandler);
+                    resolve(true);
+                };
+
+                const cancelHandler = () => {
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+                    modalConfirmBtn.removeEventListener('click', confirmHandler);
+                    modalCancelBtn.removeEventListener('click', cancelHandler);
+                    resolve(false);
+                };
+
+                modalConfirmBtn.addEventListener('click', confirmHandler);
+                modalCancelBtn.addEventListener('click', cancelHandler);
+            });
+        }
+        
+        // --- Logica Firebase e Autenticazione ---
+
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                // onAuthStateChanged è cruciale per ottenere l'ID utente dopo l'autenticazione
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        playerCollectionRef = collection(db, artifacts/${appId}/users/${userId}/football_team_roster);
+                        
+                        userIdDisplay.textContent = userId;
+                        statusDisplay.classList.remove('bg-futsal-dark');
+                        statusDisplay.classList.add('bg-futsal-green');
+                        loadingIndicator.classList.add('hidden');
+
+                        // Avvia l'ascolto dei dati solo dopo l'autenticazione
+                        setupRealtimeListener();
+                    } else {
+                        console.error("Autenticazione fallita.");
+                        userIdDisplay.textContent = 'Errore di autenticazione';
+                    }
+                });
+
+            } catch (error) {
+                console.error("Errore nell'inizializzazione o autenticazione di Firebase:", error);
+                userIdDisplay.textContent = 'Errore (vedi console)';
+            }
+        }
+        
+        // --- Operazioni Firestore ---
+
+        /**
+         * Ascolta i cambiamenti in tempo reale nella collezione dei giocatori.
+         */
+        function setupRealtimeListener() {
+            if (!playerCollectionRef) {
+                console.error("Riferimento alla collezione non disponibile.");
+                return;
+            }
+
+            const playersQuery = query(playerCollectionRef);
+            
+            onSnapshot(playersQuery, (snapshot) => {
+                const players = [];
+                snapshot.forEach(doc => {
+                    players.push({ id: doc.id, ...doc.data() });
+                });
+                
+                renderPlayerList(players);
+                console.log("Dati giocatori aggiornati in tempo reale.");
+            }, (error) => {
+                console.error("Errore nell'ascolto in tempo reale:", error);
+                // Non usiamo alert, logghiamo l'errore
+            });
+        }
+
+        /**
+         * Aggiunge un nuovo giocatore al database.
+         * @param {object} player - Dati del giocatore.
+         */
+        async function addPlayer(player) {
+            try {
+                await addDoc(playerCollectionRef, player);
+                console.log("Giocatore aggiunto con successo:", player);
+            } catch (e) {
+                console.error("Errore nell'aggiunta del documento: ", e);
+            }
+        }
+
+        /**
+         * Aggiorna un campo specifico di un giocatore.
+         * @param {string} playerId - ID del documento Firestore.
+         * @param {string} field - Campo da aggiornare ('goals' o 'assists').
+         * @param {number} incrementValue - Valore da aggiungere (solitamente 1 o -1).
+         */
+        async function updatePlayerStat(playerId, field, incrementValue) {
+            try {
+                const playerDocRef = doc(playerCollectionRef, playerId);
+                // Utilizziamo un'operazione di transazione per assicurarci che il campo esista e sia numerico
+                await updateDoc(playerDocRef, {
+                    [field]: incrementValue
+                });
+                console.log(Statistica ${field} aggiornata per il giocatore ${playerId}.);
+            } catch (e) {
+                console.error("Errore nell'aggiornamento della statistica: ", e);
+            }
+        }
+
+        /**
+         * Elimina un giocatore dal database.
+         * @param {string} playerId - ID del documento Firestore.
+         */
+        async function deletePlayer(playerId) {
+            const confirmed = await showConfirmationModal(
+                "Conferma Eliminazione",
+                "Sei sicuro di voler rimuovere questo giocatore dalla rosa?"
+            );
+
+            if (confirmed) {
+                try {
+                    await deleteDoc(doc(playerCollectionRef, playerId));
+                    console.log("Giocatore eliminato con successo:", playerId);
+                } catch (e) {
+                    console.error("Errore nell'eliminazione del documento: ", e);
+                }
+            }
+        }
+
+        /**
+         * Elimina tutti i giocatori.
+         */
+        async function deleteAllPlayers() {
+            const confirmed = await showConfirmationModal(
+                "Svuota Tutta la Rosa",
+                "Sei sicuro di voler eliminare TUTTI i giocatori? Questa azione è irreversibile."
+            );
+
+            if (confirmed) {
+                try {
+                    // Poiché non possiamo eliminare una collezione direttamente, leggiamo tutti i documenti e li eliminiamo in un batch.
+                    const snapshot = await getDocs(query(playerCollectionRef));
+                    const batch = writeBatch(db);
+
+                    snapshot.docs.forEach((doc) => {
+                        batch.delete(doc.ref);
+                    });
+
+                    await batch.commit();
+                    console.log("Tutti i giocatori eliminati con successo.");
+                } catch (e) {
+                    console.error("Errore nell'eliminazione di tutti i documenti: ", e);
+                }
+            }
+        }
+
+        // --- Gestione UI e Rendering ---
+
+        /**
+         * Renderizza la lista dei giocatori.
+         * @param {Array<object>} players - Array di oggetti giocatore.
+         */
+        function renderPlayerList(players) {
+            playerListContainer.innerHTML = ''; // Svuota la lista esistente
+
+            if (players.length === 0) {
+                emptyMessage.classList.remove('hidden');
+                return;
+            } else {
+                emptyMessage.classList.add('hidden');
+            }
+
+            // Ordina per numero maglia (se definito)
+            players.sort((a, b) => (a.number || 999) - (b.number || 999));
+
+            players.forEach(player => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                
+                const number = player.number ? player.number : '-';
+                const goals = player.goals || 0;
+                const assists = player.assists || 0;
+
+                tr.innerHTML = `
+                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-futsal-dark">${number}</td>
+                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${player.name}</td>
+                    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500">${player.position}</td>
+                    <td class="px-3 py-3 whitespace-nowrap text-sm font-bold text-gray-700">
+                        <span id="goals-${player.id}">${goals}</span>
+                        <div class="inline-flex ml-2 space-x-1">
+                            <button data-id="${player.id}" data-field="goals" data-change="1" class="stat-btn text-white bg-futsal-green hover:bg-emerald-600 rounded-full w-6 h-6 leading-none text-xs">+</button>
+                            <button data-id="${player.id}" data-field="goals" data-change="-1" ${goals <= 0 ? 'disabled' : ''} class="stat-btn text-white bg-red-400 hover:bg-red-500 rounded-full w-6 h-6 leading-none text-xs disabled:opacity-50 disabled:cursor-not-allowed">-</button>
+                        </div>
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap text-sm font-bold text-gray-700">
+                        <span id="assists-${player.id}">${assists}</span>
+                        <div class="inline-flex ml-2 space-x-1">
+                            <button data-id="${player.id}" data-field="assists" data-change="1" class="stat-btn text-white bg-futsal-green hover:bg-emerald-600 rounded-full w-6 h-6 leading-none text-xs">+</button>
+                            <button data-id="${player.id}" data-field="assists" data-change="-1" ${assists <= 0 ? 'disabled' : ''} class="stat-btn text-white bg-red-400 hover:bg-red-500 rounded-full w-6 h-6 leading-none text-xs disabled:opacity-50 disabled:cursor-not-allowed">-</button>
+                        </div>
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium">
+                        <button data-id="${player.id}" class="delete-btn text-red-600 hover:text-red-900 transition duration-150">
+                            Rimuovi
+                        </button>
+                    </td>
+                `;
+                playerListContainer.appendChild(tr);
+            });
+        }
+
+        // --- Listener Eventi ---
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Sanitizza e valida i dati in ingresso
+            const nameInput = document.getElementById('playerName');
+            const numberInput = document.getElementById('playerNumber');
+            const positionInput = document.getElementById('playerPosition');
+            const goalsInput = document.getElementById('playerGoals');
+            const assistsInput = document.getElementById('playerAssists');
+
+            const newPlayer = {
+                name: nameInput.value.trim(),
+                number: parseInt(numberInput.value) || null,
+                position: positionInput.value,
+                goals: parseInt(goalsInput.value) || 0,
+                assists: parseInt(assistsInput.value) || 0,
+            };
+
+            if (newPlayer.name && newPlayer.position) {
+                addPlayer(newPlayer);
+                form.reset(); // Resetta il modulo dopo l'invio
+                goalsInput.value = 0; // Imposta i valori di default per Gol e Assist
+                assistsInput.value = 0;
+            } else {
+                console.error("Nome e Posizione sono obbligatori.");
+                // Potresti usare il modale qui per notificare l'utente
+            }
+        });
+
+        playerListContainer.addEventListener('click', (e) => {
+            const target = e.target;
+            const playerId = target.dataset.id;
+            
+            if (!playerId) return;
+
+            // Gestione eliminazione
+            if (target.classList.contains('delete-btn')) {
+                deletePlayer(playerId);
+            } 
+            // Gestione aggiornamento statistiche
+            else if (target.classList.contains('stat-btn')) {
+                const field = target.dataset.field;
+                const change = parseInt(target.dataset.change);
+                
+                // Leggi il valore corrente dal DOM (meno affidabile, ma rapido per l'interfaccia)
+                // Usiamo il valore dal DOM solo per calcolare il nuovo totale nel frontend,
+                // ma l'aggiornamento reale in Firestore è gestito dall'operazione updateDoc.
+                const statSpan = document.getElementById(${field}-${playerId});
+                let currentValue = parseInt(statSpan.textContent);
+
+                // Evita di scendere sotto zero
+                if (change < 0 && currentValue <= 0) return;
+                
+                // L'aggiornamento corretto in Firestore non è un incremento/decremento atomico, ma un set
+                // con il nuovo valore. Dobbiamo calcolare il nuovo valore e inviarlo.
+                const newValue = Math.max(0, currentValue + change); // Assicura che sia >= 0
+                
+                updatePlayerStat(playerId, field, newValue);
+            }
+        });
+
+        resetBtn.addEventListener('click', deleteAllPlayers);
+
+
+        // --- Inizializzazione ---
+        window.onload = initFirebase;
+    </script>
+</body>
+</html>
