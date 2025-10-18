@@ -4,7 +4,7 @@ description: >-
   Breve descrizione del tuo sito o blog.
 
 # Specifica il tema Jekyll che vuoi usare (ad esempio, il tema Minimal)
-theme: jekyll-theme-minimal 
+#theme: jekyll-theme-minimal 
 
 # Configurazione del permalink (opzionale, ma consigliato per i blog)
 # permalink: /:title/
