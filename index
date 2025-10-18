@@ -1,3 +1,7 @@
+---
+layout: default # O 'page' o 'home', a seconda del tema
+---
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
