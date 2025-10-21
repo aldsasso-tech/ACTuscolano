@@ -1,518 +1,537 @@
-// =================================================================
-// 🚨 CONFIGURAZIONE FIREBASE (SOSTITUIRE CON LE TUE CREDENZIALI) 🚨
-// =================================================================
-
-// 1. CONFIGURAZIONE DEL PROGETTO FIREBASE (Ottieni da Console Firebase)
-const firebaseConfig = {
-  apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
-  authDomain: "actuscolano.firebaseapp.com",
-  projectId: "actuscolano",
-  storageBucket: "actuscolano.firebasestorage.app",
-  messagingSenderId: "62685359731",
-  appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
-  measurementId: "G-TSVH8PH4RC"
-};
-
-// 2. VARIABILI D'AMBIENTE (Sostituire o lasciare i placeholder se non si usa Canvas)
-// Nota: Queste variabili sono state estrapolate da un ambiente specifico (__app_id, __initial_auth_token)
-// Sostituisci i valori o usa un sistema di gestione delle variabili d'ambiente più sicuro per la produzione.
-const appId = firebaseConfig.appId || 'default-app-id'; // Usa l'appId da config se non c'è l'ambiente
-const initialAuthToken = null; // Token di autenticazione iniziale (tipicamente non necessario per app standard)
-
-// =================================================================
-// IMPORTS FIREBASE E LOGICA
-// =================================================================
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, query, onSnapshot, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { 
+    getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, 
+    writeBatch, deleteDoc, runTransaction 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+// =================================================================
+// 1. CONFIGURAZIONE FIREBASE (Inserita dall'utente)
+// =================================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
+    authDomain: "actuscolano.firebaseapp.com",
+    projectId: "actuscolano",
+    storageBucket: "actuscolano.firebasestorage.app",
+    messagingSenderId: "62685359731",
+    appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+    measurementId: "G-TSVH8PH4RC"
+};
 
-// Inizializzazione Firebase
+// =================================================================
+// 2. INIZIALIZZAZIONE GLOBALE E AUTHENTICAZIONE
+// =================================================================
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Variabili per l'ambito globale (esposte a window se necessario per il markup HTML)
-let currentUserId = null;
-window.matchesData = {};
-window.currentMatchFormations = [];
-window.currentFormationIndex = 0;
-window.currentMatch = null; 
+let userId = null;
+let currentView = 'stats'; // Default view
+let currentMatchDetails = null; // Dettagli della partita attualmente aperta nel modale
+let currentFormationIndex = 0; // Indice della formazione visualizzata
 
-// Mappa delle posizioni 3-3-1 (coordinate in percentuale rispetto al campo)
-const POSITIONS_331 = {
-    P: { top: '90%', left: '50%', label: 'P' },
-    D1: { top: '75%', left: '20%', label: 'DC' },
-    D2: { top: '75%', left: '50%', label: 'D' },
-    D3: { top: '75%', left: '80%', label: 'DC' },
-    C1: { top: '45%', left: '20%', label: 'CC' },
-    C2: { top: '45%', left: '50%', label: 'M' },
-    C3: { top: '45%', left: '80%', label: 'CC' },
-    A1: { top: '20%', left: '50%', label: 'A' }
+// Variabili globali d'ambiente (fornite dal Canvas, se esistenti)
+const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+// Percorsi di Firestore (basati sulle regole di sicurezza)
+const PATHS = {
+    PLAYERS: `artifacts/${appId}/public/data/ac_tuscolano_players`,
+    MATCHES: `artifacts/${appId}/public/data/ac_tuscolano_matches`,
 };
-window.POSITIONS_331 = POSITIONS_331;
+
+// Elementi DOM
+const elements = {
+    loadingStats: document.getElementById('loading-stats'),
+    playerListContainer: document.getElementById('player-list-container'),
+    loadingCalendar: document.getElementById('loading-calendar'),
+    upcomingList: document.getElementById('upcoming-list'),
+    pastList: document.getElementById('past-list'),
+    adminButton: document.getElementById('admin-button'),
+    adminModal: document.getElementById('admin-modal'),
+    matchDetailModal: document.getElementById('match-detail-modal'),
+    pathPlayers: document.getElementById('path-players'),
+    pathMatches: document.getElementById('path-matches'),
+};
 
 
-// Espongo le variabili DB e ID per accesso/debug in console/utility
-window.db = db;
-window.appId = appId;
-
-// --- Gestione Autenticazione ---
-async function setupAuth() {
-    if (initialAuthToken) {
-        try {
+/**
+ * Gestisce l'autenticazione utente (anonima o tramite token).
+ * Essenziale per accedere a Firestore.
+ */
+async function handleAuthentication() {
+    try {
+        if (initialAuthToken) {
             await signInWithCustomToken(auth, initialAuthToken);
-        } catch (error) {
-            console.error("Errore con l'autenticazione token:", error);
-            await signInAnonymously(auth); // Fallback anonimo
-        }
-    } else {
-        await signInAnonymously(auth);
-    }
-
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUserId = user.uid;
-            window.currentUserId = user.uid;
-
-            // Mostra il pulsante Admin e i percorsi in Console
-            document.getElementById('admin-button').classList.remove('hidden');
-
-            const playersPath = `/artifacts/${appId}/public/data/ac_tuscolano_players`;
-            const matchesPath = `/artifacts/${appId}/public/data/ac_tuscolano_matches`;
-            document.getElementById('path-players').textContent = playersPath;
-            document.getElementById('path-matches').textContent = matchesPath;
-
-            console.log("Utente Autenticato. ID:", currentUserId);
-
-            // Avvia il caricamento dei dati
-            loadPlayerData();
-            loadMatchData();
-
         } else {
-            console.log("Utente anonimo o disconnesso.");
+            await signInAnonymously(auth);
         }
-    });
-}
-
-// --- FUNZIONE UTILITY PER INSERIRE DATI DI MOCK REALI IN FIRESTORE ---
-window.addInitialMockData = async function() {
-    const playersRef = collection(db, `artifacts/${appId}/public/data/ac_tuscolano_players`);
-    const matchesRef = collection(db, `artifacts/${appId}/public/data/ac_tuscolano_matches`);
-
-    // Verifica se i dati esistono già
-    const checkDoc = await getDoc(doc(playersRef, 'R01'));
-    if (checkDoc.exists()) {
-        if (!confirm("I dati di prova esistono già. Vuoi sovrascriverli?")) {
-            console.log("Inserimento dati annullato dall'utente.");
-            return;
-        }
+        console.log("Autenticazione Firebase riuscita.");
+    } catch (error) {
+        console.error("Errore durante l'autenticazione Firebase:", error);
     }
+}
 
-    // 1. Dati Giocatori (minimo 12 giocatori)
-    const players = [
-        { id: 'R01', nome: 'Rossi Marco', numero: 1, ruolo: 'P', presenze: 5, gol: 0, assist: 0, votoMedio: 6.5 },
-        { id: 'B02', nome: 'Bianchi Luca', numero: 2, ruolo: 'D', presenze: 8, gol: 1, assist: 0, votoMedio: 6.8 },
-        { id: 'V03', nome: 'Verdi Paolo', numero: 3, ruolo: 'D', presenze: 7, gol: 0, assist: 2, votoMedio: 6.9 },
-        { id: 'N04', nome: 'Neri Andrea', numero: 4, ruolo: 'D', presenze: 9, gol: 0, assist: 1, votoMedio: 7.0 },
-        { id: 'G05', nome: 'Gialli Leo', numero: 5, ruolo: 'C', presenze: 6, gol: 3, assist: 3, votoMedio: 7.5 },
-        { id: 'BL06', nome: 'Blu Matteo', numero: 6, ruolo: 'C', presenze: 8, gol: 2, assist: 4, votoMedio: 7.2 },
-        { id: 'M07', nome: 'Marrone Alex', numero: 7, ruolo: 'C', presenze: 9, gol: 4, assist: 1, votoMedio: 7.8 },
-        { id: 'V08', nome: 'Viola Chris', numero: 8, ruolo: 'A', presenze: 9, gol: 12, assist: 0, votoMedio: 8.0 },
-        // Panchina
-        { id: 'GR09', nome: 'Grigio Simo', numero: 9, ruolo: 'A', presenze: 4, gol: 1, assist: 0, votoMedio: 6.5 },
-        { id: 'RO10', nome: 'Rosa Davide', numero: 10, ruolo: 'C', presenze: 5, gol: 0, assist: 0, votoMedio: 6.0 },
-        { id: 'A11', nome: 'Arancio Fede', numero: 11, ruolo: 'D', presenze: 3, gol: 0, assist: 0, votoMedio: 6.2 },
-        { id: 'C12', nome: 'Ciano Elisa', numero: 12, ruolo: 'P', presenze: 1, gol: 0, assist: 0, votoMedio: 6.0 },
-    ];
+/**
+ * Listener di autenticazione per avviare il caricamento dei dati.
+ */
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        userId = user.uid;
+        console.log("Utente connesso. UID:", userId);
+        
+        // Aggiorna i percorsi nel modale admin
+        elements.pathPlayers.textContent = PATHS.PLAYERS;
+        elements.pathMatches.textContent = PATHS.MATCHES;
 
-    await Promise.all(players.map(p => setDoc(doc(playersRef, p.id), p)));
-    console.log("Dati Giocatori di prova inseriti.");
+        // Avvia l'ascolto dei dati solo dopo l'autenticazione
+        setupRealtimeListeners();
+    } else {
+        userId = null;
+        console.warn("Nessun utente autenticato. Tentativo di autenticazione in corso.");
+        handleAuthentication();
+    }
+});
 
-    // 2. Dati Partite con Formazioni e Sostituzioni (Mock Match ID)
-    const baseLineup = {
-        P: 'Rossi Marco', D1: 'Bianchi Luca', D2: 'Verdi Paolo', D3: 'Neri Andrea',
-        C1: 'Gialli Leo', C2: 'Blu Matteo', C3: 'Marrone Alex', A1: 'Viola Chris'
-    };
-    const basePanchina = ['Grigio Simo', 'Rosa Davide', 'Arancio Fede', 'Ciano Elisa'];
+// =================================================================
+// 3. LOGICA DI VISUALIZZAZIONE E MODAL
+// =================================================================
 
-    const formations = [
-        {
-            descrizione: 'Formazione Titolare Iniziale',
-            lineup: { ...baseLineup },
-            panchina: [...basePanchina]
-        },
-        {
-            descrizione: 'Sostituzione al 15° (Grigio per Neri - D3)',
-            lineup: { ...baseLineup, D3: 'Grigio Simo' },
-            panchina: ['Neri Andrea', 'Rosa Davide', 'Arancio Fede', 'Ciano Elisa']
-        },
-        {
-            descrizione: 'Sostituzione al 30° (Rosa per Viola - A1)',
-            lineup: { ...baseLineup, D3: 'Grigio Simo', A1: 'Rosa Davide' },
-            panchina: ['Neri Andrea', 'Viola Chris', 'Arancio Fede', 'Ciano Elisa']
-        },
-        {
-            descrizione: 'Sostituzione al 45° (Arancio per Bianchi - D1)',
-            lineup: { ...baseLineup, D3: 'Grigio Simo', A1: 'Rosa Davide', D1: 'Arancio Fede' },
-            panchina: ['Neri Andrea', 'Viola Chris', 'Bianchi Luca', 'Ciano Elisa']
-        },
-    ];
+/**
+ * Passa dalla vista Statistiche alla vista Calendario e viceversa.
+ * @param {string} viewName - 'stats' o 'calendar'.
+ */
+window.showView = function(viewName) {
+    currentView = viewName;
+    document.querySelectorAll('.view').forEach(view => {
+        view.classList.add('hidden');
+    });
+    document.getElementById(`${viewName}-view`).classList.remove('hidden');
 
-    const matchData = {
-        avversario: 'ASD Test Squadra',
-        data: new Date(Date.now() + 86400000), // Domani
-        luogo: 'Campo di Casa',
-        score: 'N/A',
-        risultato: 'N/A',
-        cronaca: 'Incontro di prova del modulo 3-3-1.',
-        formazioni: formations
-    };
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('text-accent', 'border-primary');
+        button.classList.add('text-gray-500', 'border-transparent', 'hover:border-gray-300');
+    });
+    document.getElementById(`nav-${viewName}`).classList.add('text-accent', 'border-primary');
+    document.getElementById(`nav-${viewName}`).classList.remove('text-gray-500', 'border-transparent', 'hover:border-gray-300');
 
-    await setDoc(doc(matchesRef, 'MATCH_TEST_01'), matchData);
-    console.log("Dato Partita di prova inserito. Ricarica l'app per visualizzare.");
-
-    alert("Dati di prova inseriti con successo in Firestore!");
-    toggleAdminModal(false);
+    // Assicurati che le icone Lucide siano renderizzate
+    lucide.createIcons();
 };
-// FINE FUNZIONE UTILITY
 
-function loadPlayerData() {
-    const path = `artifacts/${appId}/public/data/ac_tuscolano_players`;
-    const playersCollection = collection(db, path);
+/**
+ * Mostra o nasconde il modale di amministrazione.
+ * @param {boolean} show - True per mostrare, false per nascondere.
+ */
+window.toggleAdminModal = function(show) {
+    if (show) {
+        elements.adminModal.classList.remove('hidden');
+    } else {
+        elements.adminModal.classList.add('hidden');
+    }
+};
 
-    onSnapshot(playersCollection, (snapshot) => {
-        const players = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            players.push({ id: doc.id, ...data });
-        });
-        renderPlayerStats(players);
-        document.getElementById('loading-stats').classList.add('hidden');
-    }, (error) => {
-        console.error("Errore nel caricamento dei giocatori:", error);
-        document.getElementById('loading-stats').textContent = "Errore nel caricamento.";
-    });
-}
+/**
+ * Mostra i dettagli di una partita nel modale apposito.
+ * @param {object} match - Dati della partita.
+ */
+window.showMatchDetail = function(match) {
+    currentMatchDetails = match;
+    currentFormationIndex = 0; // Reset index
+    
+    document.getElementById('match-detail-title').textContent = `${match.homeTeam} vs ${match.awayTeam}`;
+    document.getElementById('match-detail-subtitle').textContent = match.date;
 
-function loadMatchData() {
-    const path = `artifacts/${appId}/public/data/ac_tuscolano_matches`;
-    const matchesCollection = collection(db, path);
+    updateMatchDetailView();
+    elements.matchDetailModal.classList.remove('hidden');
+    lucide.createIcons();
+};
 
-    onSnapshot(matchesCollection, (snapshot) => {
-        const matches = [];
-        window.matchesData = {}; // Clear previous data
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            // Gestione della conversione del timestamp di Firestore in oggetto Date
-            if (data.data && data.data.seconds) {
-                data.date = new Date(data.data.seconds * 1000);
-            } else if (typeof data.data === 'string') {
-                data.date = new Date(data.data);
-            } else if (data.data instanceof Date) {
-                data.date = data.data; // Se è già un oggetto Date
-            } else {
-                data.date = new Date(); // Fallback per data non valida
-            }
+/**
+ * Chiude il modale dei dettagli della partita.
+ */
+window.closeMatchDetail = function() {
+    elements.matchDetailModal.classList.add('hidden');
+    currentMatchDetails = null;
+    currentFormationIndex = 0;
+};
 
-            matches.push({ id: doc.id, ...data });
-            window.matchesData[doc.id] = { id: doc.id, ...data }; // Store for quick access
-        });
-        renderCalendar(matches);
-        document.getElementById('loading-calendar').classList.add('hidden');
-    }, (error) => {
-        console.error("Errore nel caricamento degli incontri:", error);
-        document.getElementById('loading-calendar').textContent = "Errore nel caricamento.";
-    });
-}
+/**
+ * Naviga tra le formazioni di una partita (se presenti).
+ * @param {number} direction - 1 per avanti, -1 per indietro.
+ */
+window.navigateFormation = function(direction) {
+    if (!currentMatchDetails || !currentMatchDetails.formations) return;
 
-// --- Funzioni di Rendering UI ---
+    const totalFormations = currentMatchDetails.formations.length;
+    let newIndex = currentFormationIndex + direction;
 
-function renderPlayerStats(players) {
-    const sortedPlayers = players
-        .map(p => ({
-            ...p,
-            presenze: p.presenze || 0,
-            votoMedio: p.votoMedio || 6,
-            gol: p.gol || 0,
-            assist: p.assist || 0,
-        }))
-        .sort((a, b) => b.presenze - a.presenze);
+    if (newIndex >= 0 && newIndex < totalFormations) {
+        currentFormationIndex = newIndex;
+        updateMatchDetailView();
+    }
+};
 
-    const container = document.getElementById('player-list-container');
-    container.innerHTML = '';
-
-    if (sortedPlayers.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 italic">Nessun giocatore trovato. Clicca sull\'icona Impostazioni in alto a destra per istruzioni su come aggiungere i dati.</p>';
+/**
+ * Aggiorna la vista del modale (pitch e tabella) con la formazione corrente.
+ */
+function updateMatchDetailView() {
+    if (!currentMatchDetails || !currentMatchDetails.formations || currentMatchDetails.formations.length === 0) {
+        document.getElementById('pitch-container').innerHTML = '<p class="text-center text-gray-500 p-8">Nessuna formazione disponibile.</p>';
+        document.getElementById('formation-table-container').innerHTML = '';
+        document.getElementById('current-formation-index').textContent = '0 di 0';
+        document.getElementById('formation-description').textContent = '';
+        document.getElementById('prev-formation-btn').disabled = true;
+        document.getElementById('next-formation-btn').disabled = true;
         return;
     }
 
+    const formations = currentMatchDetails.formations;
+    const currentFormation = formations[currentFormationIndex];
+    const totalFormations = formations.length;
+
+    // Aggiorna l'indicatore
+    document.getElementById('current-formation-index').textContent = `${currentFormationIndex + 1} di ${totalFormations}`;
+    document.getElementById('formation-description').textContent = currentFormation.description || '';
+
+    // Aggiorna i pulsanti di navigazione
+    document.getElementById('prev-formation-btn').disabled = currentFormationIndex === 0;
+    document.getElementById('next-formation-btn').disabled = currentFormationIndex === totalFormations - 1;
+
+    // Disegna il campo
+    renderPitch(currentFormation.players);
+
+    // Disegna la tabella
+    renderFormationTable(currentFormation.players);
+}
+
+
+// =================================================================
+// 4. FUNZIONI DI RENDERIZZAZIONE
+// =================================================================
+
+/**
+ * Renderizza la lista dei giocatori (classifica).
+ * @param {Array<object>} players - Lista dei giocatori con statistiche.
+ */
+function renderPlayerList(players) {
+    elements.loadingStats.classList.add('hidden');
+    
+    // Ordina i giocatori per punteggio totale
+    const sortedPlayers = players.sort((a, b) => (b.goals || 0) + (b.assists || 0) - ((a.goals || 0) + (a.assists || 0)));
+
     let html = '<div class="space-y-3">';
-    sortedPlayers.forEach((p, index) => {
-        const badgeClass = index < 3 ? 'bg-secondary text-accent font-bold' : 'bg-gray-200 text-gray-700';
+
+    sortedPlayers.forEach((player, index) => {
+        const rank = index + 1;
+        const totalPoints = (player.goals || 0) + (player.assists || 0);
+        const rankColor = rank === 1 ? 'bg-secondary text-accent' : 
+                          rank <= 3 ? 'bg-yellow-200 text-yellow-800' : 
+                          'bg-white text-gray-700';
 
         html += `
-            <div class="bg-white p-4 rounded-xl shadow-md flex items-center justify-between transition-all hover:shadow-lg">
-                <div class="flex items-center">
-                    <span class="w-8 h-8 flex items-center justify-center rounded-full ${badgeClass} mr-3">${index + 1}</span>
-                    <div>
-                        <p class="font-bold text-lg text-accent">${p.numero ? p.numero + '. ' : ''}${p.nome}</p>
-                        <p class="text-sm text-gray-500">Ruolo: ${p.ruolo || 'Non Definito'}</p>
-                    </div>
+            <div class="p-4 rounded-xl shadow-md flex items-center transition-all duration-300 ${rankColor.includes('bg-white') ? 'hover:shadow-lg' : ''} border-l-4 border-primary">
+                <div class="w-10 h-10 flex items-center justify-center rounded-full font-bold text-lg ${rankColor}">
+                    ${rank}
                 </div>
-
+                <div class="ml-4 flex-grow">
+                    <p class="font-bold text-lg">${player.name}</p>
+                    <p class="text-sm text-gray-500">Ruolo: ${player.role || 'N/D'}</p>
+                </div>
                 <div class="text-right">
-                    <p class="text-sm font-bold text-primary">Presenze: ${p.presenze}</p>
-                    <p class="text-xs text-gray-600">G: ${p.gol} | A: ${p.assist} | Voto M: ${p.votoMedio.toFixed(1)}</p>
+                    <p class="font-bold text-accent">${totalPoints} Punti</p>
+                    <p class="text-sm text-gray-600">⚽ ${player.goals || 0} G, 👟 ${player.assists || 0} A</p>
                 </div>
             </div>
         `;
     });
+
     html += '</div>';
-    container.innerHTML = html;
-    // @ts-ignore
+    elements.playerListContainer.innerHTML = html;
+    elements.adminButton.classList.remove('hidden'); // Mostra il pulsante Admin dopo il caricamento
     lucide.createIcons();
 }
 
-function renderCalendar(matches) {
+/**
+ * Renderizza la lista delle partite (Calendario).
+ * @param {Array<object>} matches - Lista di tutte le partite.
+ */
+function renderMatchList(matches) {
+    elements.loadingCalendar.classList.add('hidden');
+    
+    // Ordina le partite per data
+    const sortedMatches = matches.sort((a, b) => new Date(a.date) - new Date(b.date));
+
     const now = new Date();
-    const upcoming = matches
-        .filter(m => m.date > now)
-        .sort((a, b) => a.date - b.date);
+    elements.upcomingList.innerHTML = '';
+    elements.pastList.innerHTML = '';
 
-    const past = matches
-        .filter(m => m.date <= now)
-        .sort((a, b) => b.date - a.date);
+    sortedMatches.forEach(match => {
+        const matchDate = new Date(match.date);
+        const isUpcoming = matchDate > now;
+        const container = isUpcoming ? elements.upcomingList : elements.pastList;
+        
+        let statusHtml = '';
+        if (isUpcoming) {
+            statusHtml = `<span class="text-xs font-semibold text-primary">Prossima Partita</span>`;
+        } else {
+            const resultColor = match.isWin ? 'text-green-600' : match.isDraw ? 'text-yellow-600' : 'text-red-600';
+            const resultText = match.isWin ? 'VITTORIA' : match.isDraw ? 'PAREGGIO' : 'SCONFITTA';
+            statusHtml = `<span class="text-xs font-bold ${resultColor}">${resultText}</span>`;
+        }
 
-    const upcomingContainer = document.getElementById('upcoming-list');
-    const pastContainer = document.getElementById('past-list');
-
-    // Render Prossimi Incontri
-    upcomingContainer.innerHTML = upcoming.length > 0
-        ? upcoming.map(renderMatchCard).join('')
-        : '<p class="text-gray-500 italic">Nessun incontro in programma.</p>';
-
-    // Render Risultati Precedenti
-    pastContainer.innerHTML = past.length > 0
-        ? past.map(renderMatchCard).join('')
-        : '<p class="text-gray-500 italic">Nessun risultato trovato.</p>';
-
-    // @ts-ignore
-    lucide.createIcons();
-}
-
-function renderMatchCard(match) {
-    const isPast = match.date <= new Date();
-    const score = match.score || 'N/A';
-    const resultClass = isPast
-        ? (match.risultato === 'V' ? 'bg-green-100 border-green-500' :
-        match.risultato === 'P' ? 'bg-red-100 border-red-500' : 'bg-gray-100 border-gray-400')
-        : 'bg-white border-primary';
-
-    const resultText = isPast
-        ? (match.risultato === 'V' ? 'Vittoria' :
-        match.risultato === 'P' ? 'Sconfitta' : 'Pareggio')
-        : 'Prossima Partita';
-
-    const day = match.date ? match.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : 'Data N/A';
-    const time = match.date ? match.date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : 'Ora N/A';
-
-    return `
-        <div class="p-4 rounded-xl shadow-md border-l-4 ${resultClass} transition-shadow duration-300 hover:shadow-lg cursor-pointer" onclick="openMatchDetail('${match.id}')">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="font-bold text-lg text-accent">${match.avversario || 'Avversario Sconosciuto'}</p>
-                    <p class="text-sm text-gray-500">Campo: ${match.luogo || 'Non specificato'}</p>
-                    <p class="text-xs ${isPast ? 'text-gray-500' : 'text-primary font-semibold'}">${match.campionato || 'Campionato'}</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-sm font-semibold ${isPast ? 'text-gray-700' : 'text-accent'}">${day} - ${time}</p>
-                    ${isPast
-                        ? `<p class="text-2xl font-extrabold text-accent mt-1">${score}</p>`
-                        : `<div class="mt-1 flex items-center text-primary font-bold">
-                            <i data-lucide="whistle" class="lucide w-4 h-4 mr-1"></i> ${resultText}
-                        </div>`
-                    }
+        const matchHtml = `
+            <div class="p-4 rounded-xl shadow-md bg-white hover:bg-gray-50 transition-colors duration-300 border-l-4 border-accent cursor-pointer" onclick="showMatchDetail(${JSON.stringify(match).replace(/"/g, '&quot;')})">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-500">${match.date}</p>
+                        <p class="text-lg font-bold text-accent">${match.homeTeam} <span class="text-gray-400 font-normal">vs</span> ${match.awayTeam}</p>
+                    </div>
+                    <div class="text-right">
+                        ${statusHtml}
+                        <p class="text-xl font-extrabold text-primary">${match.score || 'N/D'}</p>
+                    </div>
                 </div>
             </div>
-            ${isPast && match.cronaca
-                ? `<p class="mt-3 text-xs italic text-gray-600 border-t pt-2">${match.cronaca}</p>`
-                : ''
-            }
-        </div>
+        `;
+        container.innerHTML += matchHtml;
+    });
+    
+    if (elements.upcomingList.innerHTML === '') {
+        elements.upcomingList.innerHTML = '<p class="text-gray-500 italic">Nessun incontro in programma.</p>';
+    }
+    if (elements.pastList.innerHTML === '') {
+        elements.pastList.innerHTML = '<p class="text-gray-500 italic">Nessun risultato precedente.</p>';
+    }
+    lucide.createIcons();
+}
+
+/**
+ * Disegna il campo da calcio con la formazione corrente.
+ * @param {Array<object>} players - Lista dei giocatori con posizione (x, y).
+ */
+function renderPitch(players) {
+    const pitch = elements.matchDetailModal.querySelector('#pitch-container');
+    pitch.innerHTML = ''; // Pulisce il campo
+    
+    // Aggiunge la linea centrale e le aree
+    pitch.innerHTML = `
+        <!-- Linea centrale -->
+        <div class="absolute inset-x-0 top-1/2 h-0.5 bg-white transform -translate-y-1/2"></div>
+        <div class="absolute left-1/2 top-1/2 w-4 h-4 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+        
+        <!-- Cerchio centrale -->
+        <div class="absolute left-1/2 top-1/2 w-32 h-32 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+        
+        <!-- Area grande superiore -->
+        <div class="absolute top-0 left-1/2 w-2/3 h-[20%] border-2 border-white transform -translate-x-1/2"></div>
+        <!-- Area piccola superiore -->
+        <div class="absolute top-0 left-1/2 w-1/3 h-[10%] border-2 border-white transform -translate-x-1/2"></div>
+        <!-- Porta superiore -->
+        <div class="absolute top-0 left-1/2 w-1/5 h-2 bg-white transform -translate-x-1/2 -translate-y-full"></div>
+
+        <!-- Area grande inferiore -->
+        <div class="absolute bottom-0 left-1/2 w-2/3 h-[20%] border-2 border-white transform -translate-x-1/2"></div>
+        <!-- Area piccola inferiore -->
+        <div class="absolute bottom-0 left-1/2 w-1/3 h-[10%] border-2 border-white transform -translate-x-1/2"></div>
+        <!-- Porta inferiore -->
+        <div class="absolute bottom-0 left-1/2 w-1/5 h-2 bg-white transform -translate-x-1/2 translate-y-full"></div>
     `;
+
+    // Posiziona i giocatori
+    players.forEach(player => {
+        // x e y sono coordinate percentuali (0-100)
+        const x = player.position.x;
+        const y = player.position.y;
+        
+        const playerElement = document.createElement('div');
+        playerElement.className = 'player-circle absolute w-12 h-12 rounded-full flex items-center justify-center font-bold text-xs text-white bg-primary border-2 border-secondary shadow-lg transition-all duration-500';
+        playerElement.style.left = `${x}%`;
+        playerElement.style.top = `${y}%`;
+        
+        // Aggiusta il posizionamento per centrare il cerchio sul punto (x,y)
+        playerElement.style.transform = 'translate(-50%, -50%)';
+
+        const number = player.number !== undefined ? player.number : player.role.charAt(0);
+        playerElement.textContent = number;
+        playerElement.setAttribute('title', player.name);
+
+        pitch.appendChild(playerElement);
+    });
+}
+
+/**
+ * Renderizza la tabella riassuntiva della formazione.
+ * @param {Array<object>} players - Lista dei giocatori.
+ */
+function renderFormationTable(players) {
+    const tableContainer = elements.matchDetailModal.querySelector('#formation-table-container');
+    const starters = players.filter(p => p.role !== 'Riserva');
+    const subs = players.filter(p => p.role === 'Riserva');
+
+    const renderTable = (list, title) => {
+        if (list.length === 0) return '';
+        let tableHtml = `
+            <h4 class="text-lg font-semibold text-accent mt-4 mb-2">${title} (${list.length})</h4>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 bg-white rounded-lg shadow-inner">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ruolo</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+        `;
+        list.forEach(player => {
+            tableHtml += `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${player.number || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-700">${player.name}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-primary">${player.role}</td>
+                </tr>
+            `;
+        });
+        tableHtml += '</tbody></table></div>';
+        return tableHtml;
+    };
+
+    tableContainer.innerHTML = renderTable(starters, 'Titolari') + renderTable(subs, 'Riserve');
 }
 
 
-// --- LOGICA DETTAGLIO PARTITA E FORMAZIONE ---
+// =================================================================
+// 5. ASCOLTATORI IN TEMPO REALE (FIRESTORE)
+// =================================================================
 
-window.openMatchDetail = function(matchId) {
-    const match = window.matchesData[matchId];
-    if (!match || !match.formazioni || match.formazioni.length === 0) {
-        alert('Dettagli partita o formazioni non disponibili.');
+/**
+ * Configura gli ascoltatori in tempo reale per giocatori e partite.
+ */
+function setupRealtimeListeners() {
+    // ---------------------- LISTENER GIOCATORI ----------------------
+    onSnapshot(collection(db, PATHS.PLAYERS), (snapshot) => {
+        const players = [];
+        snapshot.forEach(doc => {
+            players.push({ id: doc.id, ...doc.data() });
+        });
+        console.log("Dati Giocatori aggiornati:", players.length, "documenti.");
+        renderPlayerList(players);
+    }, (error) => {
+        console.error("Errore nel listener Giocatori:", error);
+        elements.loadingStats.textContent = "Errore di caricamento. Verifica i permessi di Firestore.";
+    });
+
+    // ---------------------- LISTENER PARTITE ----------------------
+    onSnapshot(collection(db, PATHS.MATCHES), (snapshot) => {
+        const matches = [];
+        snapshot.forEach(doc => {
+            matches.push({ id: doc.id, ...doc.data() });
+        });
+        console.log("Dati Partite aggiornati:", matches.length, "documenti.");
+        renderMatchList(matches);
+    }, (error) => {
+        console.error("Errore nel listener Partite:", error);
+        elements.loadingCalendar.textContent = "Errore di caricamento. Verifica i permessi di Firestore.";
+    });
+}
+
+
+// =================================================================
+// 6. FUNZIONE ADMIN PER DATI MOCK
+// =================================================================
+
+/**
+ * Inserisce dati di prova in Firestore.
+ */
+window.addInitialMockData = async function() {
+    if (!userId) {
+        alert("Autenticazione non completata. Riprova.");
         return;
     }
+    
+    // Dati di prova per Giocatori
+    const mockPlayers = [
+        { name: "Marco Rossi", role: "Attaccante", number: 9, goals: 15, assists: 5, photoUrl: "" },
+        { name: "Luca Bianchi", role: "Centrocampista", number: 10, goals: 8, assists: 12, photoUrl: "" },
+        { name: "Andrea Verdi", role: "Difensore", number: 5, goals: 1, assists: 2, photoUrl: "" },
+        { name: "Federico Gialli", role: "Portiere", number: 1, goals: 0, assists: 0, photoUrl: "" },
+    ];
 
-    window.currentMatch = match;
-    window.currentMatchFormations = match.formazioni;
-    window.currentFormationIndex = 0; // Inizia sempre dalla formazione iniziale
-
-    document.getElementById('match-detail-title').textContent = `AC Tuscolano vs ${match.avversario}`;
-    const matchDate = match.date instanceof Date && !isNaN(match.date.getTime()) ? match.date : new Date();
-    document.getElementById('match-detail-subtitle').textContent = matchDate.toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    renderFormationDetails(window.currentMatch, window.currentFormationIndex);
-
-    document.getElementById('match-detail-modal').classList.remove('hidden');
-}
-
-window.renderFormationDetails = function(match, index) {
-    const formation = match.formazioni[index];
-    const total = match.formazioni.length;
-
-    document.getElementById('current-formation-index').textContent = `${index + 1} di ${total}`;
-    document.getElementById('formation-description').textContent = formation.descrizione;
-
-    // Abilita/Disabilita pulsanti
-    document.getElementById('prev-formation-btn').disabled = index === 0;
-    document.getElementById('next-formation-btn').disabled = index === total - 1;
-
-    renderFormationOnPitch(formation.lineup);
-    renderFormationTable(formation.lineup, formation.panchina);
-}
-
-function renderFormationOnPitch(lineup) {
-    const container = document.getElementById('pitch-container');
-    container.innerHTML = '';
-
-    // Disegno del campo semplificato (linee bianche)
-    container.innerHTML = `
-        <div class="absolute top-0 left-0 w-full h-full border-4 border-white rounded-lg">
-            <div class="absolute top-1/2 left-0 w-full border-b-2 border-white"></div>
-            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border-2 border-white"></div>
-            <div class="absolute bottom-0 left-1/4 w-1/2 h-1/6 border-t-2 border-l-2 border-r-2 border-white rounded-t-lg"></div>
-        </div>
-    `;
-
-    // Renderizza i giocatori in posizione
-    Object.keys(POSITIONS_331).forEach(key => {
-        const pos = POSITIONS_331[key];
-        const playerName = lineup[key] || '';
-        if (playerName) {
-            const playerDiv = document.createElement('div');
-            playerDiv.className = 'player-circle absolute flex flex-col items-center justify-center w-12 h-12 rounded-full shadow-lg border-2 border-white cursor-pointer transition-all duration-300 transform hover:scale-110';
-            playerDiv.style.top = pos.top;
-            playerDiv.style.left = pos.left;
-            playerDiv.style.transform = 'translate(-50%, -50%)'; // Centra il cerchio sulla posizione
-
-            // Colori per Ruolo
-            let bgColor = 'bg-accent'; // Blu scuro (Centrocampo/Attacco)
-            let textColor = 'text-white';
-            if (key === 'P') {
-                bgColor = 'bg-secondary'; // Giallo (Portiere)
-                textColor = 'text-accent';
-            }
-            else if (key.startsWith('D')) {
-                bgColor = 'bg-primary'; // Rosso (Difesa)
-                textColor = 'text-white';
-            }
-
-            playerDiv.innerHTML = `
-                <div class="text-xs font-bold ${textColor} p-1 rounded-full ${bgColor} flex items-center justify-center w-full h-full">
-                    ${playerName.split(' ').map(n => n[0]).join('')}
-                </div>
-                <span class="absolute text-xs font-medium text-white -bottom-4 whitespace-nowrap" style="text-shadow: 0 1px 1px #000;">${playerName}</span>
-            `;
-            container.appendChild(playerDiv);
+    // Dati di prova per Partite
+    const mockMatches = [
+        { 
+            homeTeam: "AC TUSCOLANO", awayTeam: "Virtus Roma", date: "2024-10-27 15:00", score: "3-1", 
+            isWin: true, isDraw: false,
+            formations: [
+                {
+                    description: "Formazione iniziale 4-4-2",
+                    players: [
+                        // Portiere
+                        { name: "Federico Gialli", role: "Portiere", number: 1, position: { x: 50, y: 5 } },
+                        // Difensori
+                        { name: "Difensore A", role: "Difensore", number: 2, position: { x: 15, y: 25 } },
+                        { name: "Difensore B", role: "Difensore", number: 5, position: { x: 40, y: 20 } },
+                        { name: "Difensore C", role: "Difensore", number: 6, position: { x: 60, y: 20 } },
+                        { name: "Difensore D", role: "Difensore", number: 3, position: { x: 85, y: 25 } },
+                        // Centrocampo
+                        { name: "Centrocampo E", role: "Centrocampista", number: 7, position: { x: 15, y: 50 } },
+                        { name: "Luca Bianchi", role: "Centrocampista", number: 10, position: { x: 40, y: 50 } },
+                        { name: "Centrocampo G", role: "Centrocampista", number: 8, position: { x: 60, y: 50 } },
+                        { name: "Centrocampo H", role: "Centrocampista", number: 4, position: { x: 85, y: 50 } },
+                        // Attacco
+                        { name: "Marco Rossi", role: "Attaccante", number: 9, position: { x: 40, y: 75 } },
+                        { name: "Attaccante J", role: "Attaccante", number: 11, position: { x: 60, y: 75 } },
+                        // Riserve
+                        { name: "Riserva 1", role: "Riserva", number: 12, position: { x: 0, y: 0 } },
+                    ]
+                }
+            ]
+        },
+        { 
+            homeTeam: "AC TUSCOLANO", awayTeam: "Team Audace", date: "2024-11-03 15:00", score: "2-2", 
+            isWin: false, isDraw: true,
+            formations: [] // Nessuna formazione per questa partita
+        },
+        { 
+            homeTeam: "AC TUSCOLANO", awayTeam: "Sporting Italia", date: "2024-12-01 15:00", score: "N/D", 
+            isWin: false, isDraw: false, 
+            formations: [],
+            isUpcoming: true 
         }
-    });
-}
+    ];
 
-function renderFormationTable(lineup, panchina) {
-    const container = document.getElementById('formation-table-container');
+    try {
+        console.log("Inizio scrittura dati di prova...");
+        const batch = writeBatch(db);
 
-    let html = '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">';
+        // 1. Aggiungi Giocatori
+        mockPlayers.forEach(player => {
+            const newDocRef = doc(collection(db, PATHS.PLAYERS));
+            batch.set(newDocRef, player);
+        });
 
-    // TABELLA TITOLARI
-    html += `
-        <div class="bg-primary bg-opacity-5 p-4 rounded-xl shadow-inner border border-primary">
-            <h4 class="font-bold text-primary mb-2 border-b-2 border-primary pb-1">Titolari in Campo (3-3-1)</h4>
-            <ul class="space-y-1 text-sm text-accent">
-                <li class="flex justify-between font-extrabold">Portiere (P): <span>${lineup.P || '-'}</span></li>
-                <li class="flex justify-between">Difensore 1 (DC): <span>${lineup.D1 || '-'}</span></li>
-                <li class="flex justify-between">Difensore 2 (D): <span>${lineup.D2 || '-'}</span></li>
-                <li class="flex justify-between">Difensore 3 (DC): <span>${lineup.D3 || '-'}</span></li>
-                <li class="flex justify-between">Centrocampista 1: <span>${lineup.C1 || '-'}</span></li>
-                <li class="flex justify-between">Centrocampista 2 (M): <span>${lineup.C2 || '-'}</span></li>
-                <li class="flex justify-between">Centrocampista 3: <span>${lineup.C3 || '-'}</span></li>
-                <li class="flex justify-between font-bold">Attaccante (A1): <span>${lineup.A1 || '-'}</span></li>
-            </ul>
-        </div>
-    `;
+        // 2. Aggiungi Partite
+        mockMatches.forEach(match => {
+            const newDocRef = doc(collection(db, PATHS.MATCHES));
+            batch.set(newDocRef, match);
+        });
 
-    // TABELLA PANCHINA
-    html += `
-        <div class="bg-gray-100 p-4 rounded-xl shadow-inner border border-gray-300">
-            <h4 class="font-bold text-accent mb-2 border-b-2 border-accent pb-1">Panchina (${panchina.length} giocatori)</h4>
-            <ul class="space-y-1 text-sm text-gray-700 max-h-40 overflow-y-auto">
-                ${panchina.length > 0 ? panchina.map(p => `<li><i data-lucide="user" class="lucide w-4 h-4 mr-1 inline-block text-accent"></i> ${p}</li>`).join('') : '<li class="italic">Nessun giocatore in panchina.</li>'}
-            </ul>
-        </div>
-    `;
+        await batch.commit();
+        console.log("Dati di prova inseriti con successo in Firestore!");
+        alert("Dati di prova inseriti con successo! La pagina si aggiornerà in automatico.");
+        toggleAdminModal(false);
 
-    html += '</div>';
-    container.innerHTML = html;
-    // @ts-ignore
-    lucide.createIcons();
-}
-
-window.navigateFormation = function(direction) {
-    if (!window.currentMatch) return;
-
-    let newIndex = window.currentFormationIndex + direction;
-
-    if (newIndex >= 0 && newIndex < window.currentMatchFormations.length) {
-        window.currentFormationIndex = newIndex;
-        renderFormationDetails(window.currentMatch, newIndex);
+    } catch (e) {
+        console.error("Errore durante l'inserimento dei dati di prova:", e);
+        alert(`Errore: Impossibile scrivere su Firestore. Verifica le Regole di Sicurezza.\nErrore Dettagliato: ${e.message}`);
     }
-}
+};
 
-
-window.closeMatchDetail = function() {
-    document.getElementById('match-detail-modal').classList.add('hidden');
-}
-
-
-// --- Logica UI Generale ---
-
-window.showView = function(viewId) {
-    document.querySelectorAll('.view').forEach(view => {
-        view.classList.add('hidden');
-    });
-    document.getElementById(`${viewId}-view`).classList.remove('hidden');
-
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.classList.remove('text-accent', 'border-primary');
-        button.classList.add('text-gray-500', 'border-transparent');
-    });
-    document.getElementById(`nav-${viewId}`).classList.add('text-accent', 'border-primary');
-    document.getElementById(`nav-${viewId}`).classList.remove('text-gray-500', 'border-transparent');
-}
-
-window.toggleAdminModal = function(show) {
-    const modal = document.getElementById('admin-modal');
-    if (show) {
-        modal.classList.remove('hidden');
-    } else {
-        modal.classList.add('hidden');
-    }
-}
-
-
-// Avvia l'autenticazione e il setup all'avvio della pagina
-window.onload = () => {
-    setupAuth();
-    // @ts-ignore
-    lucide.createIcons();
+// =================================================================
+// 7. INIZIALIZZAZIONE (Assicurarsi che le icone siano caricate)
+// =================================================================
+window.onload = function() {
+    showView('stats'); // Inizializza la vista Statistiche
+    // L'autenticazione e il caricamento dati sono gestiti da onAuthStateChanged
 };
