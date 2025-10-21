@@ -6,11 +6,12 @@
     <title>Gestione Squadra e Candidature</title>
     <!-- Carica Tailwind CSS per lo styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Carica React e ReactDOM dai CDN -->
-    <script src="https://unpkg.com/react/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom/umd/react-dom.development.js"></script>
-    <!-- Carica Babel per interpretare il JSX direttamente nel browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- *** IMPORTANTE: VERSIONE STABILE DI REACT v18 e BABEL v6 *** -->
+    <!-- Questo risolve i problemi di MIME Type Mismatch della v19 -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@6/babel.min.js"></script>
     
     <!-- Caricamento delle librerie Firebase come ES Modules -->
     <script type="module">
@@ -35,7 +36,7 @@
             serverTimestamp
         };
 
-        // Inizializzazione di base per esporre istanze a livello globale (accessibili dal codice Babel)
+        // Inizializzazione di base
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         if (Object.keys(firebaseConfig).length > 0) {
             window.firebaseApp = initializeApp(firebaseConfig);
@@ -102,9 +103,9 @@
             // --- Logica di Inizializzazione e Autenticazione (Firestore) ---
             useEffect(() => {
                 const initializeFirebase = async () => {
-                    // Controlla se le istanze globali sono disponibili (ESPOSIZIONE ERRATA = SCHERMO BIANCO)
+                    // Controlla se le istanze globali sono disponibili 
                     if (!window.firebaseApp || !window.firebaseAuth || !window.firebaseDb) {
-                        const errorMsg = "FATAL: I servizi Firebase non sono disponibili. La configurazione iniziale è fallita o non sono state caricate le variabili globali (__firebase_config).";
+                        const errorMsg = "FATAL: I servizi Firebase non sono disponibili. La configurazione iniziale è fallita.";
                         console.error(errorMsg);
                         setMessage(errorMsg);
                         setLoading(false); // Blocca il caricamento e mostra l'errore
@@ -151,7 +152,6 @@
                 const db = window.firebaseDb;
 
                 // Percorsi nel database (Public Data per una lista di squadra condivisa)
-                // Usiamo Public Data per rendere le modifiche visibili a tutti gli utenti che usano la stessa APP_ID
                 const candidaturePath = window.firebase.collection(db, `artifacts/${APP_ID}/public/data/candidature`);
                 const squadraPath = window.firebase.collection(db, `artifacts/${APP_ID}/public/data/squadra`);
 
@@ -315,7 +315,7 @@
                         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-8 rounded-xl shadow-lg max-w-lg" role="alert">
                             <p className="font-bold text-xl mb-2">⚠ Errore Critico di Avvio</p>
                             <p>{message}</p>
-                            <p className="mt-3 text-sm text-red-600">Per favore, verifica la console del browser (F12) per i dettagli tecnici.</p>
+                            <p className="mt-3 text-sm text-red-600">L'app React/Firebase non è stata in grado di inizializzarsi correttamente. Controlla la console per i dettagli.</p>
                         </div>
                     </div>
                  );
@@ -490,3 +490,4 @@
     </script>
 </body>
 </html>
+
