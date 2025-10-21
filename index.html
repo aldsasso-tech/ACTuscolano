@@ -8,8 +8,7 @@
     <!-- Caricamento di Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 🔑 CORREZIONE CRITICA: Content Security Policy (CSP) -->
-    <!-- Rafforzo la direttiva per permettere le chiamate a Firebase/Google e l'uso di script/style inline -->
+    <!-- Configurazione Content Security Policy (CSP) -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self'; 
         script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; 
@@ -37,7 +36,7 @@
         }
     </script>
 
-    <!-- 🎨 CORREZIONE CRITICA: Stili Custom incorporati (eliminato style.css) -->
+    <!-- Stili Custom incorporati -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
@@ -45,17 +44,15 @@
             font-family: 'Inter', sans-serif;
             background-color: #f4f4f9;
         }
-        /* Garantisce che l'app sia visualizzata correttamente su mobile */
         .app-container {
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            max-width: 768px; /* Ottimizzato per mobile e tablet */
+            max-width: 768px; 
             margin: 0 auto;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
         }
         
-        /* Stile per il campo da gioco */
         #pitch-container {
             background: #1e8449; /* Verde campo */
             background-image: linear-gradient(to right, #1e8449 0%, #1e8449 100%),
@@ -68,7 +65,6 @@
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
         }
 
-        /* Linee del campo */
         #pitch-container::before {
             content: '';
             position: absolute;
@@ -79,22 +75,20 @@
             height: 90%;
             border: 2px solid white;
             border-radius: 10%;
-            /* Cerchio di centrocampo */
             box-shadow: 0 0 0 2px white;
         }
 
-        /* Cerchio Giocatore */
         .player-circle {
             position: absolute;
             width: 40px;
             height: 40px;
-            background-color: #f1c40f; /* Secondary color */
+            background-color: #f1c40f; 
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            color: #2c3e50; /* Accent color */
+            color: #2c3e50; 
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
             cursor: default;
             transition: transform 0.3s ease-in-out;
@@ -134,7 +128,7 @@
         <section id="stats-view" class="view">
             <h2 class="text-2xl font-bold mb-4 text-accent border-b-2 pb-2 border-primary">Classifica Giocatori</h2>
             <div id="loading-stats" class="text-center text-gray-500 p-8">
-                <!-- Aggiungo l'icona di caricamento per coerenza visiva -->
+                <!-- Mostra l'icona di caricamento o l'errore -->
                 <i data-lucide="loader" class="lucide w-8 h-8 mx-auto animate-spin mb-2 text-primary"></i>
                 Caricamento statistiche...
             </div>
@@ -216,7 +210,6 @@
                 </button>
             </div>
 
-            <!-- Ho aggiunto l'aspetto 2:3 anche qui per garantire le proporzioni del campo -->
             <div id="pitch-container" class="relative w-full aspect-[2/3] mx-auto">
             </div>
 
@@ -226,12 +219,11 @@
     </div>
 </div>
 
-<!-- 3. Caricamento Icone -->
+<!-- Caricamento Icone -->
 <script src="https://unpkg.com/lucide@latest"></script>
 
 
-<!-- 4. 🚀 LOGICA JAVASCRIPT INTEGRATA (Contenuto di script.js) -->
-<!-- Questa sezione include la configurazione di Firebase e tutte le funzioni dell'app, risolvendo l'errore 404. -->
+<!-- LOGICA JAVASCRIPT INTEGRATA -->
 <script type="module">
     // Importazioni Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -241,10 +233,9 @@
     // Variabili Globali del Canvas
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     
-    // 💥 CORREZIONE CRITICA: Configurazione Firebase di fallback
-    // Questa configurazione viene usata se __firebase_config non è disponibile (es. esecuzione in locale).
-    // SE HAI UN TUO PROGETTO FIREBASE, SOSTITUISCI QUESTI VALORI CON LE TUE CREDENZIALI.
-   const firebaseConfig = {
+    // ⚠️ CRITICO: Configurazione Firebase di fallback
+    // DEVI SOSTITUIRE "YOUR_API_KEY" E "your-project-id" CON LE TUE CREDENZIALI REALI.
+const firebaseConfig = {
   apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
   authDomain: "actuscolano.firebaseapp.com",
   projectId: "actuscolano",
@@ -254,7 +245,6 @@
   measurementId: "G-TSVH8PH4RC"
 };
 
-    // Usa la configurazione del Canvas se presente, altrimenti usa il fallback.
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackFirebaseConfig;
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -278,20 +268,23 @@
 
     // --- FUNZIONI DI UTILITY ---
 
-    /** Mostra un errore nella console e opzionalmente sulla UI */
+    /** Mostra un errore nella console e sulla UI di Statistiche */
     function logError(message, error) {
-        console.error("ERRORE APP:", message, error);
-        // Aggiorna l'elemento di caricamento con un messaggio di errore
+        if (error) console.error("ERRORE APP:", message, error);
+        
         const loadingElement = document.getElementById('loading-stats');
         if (loadingElement) {
+            loadingElement.classList.remove('text-gray-500');
+            loadingElement.classList.add('text-red-700', 'bg-red-50', 'rounded-xl', 'border-2', 'border-red-400');
             loadingElement.innerHTML = `
                 <i data-lucide="circle-x" class="lucide w-8 h-8 mx-auto mb-2 text-red-500"></i>
-                <p>${message}</p>
-                <p class="text-xs mt-1">Verifica la Console e le Regole di Sicurezza di Firestore.</p>
+                <p class="font-bold">${message}</p>
+                <p class="text-xs mt-2 text-red-500">Consulta la console del browser per i dettagli tecnici.</p>
             `;
-            // Rilancia le icone Lucide
             lucide.createIcons();
         }
+        // Nasconde il caricamento del calendario in caso di errore generale
+        document.getElementById('loading-calendar')?.classList.add('hidden');
     }
 
     /** Helper per formattare una data */
@@ -320,7 +313,6 @@
     window.toggleAdminModal = function(show) {
         if (show) {
             adminModal.classList.remove('hidden');
-            // Aggiorna i percorsi nel modale
             document.getElementById('path-players').textContent = COLLECTIONS.PLAYERS;
             document.getElementById('path-matches').textContent = COLLECTIONS.MATCHES;
         } else {
@@ -332,9 +324,13 @@
 
     /** Inizializzazione Firebase e gestione Autenticazione */
     async function setupFirebase() {
-        // Verifica se la configurazione è fittizia (non connessa)
-        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-             return logError("Configurazione Firebase fittizia (YOUR_API_KEY). L'app non si connetterà al database.", null);
+        // 🚨 NUOVO CONTROLLO CRITICO: Verifico se le chiavi sono fittizie.
+        if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "your-project-id") {
+             return logError(`
+                 ATTENZIONE CRITICA: Configurazione Firebase FITTIZIA. 
+                 Devi sostituire "YOUR_API_KEY" e "your-project-id" nel codice JavaScript 
+                 (linee 200-202 circa) con le credenziali reali del tuo progetto.
+             `, null);
         }
         
         try {
@@ -342,30 +338,25 @@
             db = getFirestore(app);
             auth = getAuth(app);
             
-            // Tentativo di autenticazione Custom o Anonima
             if (initialAuthToken) {
                 await signInWithCustomToken(auth, initialAuthToken);
             } else {
                 await signInAnonymously(auth);
             }
             
-            // L'osservatore garantisce che le funzioni di caricamento partano solo ad autenticazione avvenuta
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     userId = user.uid;
-                    adminButton.classList.remove('hidden'); // Mostra il pulsante Admin
+                    adminButton.classList.remove('hidden'); 
                     
-                    // Avvia i listener di dati in tempo reale
                     startDataListeners();
                 } else {
-                    // Utente disconnesso (non dovrebbe accadere dopo signInAnonymously)
-                    logError("Utente non autenticato. Riprovare l'accesso.", null);
+                    logError("Utente non autenticato. Impossibile avviare i listener di dati.", null);
                 }
             });
 
         } catch (error) {
-            // Un errore qui significa che la configurazione è sbagliata o ci sono problemi di rete/regole.
-            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. (Controlla i tuoi API Key)", error);
+            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. (Controlla i tuoi API Key/Regole di sicurezza)", error);
         }
     }
     
@@ -382,7 +373,7 @@
             });
             renderPlayerList(allPlayers);
         }, (error) => {
-            logError("Errore nel listener Giocatori", error);
+            logError("Errore nel listener Giocatori. Controlla le regole di sicurezza (Permesso negato).", error);
         });
 
         // Listener per le Partite (Calendario)
@@ -394,7 +385,10 @@
             });
             renderCalendar(allMatches);
         }, (error) => {
-            logError("Errore nel listener Partite", error);
+            // Il listener del calendario usa il suo elemento di caricamento/errore dedicato se esiste
+            const loadingCalendar = document.getElementById('loading-calendar');
+            if (loadingCalendar) loadingCalendar.innerHTML = `<p class="text-red-500 font-bold">Errore di caricamento calendario: ${error.code || 'sconosciuto'}.</p>`;
+            logError("Errore nel listener Partite. Controlla le regole di sicurezza (Permesso negato).", error);
         });
     }
 
@@ -405,7 +399,8 @@
         const container = document.getElementById('player-list-container');
         const loading = document.getElementById('loading-stats');
 
-        // Ordina: prima per Gol (decrescente), poi per Assist (decrescente), poi per Nome (crescente)
+        if (loading) loading.classList.add('hidden');
+        
         const sortedPlayers = players.sort((a, b) => {
             if ((b.goals || 0) !== (a.goals || 0)) {
                 return (b.goals || 0) - (a.goals || 0);
@@ -416,7 +411,7 @@
             return (a.name || '').localeCompare(b.name || '');
         });
 
-        if (loading) loading.classList.add('hidden');
+
         if (sortedPlayers.length === 0) {
             container.innerHTML = '<p class="text-center text-gray-500 p-8">Nessun dato giocatore trovato. Usa il pulsante Admin per inserire dati di prova.</p>';
             return;
@@ -453,11 +448,10 @@
         const loading = document.getElementById('loading-calendar');
         if (loading) loading.classList.add('hidden');
 
-        // Ordina le partite per data (la più recente/futura prima)
         const sortedMatches = matches.sort((a, b) => {
             const dateA = a.date ? a.date.toDate() : new Date(0);
             const dateB = b.date ? b.date.toDate() : new Date(0);
-            return dateB - dateA; // Ordine decrescente
+            return dateB - dateA; 
         });
 
         const now = new Date();
@@ -467,7 +461,7 @@
         pastList.innerHTML = '';
 
         if (sortedMatches.length === 0) {
-            upcomingList.innerHTML = '<p class="text-center text-gray-500 p-4">Nessuna partita programmata o giocata.</p>';
+            upcomingList.innerHTML = '<p class="text-center text-gray-500 p-4">Non ci sono prossimi incontri in programma.</p>';
             pastList.innerHTML = '';
             return;
         }
@@ -502,7 +496,6 @@
             }
         });
         
-        // Se non ci sono partite future/passate, mostra un messaggio appropriato
         if (upcomingList.innerHTML === '') upcomingList.innerHTML = '<p class="text-center text-gray-500 p-4">Non ci sono prossimi incontri in programma.</p>';
         if (pastList.innerHTML === '') pastList.innerHTML = '<p class="text-center text-gray-500 p-4">Non ci sono risultati precedenti.</p>';
     }
@@ -520,7 +513,7 @@
         document.getElementById('match-detail-subtitle').textContent = currentMatchDetail.result ? `Risultato: ${currentMatchDetail.result.score_us} - ${currentMatchDetail.result.score_opponent}` : 'Pre-Partita';
 
         if (currentMatchDetail.formations && currentMatchDetail.formations.length > 0) {
-            currentFormationIndex = 0; // Inizia sempre dalla prima formazione
+            currentFormationIndex = 0; 
             renderFormation();
         } else {
             document.getElementById('current-formation-index').textContent = '0 di 0';
@@ -552,31 +545,27 @@
         document.getElementById('next-formation-btn').disabled = currentFormationIndex === totalFormations - 1;
 
         // Renderizza il campo
-        pitch.innerHTML = ''; // Pulisci il campo
+        pitch.innerHTML = ''; 
 
         if (!formation.players) {
             pitch.innerHTML = '<p class="text-center text-gray-500 p-8">Giocatori non specificati per questa formazione.</p>';
             return;
         }
         
-        const pitchWidth = 100; // Unità percentuale
         const pitchHeight = 150; // Unità percentuale (per ratio 2:3)
 
         formation.players.forEach(p => {
             const player = allPlayers.find(pl => pl.id === p.playerId);
             if (!player) return;
 
-            // Le coordinate sono espresse in percentuale (0-100) per larghezza e altezza del campo 
-            // Vengono scalate rispetto al padding-top di 150%
             const left = p.x; 
-            const top = (p.y * 100) / pitchHeight; // Normalizzazione 0-100% dell'altezza visibile
+            const top = (p.y * 100) / pitchHeight; 
 
-            // Cerchio Giocatore
             const circle = document.createElement('div');
             circle.className = 'player-circle transition-all duration-500';
-            circle.style.left = `calc(${left}% - 20px)`; // Centra orizzontalmente (- metà larghezza)
+            circle.style.left = `calc(${left}% - 20px)`; 
             circle.style.top = `${top}%`; 
-            circle.style.transform = 'translateY(-50%)'; // Centra verticalmente
+            circle.style.transform = 'translateY(-50%)'; 
             circle.innerHTML = player.number || 'N/A';
             circle.title = `${player.name} (${player.role})`;
             
@@ -608,7 +597,6 @@
             const player = allPlayers.find(pl => pl.id === p.playerId);
             if (!player) return;
             
-            // Trova gol e assist nella formazione, se presenti
             const actions = formation.actions ? formation.actions.filter(a => a.playerId === p.playerId) : [];
             const goals = actions.filter(a => a.type === 'goal').length;
             const assists = actions.filter(a => a.type === 'assist').length;
@@ -648,6 +636,11 @@
     /** Aggiunge dati iniziali di test a Firestore */
     window.addInitialMockData = async function() {
         if (!db || !userId) {
+            // Controlla ancora l'errore fittizio in modo esplicito
+            if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "your-project-id") {
+                logError("Inserimento fallito: Usa le credenziali Firebase REALI prima di inserire i dati.", null);
+                return;
+            }
             logError("Firebase non è ancora pronto o autenticato.", null);
             return;
         }
@@ -671,10 +664,10 @@
             // 2. Dati Partite
             const now = new Date();
             const pastDate = new Date();
-            pastDate.setDate(now.getDate() - 7); // Partita di 7 giorni fa
+            pastDate.setDate(now.getDate() - 7); 
             
             const futureDate = new Date();
-            futureDate.setDate(now.getDate() + 7); // Partita tra 7 giorni
+            futureDate.setDate(now.getDate() + 7); 
 
             const mockMatches = [
                 // Partita Passata con Dettagli
@@ -682,7 +675,7 @@
                     opponent: 'FC Acquedotto',
                     location: 'Campo Comunale A',
                     date: pastDate,
-                    result: { score_us: 4, score_opponent: 2 }, // Vittoria
+                    result: { score_us: 4, score_opponent: 2 }, 
                     formations: [
                         {
                             description: 'Formazione Iniziale (4-4-2)',
@@ -698,7 +691,7 @@
                             actions: [
                                 { playerId: 'p6_attacco', type: 'goal', minute: 15 },
                                 { playerId: 'p6_attacco', type: 'goal', minute: 45 },
-                                { playerId: 'p6_attacco', type: 'assist', minute: 45 }, // Assist per p5 (non è un gol, è un assist)
+                                { playerId: 'p5_centrocampo', type: 'assist', minute: 45 },
                                 { playerId: 'p5_centrocampo', type: 'goal', minute: 45 },
                                 { playerId: 'p4_centrocampo', type: 'assist', minute: 70 },
                                 { playerId: 'p2_difesa', type: 'goal', minute: 70 },
@@ -711,12 +704,11 @@
                     opponent: 'AC Trastevere',
                     location: 'Stadio Olimpico B',
                     date: futureDate,
-                    result: null, // Nessun risultato
-                    formations: [] // Nessuna formazione predefinita
+                    result: null, 
+                    formations: [] 
                 },
             ];
 
-            // Esegue un batch per garantire il salvataggio dei giocatori e delle partite
             await runTransaction(db, async (transaction) => {
                 // 1. Salva i Giocatori (sovrascrive se esistono)
                 mockPlayers.forEach(player => {
@@ -730,10 +722,10 @@
                     });
                 });
 
-                // 2. Salva le Partite (usa addDoc per ID generati automaticamente)
+                // 2. Salva le Partite (usa setDoc con doc() vuoto per generare un ID)
                 mockMatches.forEach(match => {
                     const colRef = collection(db, COLLECTIONS.MATCHES);
-                    transaction.set(doc(colRef), match); // Usa setDoc con doc() vuoto per generare un ID
+                    transaction.set(doc(colRef), match); 
                 });
             });
 
@@ -748,10 +740,9 @@
             }, 3000);
 
         } catch (error) {
-            logError("Errore durante l'inserimento dei dati di test in Firestore", error);
-            // Non usare alert(), mostra un messaggio sulla UI
             const errorArea = document.getElementById('admin-modal').querySelector('p:nth-child(2)');
-            errorArea.innerHTML = `<p class="text-sm text-red-600 mt-2 font-bold">ERRORE: Impossibile inserire i dati. Controlla che le tue credenziali Firebase siano valide e che le regole di sicurezza di Firestore permettano la scrittura pubblica su /artifacts/{appId}/public/data/.</p>`;
+            errorArea.innerHTML = `<p class="text-sm text-red-600 mt-2 font-bold">ERRORE: Impossibile inserire i dati. Controlla le credenziali e che le regole di sicurezza di Firestore permettano la scrittura pubblica.</p>`;
+            logError("Errore durante l'inserimento dei dati di test in Firestore", error);
         } finally {
             button.disabled = false;
             button.textContent = 'Inserisci Dati di Prova in Firestore';
@@ -761,7 +752,6 @@
 
     // --- AVVIO DELL'APPLICAZIONE ---
     
-    // Assicurati che Lucide sia pronto e che l'app si avvii
     window.onload = () => {
         lucide.createIcons();
         setupFirebase();
