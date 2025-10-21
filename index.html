@@ -240,7 +240,22 @@
     
     // Variabili Globali del Canvas
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    
+    // 💥 CORREZIONE CRITICA: Configurazione Firebase di fallback
+    // Questa configurazione viene usata se __firebase_config non è disponibile (es. esecuzione in locale).
+    // SE HAI UN TUO PROGETTO FIREBASE, SOSTITUISCI QUESTI VALORI CON LE TUE CREDENZIALI.
+   const firebaseConfig = {
+  apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
+  authDomain: "actuscolano.firebaseapp.com",
+  projectId: "actuscolano",
+  storageBucket: "actuscolano.firebasestorage.app",
+  messagingSenderId: "62685359731",
+  appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+  measurementId: "G-TSVH8PH4RC"
+};
+
+    // Usa la configurazione del Canvas se presente, altrimenti usa il fallback.
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackFirebaseConfig;
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
     // Collezioni Firestore
@@ -271,7 +286,7 @@
         if (loadingElement) {
             loadingElement.innerHTML = `
                 <i data-lucide="circle-x" class="lucide w-8 h-8 mx-auto mb-2 text-red-500"></i>
-                <p>Errore di caricamento: ${message}</p>
+                <p>${message}</p>
                 <p class="text-xs mt-1">Verifica la Console e le Regole di Sicurezza di Firestore.</p>
             `;
             // Rilancia le icone Lucide
@@ -317,8 +332,9 @@
 
     /** Inizializzazione Firebase e gestione Autenticazione */
     async function setupFirebase() {
-        if (!firebaseConfig) {
-             return logError("Configurazione Firebase non trovata. Impossibile avviare l'app.", null);
+        // Verifica se la configurazione è fittizia (non connessa)
+        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+             return logError("Configurazione Firebase fittizia (YOUR_API_KEY). L'app non si connetterà al database.", null);
         }
         
         try {
@@ -326,9 +342,6 @@
             db = getFirestore(app);
             auth = getAuth(app);
             
-            // Log a livello Debug per vedere le operazioni di Firestore
-            // setLogLevel('Debug'); // Non disponibile con questa versione di CDN, useremo console.log
-
             // Tentativo di autenticazione Custom o Anonima
             if (initialAuthToken) {
                 await signInWithCustomToken(auth, initialAuthToken);
@@ -351,7 +364,8 @@
             });
 
         } catch (error) {
-            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase", error);
+            // Un errore qui significa che la configurazione è sbagliata o ci sono problemi di rete/regole.
+            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. (Controlla i tuoi API Key)", error);
         }
     }
     
@@ -735,7 +749,9 @@
 
         } catch (error) {
             logError("Errore durante l'inserimento dei dati di test in Firestore", error);
-            alert("Errore durante l'inserimento dei dati di test in Firestore. Controlla la console.");
+            // Non usare alert(), mostra un messaggio sulla UI
+            const errorArea = document.getElementById('admin-modal').querySelector('p:nth-child(2)');
+            errorArea.innerHTML = `<p class="text-sm text-red-600 mt-2 font-bold">ERRORE: Impossibile inserire i dati. Controlla che le tue credenziali Firebase siano valide e che le regole di sicurezza di Firestore permettano la scrittura pubblica su /artifacts/{appId}/public/data/.</p>`;
         } finally {
             button.disabled = false;
             button.textContent = 'Inserisci Dati di Prova in Firestore';
