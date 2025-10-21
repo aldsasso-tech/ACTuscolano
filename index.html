@@ -14,7 +14,7 @@
         script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; 
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
         font-src 'self' data: https://fonts.gstatic.com;
-        connect-src 'self' https://*.firebaseio.com https://firestore.googleapis.com; 
+        connect-src 'self' https://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; 
         img-src 'self' data: https:;" 
     />
     
@@ -229,22 +229,17 @@
     // Variabili Globali del Canvas
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     
-    // ⚠️ CRITICO: Configurazione Firebase di fallback
-    // DEVI SOSTITUIRE "YOUR_API_KEY" E "your-project-id" CON LE TUE CREDENZIALI REALI.
-    // --------------------------------------------------------------------------
-    // LINEE 220-222 (CONTROLLA QUI)
-    const fallbackFirebaseConfig = {
-  apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
-  authDomain: "actuscolano.firebaseapp.com",
-  projectId: "actuscolano",
-  storageBucket: "actuscolano.firebasestorage.app",
-  messagingSenderId: "62685359731",
-  appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
-  measurementId: "G-TSVH8PH4RC"
+    // Configurazione Firebase fornita dall'utente (Ora Reale)
+    const firebaseConfig = {
+        apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
+        authDomain: "actuscolano.firebaseapp.com",
+        projectId: "actuscolano",
+        storageBucket: "actuscolano.firebasestorage.app",
+        messagingSenderId: "62685359731",
+        appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+        measurementId: "G-TSVH8PH4RC"
     };
-    // --------------------------------------------------------------------------
 
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackFirebaseConfig;
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
     // Collezioni Firestore
@@ -278,9 +273,9 @@
             loadingElement.innerHTML = `
                 <i data-lucide="alert-octagon" class="lucide w-8 h-8 mx-auto mb-2 text-red-500"></i>
                 <p class="font-bold">${message}</p>
-                <p class="text-xs mt-2 text-red-500">
+                <p class="text-xs mt-2 text-red-500 break-all">
                    ${error && error.code ? `Codice Errore: ${error.code}. ` : ''} 
-                   Consulta la console del browser per i dettagli tecnici.
+                   ${error && error.message ? `Messaggio: ${error.message}` : 'Dettagli non disponibili.'}
                 </p>
             `;
             lucide.createIcons();
@@ -326,26 +321,20 @@
 
     /** Inizializzazione Firebase e gestione Autenticazione */
     async function setupFirebase() {
-        // 🚨 NUOVO CONTROLLO CRITICO AGGRESSIVO: Verifico se le chiavi sono fittizie.
-        if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "your-project-id") {
-             return logError(`
-                 ATTENZIONE CRITICA: Configurazione Firebase FITTIZIA. 
-                 Devi sostituire "YOUR_API_KEY" e "your-project-id" nel codice JavaScript 
-                 (linee 220-222 circa) con le credenziali reali del tuo progetto Firebase per connetterti.
-             `, null);
-        }
-        
         try {
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
             
+            // Tenta di usare il token personalizzato se presente
             if (initialAuthToken) {
                 await signInWithCustomToken(auth, initialAuthToken);
             } else {
+                // Altrimenti usa l'autenticazione anonima (deve essere abilitata nel progetto)
                 await signInAnonymously(auth);
             }
             
+            // Ascolta i cambiamenti di stato dell'autenticazione
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     userId = user.uid;
@@ -353,12 +342,14 @@
                     
                     startDataListeners();
                 } else {
-                    logError("Utente non autenticato. Impossibile avviare i listener di dati. (Controlla le regole Auth)", null);
+                    // Questo può succedere se l'auth anonimo fallisce o il token non è valido
+                    logError("Autenticazione Fallita. Assicurati che l'Auth Anonima sia abilitata nel tuo progetto Firebase.", null);
                 }
             });
 
         } catch (error) {
-            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. (Controlla i tuoi API Key/Regole Auth)", error);
+            // Cattura errori di inizializzazione (es. API key errata) o di autenticazione immediata
+            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. Controlla le tue API Key e le regole di Auth.", error);
         }
     }
     
@@ -643,11 +634,6 @@
     /** Aggiunge dati iniziali di test a Firestore */
     window.addInitialMockData = async function() {
         if (!db || !userId) {
-            // Controlla ancora l'errore fittizio in modo esplicito
-            if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "your-project-id") {
-                logError("Inserimento fallito: Usa le credenziali Firebase REALI prima di inserire i dati.", null);
-                return;
-            }
             logError("Firebase non è ancora pronto o autenticato.", null);
             return;
         }
