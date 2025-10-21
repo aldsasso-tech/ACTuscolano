@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Squadra e Candidature</title>
+    <!-- Carica Tailwind CSS per lo styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carica React e ReactDOM dai CDN -->
+    <script src="https://unpkg.com/react/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom/umd/react-dom.development.js"></script>
+    <!-- Carica Babel per interpretare il JSX direttamente nel browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* Imposta il font Inter e uno sfondo leggero */
+        body { font-family: 'Inter', sans-serif; background-color: #eef2f5; }
+    </style>
+</head>
+<body>
+
+    <!-- Contenitore principale dell'applicazione -->
+    <div id="root" class="min-h-screen flex items-center justify-center p-4"></div>
+
+    <script type="text/babel">
+        // ===============================================
+        // Dati Iniziali e Tipi di Ruolo
+        // ===============================================
+
+        const { useState, useCallback } = React;
+
+        const initialSquadra = [
+            { id: 1, nome: "Marco Rossi", ruolo: "Attaccante", attivo: true },
+            { id: 2, nome: "Luca Bianchi", ruolo: "Difensore", attivo: true },
+        ];
+
+        const initialCandidature = [
+            { id: 101, nome: "Giulia Neri", ruoloDesiderato: "Centrocampista" },
+            { id: 102, nome: "Andrea Gallo", ruoloDesiderato: "Portiere" },
+        ];
+        
+        const ruoliDisponibili = ["Attaccante", "Centrocampista", "Difensore", "Portiere", "Allenatore"];
+
+        // ===============================================
+        // Componente Principale
+        // ===============================================
+
+        function GestioneCompletaApp() {
+            const [squadra, setSquadra] = useState(initialSquadra);
+            const [candidature, setCandidature] = useState(initialCandidature);
+            
+            // Stato per il form di aggiunta Candidato
+            const [nuovoNomeCandidato, setNuovoNomeCandidato] = useState('');
+            const [nuovoRuoloCandidato, setNuovoRuoloCandidato] = useState(ruoliDisponibili[0]);
+
+            // Funzione per aggiungere un NUOVO CANDIDATO
+            const addCandidatura = useCallback(() => {
+                if (nuovoNomeCandidato.trim() === '') return;
+
+                const newCandidato = {
+                    id: Date.now(),
+                    nome: nuovoNomeCandidato.trim(),
+                    ruoloDesiderato: nuovoRuoloCandidato,
+                };
+                setCandidature(prevCandidature => [...prevCandidature, newCandidato]);
+                setNuovoNomeCandidato('');
+                setNuovoRuoloCandidato(ruoliDisponibili[0]);
+            }, [nuovoNomeCandidato, nuovoRuoloCandidato]);
+
+
+            // Funzione per accettare una CANDIDATURA e spostarla nella Squadra
+            const accettaCandidato = useCallback((idCandidato) => {
+                const candidato = candidature.find(c => c.id === idCandidato);
+                if (!candidato) return;
+
+                // 1. Aggiungi alla squadra
+                const newMembro = {
+                    id: Date.now(), // Usa un nuovo ID per la squadra
+                    nome: candidato.nome,
+                    ruolo: candidato.ruoloDesiderato,
+                    attivo: true,
+                };
+                setSquadra(prevSquadra => [...prevSquadra, newMembro]);
+
+                // 2. Rimuovi dalle candidature
+                setCandidature(prevCandidature => prevCandidature.filter(c => c.id !== idCandidato));
+            }, [candidature]);
+
+
+            // Funzione per rifiutare una CANDIDATURA
+            const rifiutaCandidato = useCallback((idCandidato) => {
+                setCandidature(prevCandidature => prevCandidature.filter(c => c.id !== idCandidato));
+            }, []);
+
+            // Funzione per attivare/disattivare un membro della SQUADRA
+            const toggleAttivo = useCallback((id) => {
+                setSquadra(prevSquadra =>
+                    prevSquadra.map(membro =>
+                        membro.id === id ? { ...membro, attivo: !membro.attivo } : membro
+                    )
+                );
+            }, []);
+
+            // Funzione per rimuovere un membro dalla SQUADRA
+            const rimuoviMembro = useCallback((id) => {
+                setSquadra(prevSquadra => prevSquadra.filter(membro => membro.id !== id));
+            }, []);
+
+
+            return (
+                <div className="bg-white shadow-2xl rounded-2xl p-6 md:p-10 w-full max-w-6xl transition-all duration-300">
+                    <h1 className="text-4xl font-extrabold text-indigo-800 mb-8 text-center">
+                        Sistema di Gestione Team
+                    </h1>
+                    
+                    {/* Contenitore Flessibile per le Due Sezioni */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        
+                        {/* -------------------- SEZIONE 1: GESTIONE CANDIDATURE -------------------- */}
+                        <div className="bg-yellow-50 p-6 rounded-xl shadow-lg border border-yellow-200">
+                            <h2 className="text-2xl font-bold text-yellow-800 mb-4 flex items-center">
+                                <span className="mr-2">📝</span> Gestione Candidature ({candidature.length})
+                            </h2>
+
+                            {/* Form per nuova candidatura */}
+                            <div className="mb-6 p-4 bg-white rounded-lg border border-yellow-100">
+                                <h3 className="text-lg font-semibold text-yellow-700 mb-3">Aggiungi Candidato</h3>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Nome Candidato"
+                                        value={nuovoNomeCandidato}
+                                        onChange={(e) => setNuovoNomeCandidato(e.target.value)}
+                                        className="flex-1 p-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 transition-shadow"
+                                    />
+                                    <select
+                                        value={nuovoRuoloCandidato}
+                                        onChange={(e) => setNuovoRuoloCandidato(e.target.value)}
+                                        className="p-2 border border-yellow-300 rounded-lg bg-white"
+                                    >
+                                        {ruoliDisponibili.map(r => (
+                                            <option key={r} value={r}>{r}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={addCandidatura}
+                                        className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow-md active:shadow-sm"
+                                    >
+                                        Invia Candidatura
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Lista Candidature */}
+                            <div className="space-y-3">
+                                {candidature.length === 0 ? (
+                                    <p className="text-center text-gray-500 italic p-4 bg-white rounded-lg">Nessuna candidatura in attesa.</p>
+                                ) : (
+                                    candidature.map((candidato) => (
+                                        <div
+                                            key={candidato.id}
+                                            className="flex items-center justify-between p-4 rounded-lg shadow-sm bg-white border border-yellow-100"
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-gray-800 truncate">{candidato.nome}</p>
+                                                <p className="text-sm text-gray-500">Ruolo Desiderato: <span className="font-medium text-yellow-700">{candidato.ruoloDesiderato}</span></p>
+                                            </div>
+                                            <div className="flex space-x-2 ml-4">
+                                                <button
+                                                    onClick={() => accettaCandidato(candidato.id)}
+                                                    className="bg-green-500 text-white p-2 rounded-full hover:bg-green-600 transition-colors shadow-md"
+                                                    title="Accetta e aggiungi alla Squadra"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => rifiutaCandidato(candidato.id)}
+                                                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-md"
+                                                    title="Rifiuta Candidatura"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* -------------------- SEZIONE 2: SQUADRA ATTIVA -------------------- */}
+                        <div className="bg-indigo-50 p-6 rounded-xl shadow-lg border border-indigo-200">
+                            <h2 className="text-2xl font-bold text-indigo-800 mb-6 flex items-center">
+                                <span className="mr-2">👥</span> Squadra Attiva ({squadra.length})
+                            </h2>
+
+                            {/* Form di Aggiunta Rapida (se necessario) - L'aggiunta principale avviene tramite Candidature */}
+                            <div className="mb-6 p-4 bg-white rounded-lg border border-indigo-100">
+                                <h3 className="text-lg font-semibold text-indigo-700 mb-3">Aggiunta Veloce Membro</h3>
+                                <p className="text-sm text-gray-500 mb-2">
+                                    (Utilizzato per aggiunte immediate senza passare per la fase di candidatura)
+                                </p>
+                                <div className="flex justify-center text-center">
+                                    <span className="text-sm text-gray-400 italic">
+                                        Per semplicità, la funzione di aggiunta rapida è disabilitata.
+                                        Usa la sezione "Gestione Candidature" per aggiungere membri.
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            {/* Lista Membri Squadra */}
+                            <div className="space-y-3">
+                                {squadra.length === 0 ? (
+                                    <p className="text-center text-gray-500 italic p-4 bg-white rounded-lg">La squadra non ha membri attivi.</p>
+                                ) : (
+                                    squadra.map((membro) => (
+                                        <div
+                                            key={membro.id}
+                                            className={`flex items-center justify-between p-4 rounded-lg shadow-md transition-all duration-200 ${
+                                                membro.attivo ? 'bg-green-100 border-l-4 border-green-500' : 'bg-gray-100 border-l-4 border-gray-400 opacity-80'
+                                            }`}
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`font-semibold text-lg truncate ${membro.attivo ? 'text-green-800' : 'text-gray-600'}`}>{membro.nome}</p>
+                                                <p className="text-sm text-gray-500">{membro.ruolo}</p>
+                                            </div>
+                                            <div className="flex space-x-3 ml-4">
+                                                <span className={`px-3 py-1 text-xs font-medium rounded-full ${membro.attivo ? 'bg-green-200 text-green-800' : 'bg-gray-300 text-gray-700'}`}>
+                                                    {membro.attivo ? 'Attivo' : 'Inattivo'}
+                                                </span>
+                                                <button
+                                                    onClick={() => toggleAttivo(membro.id)}
+                                                    className={`text-white p-2 rounded-full text-sm shadow-md transition-colors ${
+                                                        membro.attivo ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-indigo-500 hover:bg-indigo-600'
+                                                    }`}
+                                                    title={membro.attivo ? 'Disattiva' : 'Attiva'}
+                                                >
+                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d={membro.attivo ? "M10 12a2 2 0 100-4 2 2 0 000 4z" : "M4 6h16v12H4V6z"} clipRule="evenodd" />
+                                                        <path fillRule="evenodd" d={membro.attivo ? "M.588 8.016A13.88 13.88 0 0110 5a13.88 13.88 0 019.412 3.016a1 1 0 010 1.968A13.88 13.88 0 0110 15a13.88 13.88 0 01-9.412-3.016a1 1 0 010-1.968zM10 13a3 3 0 100-6 3 3 0 000 6z" : "M10 2a8 8 0 00-8 8c0 2.27 1.574 4.195 3.738 5.093A8.001 8.001 0 0010 18c2.27 0 4.195-1.574 5.093-3.738C16.426 14.195 18 12.27 18 10a8 8 0 00-8-8zm4 10a1 1 0 11-2 0 1 1 0 012 0z"} clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => rimuoviMembro(membro.id)}
+                                                    className="text-white p-2 rounded-full text-sm bg-gray-400 hover:bg-gray-500 transition-colors shadow-md"
+                                                    title="Rimuovi Membro"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+                    
+                </div>
+            );
+        }
+
+        // Montaggio dell'App
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<GestioneCompletaApp />);
+
+    </script>
+</body>
+</html>
