@@ -4,12 +4,13 @@
 
 // 1. CONFIGURAZIONE DEL PROGETTO FIREBASE (Ottieni da Console Firebase)
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY", 
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
+  authDomain: "actuscolano.firebaseapp.com",
+  projectId: "actuscolano",
+  storageBucket: "actuscolano.firebasestorage.app",
+  messagingSenderId: "62685359731",
+  appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+  measurementId: "G-TSVH8PH4RC"
 };
 
 // 2. VARIABILI D'AMBIENTE (Sostituire o lasciare i placeholder se non si usa Canvas)
