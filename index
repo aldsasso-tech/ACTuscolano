@@ -6,7 +6,7 @@
     <title>AC TUSCOLANO - Team Manager</title>
     
     <!-- 🔑 CORREZIONE CRITICA: Content Security Policy (CSP) -->
-    <!-- Permette l'uso di 'data:' URL (necessario per i font Base64) e di script/stili da CDN e inline (necessario per Tailwind e la configurazione locale). -->
+    <!-- Ho aggiornato img-src per includere 'self', consentendo il caricamento di favicon.ico e altre immagini locali. -->
     <meta http-equiv="Content-Security-Policy" 
           content="default-src 'self'; 
                    script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com 'unsafe-inline'; 
