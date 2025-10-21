@@ -1,8 +1,8 @@
 /* Definizione dei colori del club */
 :root {
-    --color-primary: #C0392B; /* Rosso Scuro */
-    --color-secondary: #F1C40F; /* Giallo/Oro */
-    --color-accent: #2C3E50; /* Blu Scuro/Navy */
+    --color-primary: #C0392B; /* Rosso Scuro */
+    --color-secondary: #F1C40F; /* Giallo/Oro */
+    --color-accent: #2C3E50; /* Blu Scuro/Navy */
 }
 .bg-primary { background-color: var(--color-primary); }
 .text-primary { color: var(--color-primary); }
@@ -13,37 +13,37 @@
 
 /* Stile personalizzato per la PWA */
 body {
-    font-family: 'Inter', sans-serif;
-    background-color: #f4f4f9;
+    /* Rimosso font-family: 'Inter', sans-serif; per evitare conflitti con font esterni non caricati via CDN */
+    background-color: #f4f4f9;
 }
 /* Garantisce che l'app sia visualizzata correttamente su mobile */
 .app-container {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    max-width: 768px; /* Ottimizzato per mobile e tablet */
-    margin: 0 auto;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    max-width: 768px; /* Ottimizzato per mobile e tablet */
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 /* Stile per le icone Lucide */
 .lucide {
-    display: inline-block;
-    vertical-align: middle;
-    stroke-width: 2.5;
+    display: inline-block;
+    vertical-align: middle;
+    stroke-width: 2.5;
 }
 
 /* Stile specifico per il campo da gioco */
 #pitch-container {
-    position: relative;
-    width: 100%;
-    padding-top: 150%; /* 2:3 aspect ratio (altezza maggiore della larghezza) */
-    background: #1e8449; /* Verde campo */
-    border: 4px solid #fff;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    border-radius: 12px;
-    margin: 10px auto;
+    position: relative;
+    width: 100%;
+    padding-top: 150%; /* 2:3 aspect ratio (altezza maggiore della larghezza) */
+    background: #1e8449; /* Verde campo */
+    border: 4px solid #fff;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    margin: 10px auto;
 }
 .player-circle {
-    /* Colori dinamici in JS */
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+    /* Colori dinamici in JS */
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
