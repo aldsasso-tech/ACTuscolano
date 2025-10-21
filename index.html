@@ -8,18 +8,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- *** IMPORTANTE: VERSIONE STABILE DI REACT v18 e BABEL v6 *** -->
-    <!-- Questo risolve i problemi di MIME Type Mismatch della v19 -->
+    <!-- Manteniamo i link stabili che dovrebbero risolvere l'errore MIME -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone@6/babel.min.js"></script>
     
-    <!-- Caricamento delle librerie Firebase come ES Modules -->
+    <!-- Caricamento delle librerie Firebase come ES Modules e esposizione globale -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Espone le funzioni Firebase a livello globale
+        // Espone le FUNZIONI Firebase a livello globale
         window.firebase = {
             initializeApp,
             getAuth,
@@ -36,12 +36,15 @@
             serverTimestamp
         };
 
-        // Inizializzazione di base
+        // Inizializzazione di base e esposizione delle ISTANZE
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         if (Object.keys(firebaseConfig).length > 0) {
             window.firebaseApp = initializeApp(firebaseConfig);
             window.firebaseAuth = getAuth(window.firebaseApp);
             window.firebaseDb = getFirestore(window.firebaseApp);
+            console.log("Firebase Istanze Inizializzate Globalmente.");
+        } else {
+            console.error("Configurazione Firebase non trovata, l'app funzionerà in modalità 'loading' con errore.");
         }
     </script>
 
@@ -88,27 +91,32 @@
         // ===============================================
 
         function GestioneCompletaApp() {
-            // Stato dei dati ora gestito da Firestore
             const [squadra, setSquadra] = useState([]);
             const [candidature, setCandidature] = useState([]);
             const [nuovoNomeCandidato, setNuovoNomeCandidato] = useState('');
             const [nuovoRuoloCandidato, setNuovoRuoloCandidato] = useState(ruoliDisponibili[0]);
             
-            // Stati di Firebase
             const [isFirebaseReady, setIsFirebaseReady] = useState(false);
             const [userId, setUserId] = useState(null);
             const [loading, setLoading] = useState(true);
-            const [message, setMessage] = useState(null); // Usato per errori e messaggi utente
+            const [errorMessage, setErrorMessage] = useState(null); // Messaggio di errore critico
+            const [userMessage, setUserMessage] = useState(null); // Messaggio di feedback utente
+            
+            // Funzione per impostare i messaggi di feedback utente
+            const setMessage = (msg) => {
+                console.log("User Feedback:", msg);
+                setUserMessage(msg);
+            }
 
             // --- Logica di Inizializzazione e Autenticazione (Firestore) ---
             useEffect(() => {
                 const initializeFirebase = async () => {
-                    // Controlla se le istanze globali sono disponibili 
-                    if (!window.firebaseApp || !window.firebaseAuth || !window.firebaseDb) {
-                        const errorMsg = "FATAL: I servizi Firebase non sono disponibili. La configurazione iniziale è fallita.";
+                    // Controlla la presenza delle istanze globali di Firebase
+                    if (!window.firebaseApp || !window.firebaseAuth || !window.firebaseDb || !window.firebase) {
+                        const errorMsg = "CRITICO: I servizi Firebase non sono stati caricati correttamente (window.firebaseApp, etc. non trovati).";
                         console.error(errorMsg);
-                        setMessage(errorMsg);
-                        setLoading(false); // Blocca il caricamento e mostra l'errore
+                        setErrorMessage(errorMsg); // Imposta l'errore CRITICO
+                        setLoading(false); 
                         return;
                     }
 
@@ -119,23 +127,24 @@
                         if (initialAuthToken) {
                             await auth.signInWithCustomToken(initialAuthToken);
                         } else {
-                            await auth.signInAnonymously();
+                            // Se il token non è disponibile, usa l'autenticazione anonima come fallback
+                            await window.firebase.signInAnonymously(auth); 
                         }
                     } catch (error) {
                         console.error("Firebase Authentication Error:", error);
-                        setMessage(`Errore di autenticazione: ${error.message}`);
+                        setErrorMessage(`Errore di autenticazione: ${error.message}`);
                     }
 
-                    // Listener per lo stato di autenticazione (ottiene l'ID utente)
+                    // Listener per lo stato di autenticazione
                     const unsubscribe = window.firebase.onAuthStateChanged(auth, user => {
                         if (user) {
                             setUserId(user.uid);
                         } else {
-                            // Fallback ID semplice in caso di autenticazione anonima/fallita
+                            // Questo non dovrebbe accadere se l'autenticazione anonima ha successo
                             setUserId('unauth-' + Math.random().toString(36).substring(2, 9)); 
                         }
                         setIsFirebaseReady(true);
-                        setLoading(false); // Fine caricamento
+                        setLoading(false); // Fine caricamento, si può iniziare a renderizzare
                     });
 
                     return () => unsubscribe();
@@ -146,7 +155,6 @@
 
             // --- Logica di Caricamento Dati in Real-Time (onSnapshot) ---
             useEffect(() => {
-                // Avvia i listener SOLO quando Firebase è pronto e l'ID utente è stato stabilito
                 if (!isFirebaseReady || !userId) return;
 
                 const db = window.firebaseDb;
@@ -157,7 +165,6 @@
 
                 // Candidature Listener
                 const unsubscribeCandidature = window.firebase.onSnapshot(candidaturePath, (snapshot) => {
-                    // Ordina le candidature per timestamp decrescente
                     const newCandidature = snapshot.docs.map(doc => ({
                         ...doc.data(),
                         id: doc.id
@@ -165,12 +172,11 @@
                     setCandidature(newCandidature);
                 }, (error) => {
                     console.error("Firestore Candidature Listener Error:", error);
-                    setMessage(`Errore caricamento candidature: ${error.message}`);
+                    setErrorMessage(`Errore caricamento candidature: ${error.message}`);
                 });
 
                 // Squadra Listener
                 const unsubscribeSquadra = window.firebase.onSnapshot(squadraPath, (snapshot) => {
-                     // Ordina la squadra per nome in ordine alfabetico
                     const newSquadra = snapshot.docs.map(doc => ({
                         ...doc.data(),
                         id: doc.id
@@ -178,7 +184,7 @@
                     setSquadra(newSquadra);
                 }, (error) => {
                     console.error("Firestore Squadra Listener Error:", error);
-                    setMessage(`Errore caricamento squadra: ${error.message}`);
+                    setErrorMessage(`Errore caricamento squadra: ${error.message}`);
                 });
 
                 return () => {
@@ -207,7 +213,7 @@
                     setMessage(`Candidatura di ${nuovoNomeCandidato.trim()} inviata con successo.`);
                 } catch (error) {
                     console.error("Error adding candidature: ", error);
-                    setMessage(`Errore nell'invio della candidatura: ${error.message}`);
+                    setErrorMessage(`Errore nell'invio della candidatura: ${error.message}`);
                 }
             }, [nuovoNomeCandidato, nuovoRuoloCandidato, isFirebaseReady]);
 
@@ -239,7 +245,7 @@
 
                 } catch (error) {
                     console.error("Error accepting candidate: ", error);
-                    setMessage(`Errore nell'accettazione del candidato: ${error.message}`);
+                    setErrorMessage(`Errore nell'accettazione del candidato: ${error.message}`);
                 }
             }, [candidature, isFirebaseReady]);
 
@@ -257,7 +263,7 @@
                     setMessage(`Candidatura di ${candidato?.nome || 'un candidato'} rifiutata.`);
                 } catch (error) {
                     console.error("Error refusing candidate: ", error);
-                    setMessage(`Errore nel rifiuto della candidatura: ${error.message}`);
+                    setErrorMessage(`Errore nel rifiuto della candidatura: ${error.message}`);
                 }
             }, [candidature, isFirebaseReady]);
 
@@ -273,7 +279,7 @@
                     setMessage(`Stato membro aggiornato a ${!currentAttivo ? 'Attivo' : 'Inattivo'}.`);
                 } catch (error) {
                     console.error("Error toggling active status: ", error);
-                    setMessage(`Errore nell'aggiornamento dello stato: ${error.message}`);
+                    setErrorMessage(`Errore nell'aggiornamento dello stato: ${error.message}`);
                 }
             }, [isFirebaseReady]);
 
@@ -289,19 +295,20 @@
                     setMessage('Membro rimosso dalla squadra.');
                 } catch (error) {
                     console.error("Error removing member: ", error);
-                    setMessage(`Errore nella rimozione del membro: ${error.message}`);
+                    setErrorMessage(`Errore nella rimozione del membro: ${error.message}`);
                 }
             }, [isFirebaseReady]);
             
-            // Render di caricamento
+            
+            // --- Render di Caricamento/Errore ---
             if (loading) {
                 return (
                     <div className="flex flex-col items-center justify-center h-screen bg-eef2f5">
                         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
                         <p className="mt-4 text-indigo-600 font-semibold">Caricamento servizi e autenticazione...</p>
-                        {message && (
+                        {errorMessage && (
                             <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded max-w-md text-center">
-                                Errore (in attesa): {message}
+                                Errore CRITICO: {errorMessage}
                             </div>
                         )}
                     </div>
@@ -309,25 +316,25 @@
             }
             
             // Render di errore CRITICO dopo il caricamento
-            if (message && !loading && !isFirebaseReady) {
+            if (errorMessage && !isFirebaseReady) {
                  return (
                     <div className="flex items-center justify-center h-screen">
                         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-8 rounded-xl shadow-lg max-w-lg" role="alert">
                             <p className="font-bold text-xl mb-2">⚠ Errore Critico di Avvio</p>
-                            <p>{message}</p>
+                            <p>{errorMessage}</p>
                             <p className="mt-3 text-sm text-red-600">L'app React/Firebase non è stata in grado di inizializzarsi correttamente. Controlla la console per i dettagli.</p>
                         </div>
                     </div>
                  );
             }
 
-            // Render dell'applicazione principale
+            // --- Render dell'applicazione principale ---
             return (
                 <div className="bg-white shadow-2xl rounded-2xl p-6 md:p-10 w-full max-w-6xl transition-all duration-300">
                     {/* Il MessageBox gestisce i messaggi di successo o gli errori di runtime */}
                     <MessageBox 
-                        message={message && !message.startsWith("FATAL:") ? message : null} 
-                        onClose={() => setMessage(null)} 
+                        message={userMessage} 
+                        onClose={() => setUserMessage(null)} 
                     />
                     
                     <h1 className="text-4xl font-extrabold text-indigo-800 mb-2 text-center">
