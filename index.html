@@ -55,11 +55,10 @@
         
         #pitch-container {
             background: #1e8449; /* Verde campo */
-            background-image: linear-gradient(to right, #1e8449 0%, #1e8449 100%),
-                              linear-gradient(to right, #1e8449 0%, #1e8449 100%);
-            background-repeat: no-repeat;
-            background-position: center top, center bottom;
-            background-size: 100% 50%;
+            background-image: 
+              linear-gradient(to right, rgba(255,255,255,0.2) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(255,255,255,0.2) 1px, transparent 1px);
+            background-size: 10% 10%, 10% 10%;
             border: 4px solid rgba(255, 255, 255, 0.8);
             border-radius: 12px;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
@@ -128,7 +127,7 @@
         <section id="stats-view" class="view">
             <h2 class="text-2xl font-bold mb-4 text-accent border-b-2 pb-2 border-primary">Classifica Giocatori</h2>
             <div id="loading-stats" class="text-center text-gray-500 p-8">
-                <!-- Mostra l'icona di caricamento o l'errore -->
+                <!-- Messaggio di caricamento o errore -->
                 <i data-lucide="loader" class="lucide w-8 h-8 mx-auto animate-spin mb-2 text-primary"></i>
                 Caricamento statistiche...
             </div>
@@ -165,13 +164,10 @@
     <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-lg">
         <h3 class="text-2xl font-bold text-accent mb-4 border-b pb-2">Gestione Dati (Admin)</h3>
         <p class="text-sm text-gray-600 mb-4">
-            I dati di prova verranno salvati pubblicamente.
-        </p>
-        <p class="text-sm text-gray-600 mb-4">
-            I dati di prova verranno salvati in:
+            I dati di prova verranno salvati pubblicamente nel percorso:
             <ul class="list-disc list-inside space-y-1 ml-4 mt-2 text-xs font-mono bg-gray-50 p-2 rounded">
-                <li>**Giocatori:** <span id="path-players" class="text-primary"></span></li>
-                <li>**Partite:** <span id="path-matches" class="text-primary"></span></li>
+                <li>**Giocatori:** <code class="text-primary break-all" id="path-players"></code></li>
+                <li>**Partite:** <code class="text-primary break-all" id="path-matches"></code></li>
             </ul>
         </p>
         <button onclick="addInitialMockData()" class="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-md">
@@ -228,14 +224,16 @@
     // Importazioni Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, collection, query, addDoc, setDoc, getDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot, collection, query, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     
     // Variabili Globali del Canvas
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     
     // ⚠️ CRITICO: Configurazione Firebase di fallback
-    // SOSTITUITE CREDENZIALI
-const firebaseConfig = {
+    // DEVI SOSTITUIRE "YOUR_API_KEY" E "your-project-id" CON LE TUE CREDENZIALI REALI.
+    // --------------------------------------------------------------------------
+    // LINEE 220-222 (CONTROLLA QUI)
+    const fallbackFirebaseConfig = {
   apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
   authDomain: "actuscolano.firebaseapp.com",
   projectId: "actuscolano",
@@ -243,7 +241,8 @@ const firebaseConfig = {
   messagingSenderId: "62685359731",
   appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
   measurementId: "G-TSVH8PH4RC"
-};
+    };
+    // --------------------------------------------------------------------------
 
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : fallbackFirebaseConfig;
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
@@ -268,18 +267,21 @@ const firebaseConfig = {
 
     // --- FUNZIONI DI UTILITY ---
 
-    /** Mostra un errore nella console e sulla UI di Statistiche */
+    /** Mostra un errore nella console e sulla UI di Statistiche in modo prominente */
     function logError(message, error) {
         if (error) console.error("ERRORE APP:", message, error);
         
         const loadingElement = document.getElementById('loading-stats');
         if (loadingElement) {
-            loadingElement.classList.remove('text-gray-500');
-            loadingElement.classList.add('text-red-700', 'bg-red-50', 'rounded-xl', 'border-2', 'border-red-400');
+            loadingElement.classList.remove('text-gray-500', 'animate-spin');
+            loadingElement.classList.add('text-red-700', 'bg-red-50', 'p-4', 'rounded-xl', 'border-2', 'border-red-400');
             loadingElement.innerHTML = `
-                <i data-lucide="circle-x" class="lucide w-8 h-8 mx-auto mb-2 text-red-500"></i>
+                <i data-lucide="alert-octagon" class="lucide w-8 h-8 mx-auto mb-2 text-red-500"></i>
                 <p class="font-bold">${message}</p>
-                <p class="text-xs mt-2 text-red-500">Consulta la console del browser per i dettagli tecnici.</p>
+                <p class="text-xs mt-2 text-red-500">
+                   ${error && error.code ? `Codice Errore: ${error.code}. ` : ''} 
+                   Consulta la console del browser per i dettagli tecnici.
+                </p>
             `;
             lucide.createIcons();
         }
@@ -312,9 +314,9 @@ const firebaseConfig = {
     /** Gestione modale Admin */
     window.toggleAdminModal = function(show) {
         if (show) {
-            adminModal.classList.remove('hidden');
             document.getElementById('path-players').textContent = COLLECTIONS.PLAYERS;
             document.getElementById('path-matches').textContent = COLLECTIONS.MATCHES;
+            adminModal.classList.remove('hidden');
         } else {
             adminModal.classList.add('hidden');
         }
@@ -324,12 +326,12 @@ const firebaseConfig = {
 
     /** Inizializzazione Firebase e gestione Autenticazione */
     async function setupFirebase() {
-        // 🚨 NUOVO CONTROLLO CRITICO: Verifico se le chiavi sono fittizie.
+        // 🚨 NUOVO CONTROLLO CRITICO AGGRESSIVO: Verifico se le chiavi sono fittizie.
         if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "your-project-id") {
              return logError(`
                  ATTENZIONE CRITICA: Configurazione Firebase FITTIZIA. 
                  Devi sostituire "YOUR_API_KEY" e "your-project-id" nel codice JavaScript 
-                 (linee 200-202 circa) con le credenziali reali del tuo progetto.
+                 (linee 220-222 circa) con le credenziali reali del tuo progetto Firebase per connetterti.
              `, null);
         }
         
@@ -351,18 +353,21 @@ const firebaseConfig = {
                     
                     startDataListeners();
                 } else {
-                    logError("Utente non autenticato. Impossibile avviare i listener di dati.", null);
+                    logError("Utente non autenticato. Impossibile avviare i listener di dati. (Controlla le regole Auth)", null);
                 }
             });
 
         } catch (error) {
-            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. (Controlla i tuoi API Key/Regole di sicurezza)", error);
+            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. (Controlla i tuoi API Key/Regole Auth)", error);
         }
     }
     
     /** Avvia i listener onSnapshot per i dati in tempo reale */
     function startDataListeners() {
-        if (!db) return;
+        if (!db) {
+            logError("Database non inizializzato. Impossibile avviare i listener.", null);
+            return;
+        }
 
         // Listener per i Giocatori (Statistiche)
         const playersQuery = collection(db, COLLECTIONS.PLAYERS);
@@ -373,7 +378,7 @@ const firebaseConfig = {
             });
             renderPlayerList(allPlayers);
         }, (error) => {
-            logError("Errore nel listener Giocatori. Controlla le regole di sicurezza (Permesso negato).", error);
+            logError("Errore nel listener Giocatori. Controlla le regole di sicurezza (Permission Denied).", error);
         });
 
         // Listener per le Partite (Calendario)
@@ -385,10 +390,13 @@ const firebaseConfig = {
             });
             renderCalendar(allMatches);
         }, (error) => {
-            // Il listener del calendario usa il suo elemento di caricamento/errore dedicato se esiste
+            // Usa un messaggio meno invasivo per il calendario, lasciando l'errore principale in stats
             const loadingCalendar = document.getElementById('loading-calendar');
-            if (loadingCalendar) loadingCalendar.innerHTML = `<p class="text-red-500 font-bold">Errore di caricamento calendario: ${error.code || 'sconosciuto'}.</p>`;
-            logError("Errore nel listener Partite. Controlla le regole di sicurezza (Permesso negato).", error);
+            if (loadingCalendar) {
+                 loadingCalendar.innerHTML = `<p class="text-red-500 font-bold">Errore di caricamento calendario: ${error.code || 'sconosciuto'}. Controlla le regole di sicurezza.</p>`;
+                 loadingCalendar.classList.remove('hidden');
+            }
+            console.error("Errore nel listener Partite:", error);
         });
     }
 
@@ -413,7 +421,7 @@ const firebaseConfig = {
 
 
         if (sortedPlayers.length === 0) {
-            container.innerHTML = '<p class="text-center text-gray-500 p-8">Nessun dato giocatore trovato. Usa il pulsante Admin per inserire dati di prova.</p>';
+            container.innerHTML = '<p class="text-center text-gray-500 p-8">Nessun dato giocatore trovato. Usa il pannello Admin per inserire dati di prova.</p>';
             return;
         }
 
@@ -552,18 +560,17 @@ const firebaseConfig = {
             return;
         }
         
-        const pitchHeight = 150; // Unità percentuale (per ratio 2:3)
-
+        // La logica di posizione è basata su percentuale
         formation.players.forEach(p => {
             const player = allPlayers.find(pl => pl.id === p.playerId);
             if (!player) return;
 
-            const left = p.x; 
-            const top = (p.y * 100) / pitchHeight; 
+            const left = p.x; // Percentuale da 0 a 100
+            const top = p.y; // Percentuale da 0 a 100
 
             const circle = document.createElement('div');
             circle.className = 'player-circle transition-all duration-500';
-            circle.style.left = `calc(${left}% - 20px)`; 
+            circle.style.left = `calc(${left}% - 20px)`; // -20px per centrare (metà della larghezza del cerchio)
             circle.style.top = `${top}%`; 
             circle.style.transform = 'translateY(-50%)'; 
             circle.innerHTML = player.number || 'N/A';
@@ -678,23 +685,37 @@ const firebaseConfig = {
                     result: { score_us: 4, score_opponent: 2 }, 
                     formations: [
                         {
-                            description: 'Formazione Iniziale (4-4-2)',
+                            description: 'Primo Tempo (30 min) - 4-4-2',
                             players: [
-                                { playerId: 'p1_portiere', x: 50, y: 10 },
-                                { playerId: 'p2_difesa', x: 25, y: 30 },
-                                { playerId: 'p3_difesa', x: 75, y: 30 },
-                                { playerId: 'p4_centrocampo', x: 40, y: 60 },
-                                { playerId: 'p5_centrocampo', x: 60, y: 60 },
-                                { playerId: 'p6_attacco', x: 30, y: 90 },
-                                { playerId: 'p7_attacco', x: 70, y: 90 },
+                                { playerId: 'p1_portiere', x: 50, y: 5 }, // P
+                                { playerId: 'p2_difesa', x: 20, y: 30 }, // D
+                                { playerId: 'p3_difesa', x: 80, y: 30 }, // D
+                                { playerId: 'p4_centrocampo', x: 40, y: 55 }, // C
+                                { playerId: 'p5_centrocampo', x: 60, y: 55 }, // C
+                                { playerId: 'p6_attacco', x: 30, y: 85 }, // A
+                                { playerId: 'p7_attacco', x: 70, y: 85 }, // A
                             ],
                             actions: [
                                 { playerId: 'p6_attacco', type: 'goal', minute: 15 },
-                                { playerId: 'p6_attacco', type: 'goal', minute: 45 },
-                                { playerId: 'p5_centrocampo', type: 'assist', minute: 45 },
-                                { playerId: 'p5_centrocampo', type: 'goal', minute: 45 },
-                                { playerId: 'p4_centrocampo', type: 'assist', minute: 70 },
-                                { playerId: 'p2_difesa', type: 'goal', minute: 70 },
+                                { playerId: 'p6_attacco', type: 'goal', minute: 28 },
+                            ]
+                        },
+                         {
+                            description: 'Secondo Tempo (30 min) - Cambio Tattico 3-4-3',
+                            players: [
+                                { playerId: 'p1_portiere', x: 50, y: 5 }, // P
+                                { playerId: 'p2_difesa', x: 25, y: 35 }, // D
+                                { playerId: 'p3_difesa', x: 50, y: 35 }, // D
+                                { playerId: 'p4_centrocampo', x: 75, y: 35 }, // D
+                                { playerId: 'p5_centrocampo', x: 40, y: 60 }, // C
+                                { playerId: 'p6_attacco', x: 60, y: 60 }, // C
+                                { playerId: 'p7_attacco', x: 50, y: 85 }, // A
+                            ],
+                            actions: [
+                                { playerId: 'p5_centrocampo', type: 'assist', minute: 40 },
+                                { playerId: 'p4_centrocampo', type: 'goal', minute: 50 }, // Gol del difensore avanzato
+                                { playerId: 'p2_difesa', type: 'assist', minute: 55 },
+                                { playerId: 'p7_attacco', type: 'goal', minute: 55 },
                             ]
                         }
                     ]
@@ -713,6 +734,7 @@ const firebaseConfig = {
                 // 1. Salva i Giocatori (sovrascrive se esistono)
                 mockPlayers.forEach(player => {
                     const docRef = doc(db, COLLECTIONS.PLAYERS, player.id);
+                    // Usiamo solo i dati rilevanti per la statistica totale
                     transaction.set(docRef, { 
                         name: player.name, 
                         role: player.role, 
@@ -741,7 +763,7 @@ const firebaseConfig = {
 
         } catch (error) {
             const errorArea = document.getElementById('admin-modal').querySelector('p:nth-child(2)');
-            errorArea.innerHTML = `<p class="text-sm text-red-600 mt-2 font-bold">ERRORE: Impossibile inserire i dati. Controlla le credenziali e che le regole di sicurezza di Firestore permettano la scrittura pubblica.</p>`;
+            errorArea.innerHTML = `<p class="text-sm text-red-600 mt-2 font-bold">ERRORE: Impossibile inserire i dati. Controlla che le credenziali siano corrette e che le regole di sicurezza permettano la scrittura.</p>`;
             logError("Errore durante l'inserimento dei dati di test in Firestore", error);
         } finally {
             button.disabled = false;
