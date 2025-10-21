@@ -92,6 +92,19 @@
             cursor: default;
             transition: transform 0.3s ease-in-out;
         }
+        
+        /* Stili per il pulsante di rimozione formazione */
+        .remove-formation-btn {
+            background-color: #E74C3C; /* Rosso vivo */
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .remove-formation-btn:hover {
+            background-color: #C0392B;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -159,16 +172,17 @@
     </footer>
 </div>
 
-<!-- Modale Amministrazione -->
+<!-- Modale Amministrazione PRINCIPALE -->
 <div id="admin-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center hidden">
     <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-lg">
-        <h3 class="text-2xl font-bold text-accent mb-4 border-b pb-2">Gestione Dati (Admin)</h3>
+        <h3 id="admin-modal-title" class="text-2xl font-bold text-accent mb-4 border-b pb-2">Gestione Dati (Admin)</h3>
+        
+        <button onclick="toggleAdminModal(false); toggleMatchManagement(true);" class="w-full bg-secondary text-accent font-bold py-3 mb-4 rounded-lg hover:bg-yellow-400 transition-colors duration-300 shadow-md">
+            <i data-lucide="pencil-line" class="lucide w-5 h-5 mr-2 inline-block"></i> Gestisci Partite & Formazioni
+        </button>
+        
         <p class="text-sm text-gray-600 mb-4">
-            I dati di prova verranno salvati pubblicamente nel percorso:
-            <ul class="list-disc list-inside space-y-1 ml-4 mt-2 text-xs font-mono bg-gray-50 p-2 rounded">
-                <li>**Giocatori:** <code class="text-primary break-all" id="path-players"></code></li>
-                <li>**Partite:** <code class="text-primary break-all" id="path-matches"></code></li>
-            </ul>
+            Opzione per inserire rapidamente i dati di prova iniziali (sovrascrive le statistiche).
         </p>
         <button onclick="addInitialMockData()" class="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-md">
             <i data-lucide="database" class="lucide w-5 h-5 mr-2 inline-block"></i> Inserisci Dati di Prova in Firestore
@@ -176,10 +190,80 @@
         <button onclick="toggleAdminModal(false)" class="w-full mt-3 bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg hover:bg-gray-400 transition-colors duration-300">
             Chiudi
         </button>
+        
+        <div class="mt-4 pt-4 border-t border-gray-200">
+            <p class="text-xs text-gray-500">Percorsi Firestore:</p>
+            <p class="text-xs font-mono bg-gray-50 p-1 rounded break-all">Giocatori: <code class="text-primary" id="path-players"></code></p>
+            <p class="text-xs font-mono bg-gray-50 p-1 rounded break-all">Partite: <code class="text-primary" id="path-matches"></code></p>
+        </div>
     </div>
 </div>
 
-<!-- Modale Dettagli Partita -->
+<!-- Modale GESTIONE PARTITE -->
+<div id="match-management-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b pb-3 mb-4">
+            <h3 class="text-2xl font-bold text-accent">Gestione Partite</h3>
+            <button onclick="toggleMatchManagement(false); toggleAdminModal(true);" class="text-gray-500 hover:text-accent">
+                <i data-lucide="x" class="lucide w-6 h-6"></i>
+            </button>
+        </div>
+        
+        <div class="space-y-4">
+            <!-- SELEZIONE/CREAZIONE PARTITA -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <label for="match-select" class="block text-sm font-medium text-gray-700 mb-1">Seleziona Partita Esistente:</label>
+                <select id="match-select" onchange="loadMatchForEditing(this.value)" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                    <option value="">-- Nuova Partita --</option>
+                    <!-- Opzioni popolate da JS -->
+                </select>
+            </div>
+            
+            <!-- FORM DETTAGLI PARTITA -->
+            <div id="match-form-container" class="bg-white p-4 border border-gray-200 rounded-lg">
+                <h4 id="match-form-title" class="text-xl font-bold text-primary mb-3">Nuova Partita</h4>
+                
+                <label class="block text-sm font-medium text-gray-700">Avversario</label>
+                <input type="text" id="opponent" class="w-full p-2 mb-3 border rounded-lg" placeholder="Nome squadra avversaria" required>
+
+                <label class="block text-sm font-medium text-gray-700">Data e Ora (formato YYYY-MM-DDTHH:MM)</label>
+                <input type="datetime-local" id="match-date" class="w-full p-2 mb-3 border rounded-lg" required>
+                
+                <label class="block text-sm font-medium text-gray-700">Luogo</label>
+                <input type="text" id="location" class="w-full p-2 mb-4 border rounded-lg" placeholder="Stadio/Campo">
+
+                <div class="flex space-x-4 mb-4">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700">Il Nostro Punteggio (Risultato)</label>
+                        <input type="number" id="score-us" class="w-full p-2 border rounded-lg" placeholder="0">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700">Punteggio Avversario</label>
+                        <input type="number" id="score-opponent" class="w-full p-2 border rounded-lg" placeholder="0">
+                    </div>
+                </div>
+                
+                <button onclick="saveMatchDetails()" class="w-full bg-primary text-white font-bold py-2 rounded-lg hover:bg-red-700 transition-colors duration-300">
+                    Salva Dettagli Partita
+                </button>
+            </div>
+            
+            <!-- GESTIONE FORMAZIONI -->
+            <div id="formations-management" class="bg-white p-4 border border-gray-200 rounded-lg hidden">
+                <h4 class="text-xl font-bold text-primary mb-3">Formazioni e Azioni</h4>
+                <div id="formation-list-container" class="space-y-3 mb-4">
+                    <!-- Formazioni esistenti -->
+                </div>
+                
+                <button onclick="openFormationEditor()" class="w-full bg-accent text-white font-bold py-2 rounded-lg hover:bg-gray-700 transition-colors duration-300">
+                    <i data-lucide="plus-circle" class="lucide w-5 h-5 mr-1 inline-block"></i> Aggiungi Nuova Formazione
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modale Dettagli Partita (VISUALIZZAZIONE) -->
 <div id="match-detail-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-40 flex items-center justify-center hidden">
     <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12 max-w-xl max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -215,6 +299,49 @@
     </div>
 </div>
 
+<!-- Modale EDITOR FORMAZIONE -->
+<div id="formation-editor-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-[60] flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12 max-w-3xl max-h-[95vh] overflow-y-auto">
+        <div class="flex justify-between items-center border-b pb-3 mb-4">
+            <h3 id="formation-editor-title" class="text-2xl font-bold text-accent">Aggiungi/Modifica Formazione</h3>
+            <button onclick="closeFormationEditor()" class="text-gray-500 hover:text-accent">
+                <i data-lucide="x" class="lucide w-6 h-6"></i>
+            </button>
+        </div>
+
+        <input type="hidden" id="editing-formation-index">
+        
+        <label class="block text-sm font-medium text-gray-700">Descrizione (Es: Primo Tempo, 4-4-2)</label>
+        <input type="text" id="formation-description-input" class="w-full p-2 mb-4 border rounded-lg" placeholder="Descrizione della formazione">
+
+        <!-- Posizionamento Giocatori (Area per interazione drag&drop, per ora solo lista) -->
+        <h4 class="text-xl font-bold text-primary mb-3">Giocatori in Campo (Max 7)</h4>
+        
+        <div id="formation-players-list" class="space-y-2 mb-4">
+            <!-- Lista dei giocatori nella formazione con posizione (X, Y) e azioni -->
+        </div>
+
+        <!-- SELEZIONE NUOVO GIOCATORE -->
+        <div class="flex gap-4 items-end bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <div class="flex-grow">
+                <label for="available-players-select" class="block text-sm font-medium text-gray-700">Aggiungi Giocatore</label>
+                <select id="available-players-select" class="w-full p-2 border rounded-lg">
+                    <option value="">-- Seleziona --</option>
+                    <!-- Opzioni popolate da JS -->
+                </select>
+            </div>
+            <button onclick="addPlayerToFormation()" class="bg-accent text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300 flex-shrink-0">
+                Aggiungi
+            </button>
+        </div>
+        
+        <!-- PULSANTE SALVA -->
+        <button onclick="saveFormation()" class="w-full bg-primary text-white font-bold py-3 mt-6 rounded-lg hover:bg-red-700 transition-colors duration-300">
+            Salva Formazione
+        </button>
+    </div>
+</div>
+
 <!-- Caricamento Icone -->
 <script src="https://unpkg.com/lucide@latest"></script>
 
@@ -224,7 +351,7 @@
     // Importazioni Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, collection, query, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot, collection, query, setDoc, runTransaction, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     
     // Variabili Globali del Canvas
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -255,10 +382,14 @@
     let allMatches = [];
     let currentMatchDetail = null;
     let currentFormationIndex = 0;
-    
+    let editingMatchId = null; 
+    let editingFormation = null; // Struttura della formazione in fase di editing
+
     const adminButton = document.getElementById('admin-button');
     const adminModal = document.getElementById('admin-modal');
+    const matchManagementModal = document.getElementById('match-management-modal');
     const matchDetailModal = document.getElementById('match-detail-modal');
+    const formationEditorModal = document.getElementById('formation-editor-modal');
 
     // --- FUNZIONI DI UTILITY ---
 
@@ -291,6 +422,18 @@
         return new Intl.DateTimeFormat('it-IT', { dateStyle: 'full', timeStyle: 'short' }).format(date);
     }
     
+    /** Converte un Timestamp Firestore in stringa per input datetime-local */
+    function timestampToInputString(timestamp) {
+        if (!timestamp) return '';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        const h = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        return `${y}-${m}-${d}T${h}:${min}`;
+    }
+    
     /** Aggiorna la vista corrente */
     window.showView = function(viewId) {
         document.querySelectorAll('.view').forEach(view => {
@@ -306,7 +449,8 @@
         document.getElementById(`nav-${viewId}`).classList.remove('text-gray-500', 'border-transparent', 'hover:border-gray-300');
     }
 
-    /** Gestione modale Admin */
+    // --- GESTIONE MODALI ---
+
     window.toggleAdminModal = function(show) {
         if (show) {
             document.getElementById('path-players').textContent = COLLECTIONS.PLAYERS;
@@ -317,6 +461,26 @@
         }
     }
     
+    window.toggleMatchManagement = function(show) {
+        if (show) {
+            populateMatchSelect();
+            resetMatchForm();
+            matchManagementModal.classList.remove('hidden');
+        } else {
+            matchManagementModal.classList.add('hidden');
+        }
+    }
+    
+    window.closeMatchDetail = function() {
+        matchDetailModal.classList.add('hidden');
+        currentMatchDetail = null;
+    }
+
+    window.closeFormationEditor = function() {
+        editingFormation = null;
+        formationEditorModal.classList.add('hidden');
+    }
+
     // --- FIREBASE E AUTENTICAZIONE ---
 
     /** Inizializzazione Firebase e gestione Autenticazione */
@@ -326,29 +490,23 @@
             db = getFirestore(app);
             auth = getAuth(app);
             
-            // Tenta di usare il token personalizzato se presente
             if (initialAuthToken) {
                 await signInWithCustomToken(auth, initialAuthToken);
             } else {
-                // Altrimenti usa l'autenticazione anonima (deve essere abilitata nel progetto)
                 await signInAnonymously(auth);
             }
             
-            // Ascolta i cambiamenti di stato dell'autenticazione
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     userId = user.uid;
                     adminButton.classList.remove('hidden'); 
-                    
                     startDataListeners();
                 } else {
-                    // Questo può succedere se l'auth anonimo fallisce o il token non è valido
                     logError("Autenticazione Fallita. Assicurati che l'Auth Anonima sia abilitata nel tuo progetto Firebase.", null);
                 }
             });
 
         } catch (error) {
-            // Cattura errori di inizializzazione (es. API key errata) o di autenticazione immediata
             logError("Errore durante l'inizializzazione o l'autenticazione di Firebase. Controlla le tue API Key e le regole di Auth.", error);
         }
     }
@@ -368,6 +526,7 @@
                 allPlayers.push({ id: doc.id, ...doc.data() });
             });
             renderPlayerList(allPlayers);
+            populateAvailablePlayersSelect(); // Aggiorna la select nell'editor
         }, (error) => {
             logError("Errore nel listener Giocatori. Controlla le regole di sicurezza (Permission Denied).", error);
         });
@@ -380,8 +539,8 @@
                 allMatches.push({ id: doc.id, ...doc.data() });
             });
             renderCalendar(allMatches);
+            populateMatchSelect(); // Aggiorna la select nel pannello di gestione
         }, (error) => {
-            // Usa un messaggio meno invasivo per il calendario, lasciando l'errore principale in stats
             const loadingCalendar = document.getElementById('loading-calendar');
             if (loadingCalendar) {
                  loadingCalendar.innerHTML = `<p class="text-red-500 font-bold">Errore di caricamento calendario: ${error.code || 'sconosciuto'}. Controlla le regole di sicurezza.</p>`;
@@ -391,7 +550,431 @@
         });
     }
 
-    // --- FUNZIONI DI RENDERIZZAZIONE ---
+    // --- GESTIONE DEI DATI DELLE PARTITE (ADMIN) ---
+
+    /** Popola la select delle partite nel pannello di gestione */
+    function populateMatchSelect() {
+        const select = document.getElementById('match-select');
+        select.innerHTML = '<option value="">-- Nuova Partita --</option>';
+
+        // Ordina per data decrescente
+        const sortedMatches = allMatches.sort((a, b) => {
+            const dateA = a.date ? a.date.toDate() : new Date(0);
+            const dateB = b.date ? b.date.toDate() : new Date(0);
+            return dateB - dateA; 
+        });
+
+        sortedMatches.forEach(match => {
+            const option = document.createElement('option');
+            option.value = match.id;
+            const dateStr = match.date ? new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' }).format(match.date.toDate()) : 'N/D';
+            option.textContent = `${dateStr} - vs ${match.opponent || 'Avversario N/D'}`;
+            select.appendChild(option);
+        });
+        // Ripristina la selezione corrente se stiamo modificando
+        select.value = editingMatchId || ""; 
+    }
+    
+    /** Carica i dettagli della partita selezionata per la modifica */
+    window.loadMatchForEditing = function(matchId) {
+        editingMatchId = matchId;
+        resetMatchForm(); 
+        
+        const formTitle = document.getElementById('match-form-title');
+        const formationsContainer = document.getElementById('formations-management');
+
+        if (!matchId) {
+            formTitle.textContent = 'Nuova Partita';
+            formationsContainer.classList.add('hidden');
+            return;
+        }
+
+        const match = allMatches.find(m => m.id === matchId);
+        if (!match) return; 
+
+        formTitle.textContent = `Modifica Partita vs ${match.opponent}`;
+        formationsContainer.classList.remove('hidden');
+        
+        document.getElementById('opponent').value = match.opponent || '';
+        document.getElementById('location').value = match.location || '';
+        
+        // Data
+        document.getElementById('match-date').value = timestampToInputString(match.date);
+
+        // Risultato
+        document.getElementById('score-us').value = match.result ? (match.result.score_us || '') : '';
+        document.getElementById('score-opponent').value = match.result ? (match.result.score_opponent || '') : '';
+
+        // Formazioni
+        renderFormationsListForEditing(match.formations || []);
+    }
+
+    /** Resetta il form di gestione partita */
+    function resetMatchForm() {
+        document.getElementById('match-form-title').textContent = 'Nuova Partita';
+        document.getElementById('opponent').value = '';
+        document.getElementById('match-date').value = '';
+        document.getElementById('location').value = '';
+        document.getElementById('score-us').value = '';
+        document.getElementById('score-opponent').value = '';
+        document.getElementById('formations-management').classList.add('hidden');
+        document.getElementById('match-select').value = '';
+        editingMatchId = null;
+    }
+    
+    /** Salva i dettagli base della partita */
+    window.saveMatchDetails = async function() {
+        if (!db) return logError("Database non pronto.", null);
+
+        const opponent = document.getElementById('opponent').value.trim();
+        const dateInput = document.getElementById('match-date').value;
+        const location = document.getElementById('location').value.trim();
+        const scoreUs = parseInt(document.getElementById('score-us').value) || null;
+        const scoreOpponent = parseInt(document.getElementById('score-opponent').value) || null;
+
+        if (!opponent || !dateInput) {
+            alert("Devi inserire Avversario e Data.");
+            return;
+        }
+
+        const matchData = {
+            opponent: opponent,
+            date: Timestamp.fromDate(new Date(dateInput)),
+            location: location,
+            result: (scoreUs !== null && scoreOpponent !== null) ? { score_us: scoreUs, score_opponent: scoreOpponent } : null,
+        };
+
+        try {
+            const matchRef = editingMatchId ? doc(db, COLLECTIONS.MATCHES, editingMatchId) : doc(collection(db, COLLECTIONS.MATCHES));
+            
+            // Se esiste, carica anche le formazioni per non sovrascriverle
+            if (editingMatchId) {
+                const existingMatch = allMatches.find(m => m.id === editingMatchId);
+                if (existingMatch) {
+                    matchData.formations = existingMatch.formations || [];
+                }
+            } else {
+                 matchData.formations = [];
+            }
+            
+            await setDoc(matchRef, matchData);
+            
+            // Aggiorna lo stato di editing se era una nuova partita
+            if (!editingMatchId) {
+                editingMatchId = matchRef.id;
+            }
+            
+            // Aggiorna la modale
+            loadMatchForEditing(editingMatchId);
+            alert(`Dettagli Partita ${editingMatchId ? 'Aggiornati' : 'Salvata'} con successo!`);
+        } catch (error) {
+            logError("Errore durante il salvataggio dei dettagli della partita.", error);
+            alert("Errore nel salvataggio. Controlla la console.");
+        }
+    }
+    
+    // --- GESTIONE FORMAZIONI (ADMIN) ---
+
+    /** Renderizza l'elenco delle formazioni per la modifica */
+    function renderFormationsListForEditing(formations) {
+        const listContainer = document.getElementById('formation-list-container');
+        listContainer.innerHTML = '';
+
+        if (formations.length === 0) {
+            listContainer.innerHTML = '<p class="text-sm text-gray-500">Nessuna formazione inserita per questa partita.</p>';
+            return;
+        }
+
+        formations.forEach((f, index) => {
+            const playersCount = f.players ? f.players.length : 0;
+            const actionsCount = f.actions ? f.actions.length : 0;
+            
+            const itemHtml = `
+                <div class="flex justify-between items-center p-3 bg-white border rounded-lg shadow-sm">
+                    <div class="flex-grow">
+                        <p class="font-semibold text-accent">Formazione #${index + 1}: ${f.description || 'N/D'}</p>
+                        <p class="text-xs text-gray-500">${playersCount} giocatori, ${actionsCount} azioni registrate.</p>
+                    </div>
+                    <div class="space-x-2">
+                        <button onclick="editFormation(${index})" class="text-secondary hover:text-yellow-600" title="Modifica Formazione">
+                            <i data-lucide="edit-3" class="lucide w-5 h-5"></i>
+                        </button>
+                        <button onclick="removeFormation(${index})" class="text-red-500 hover:text-red-700" title="Rimuovi Formazione">
+                            <i data-lucide="trash-2" class="lucide w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            listContainer.insertAdjacentHTML('beforeend', itemHtml);
+        });
+        lucide.createIcons();
+    }
+    
+    /** Apertura Editor Formazione */
+    window.openFormationEditor = function(index = null) {
+        const descriptionInput = document.getElementById('formation-description-input');
+        const editorTitle = document.getElementById('formation-editor-title');
+        
+        // Reset stato
+        document.getElementById('editing-formation-index').value = index !== null ? index : '';
+        editingFormation = {
+            description: '',
+            players: [],
+            actions: [] 
+        };
+        
+        if (index !== null && editingMatchId) {
+            const match = allMatches.find(m => m.id === editingMatchId);
+            if (match && match.formations && match.formations[index]) {
+                // Cloniamo l'oggetto per evitare modifiche dirette allo stato globale
+                editingFormation = JSON.parse(JSON.stringify(match.formations[index]));
+                descriptionInput.value = editingFormation.description || '';
+                editorTitle.textContent = `Modifica Formazione #${index + 1}`;
+            }
+        } else {
+            editorTitle.textContent = 'Aggiungi Nuova Formazione';
+            descriptionInput.value = '';
+        }
+        
+        renderFormationPlayersList();
+        formationEditorModal.classList.remove('hidden');
+    }
+    
+    /** Popola la select dei giocatori disponibili */
+    function populateAvailablePlayersSelect() {
+        const select = document.getElementById('available-players-select');
+        select.innerHTML = '<option value="">-- Seleziona Giocatore --</option>';
+
+        // Filtra solo i giocatori non ancora in campo in questa formazione (se in editing)
+        const currentPlayersIds = editingFormation ? editingFormation.players.map(p => p.playerId) : [];
+
+        allPlayers.sort((a, b) => a.number - b.number).forEach(player => {
+            // Se non stiamo editando una formazione o il giocatore non è in campo, lo aggiungiamo
+            if (currentPlayersIds.length === 0 || !currentPlayersIds.includes(player.id)) {
+                const option = document.createElement('option');
+                option.value = player.id;
+                option.textContent = `#${player.number || 'N/A'} ${player.name} (${player.role})`;
+                select.appendChild(option);
+            }
+        });
+    }
+
+    /** Renderizza i giocatori nella lista dell'editor (inclusa la posizione fissa 7v7) */
+    function renderFormationPlayersList() {
+        const listContainer = document.getElementById('formation-players-list');
+        listContainer.innerHTML = '';
+        
+        populateAvailablePlayersSelect();
+        
+        if (editingFormation.players.length === 0) {
+            listContainer.innerHTML = '<p class="text-sm text-gray-500 italic">Nessun giocatore in questa formazione.</p>';
+            return;
+        }
+
+        editingFormation.players.forEach((p, index) => {
+            const player = allPlayers.find(pl => pl.id === p.playerId);
+            if (!player) return;
+
+            const goals = editingFormation.actions.filter(a => a.playerId === p.playerId && a.type === 'goal').length;
+            const assists = editingFormation.actions.filter(a => a.playerId === p.playerId && a.type === 'assist').length;
+
+            const html = `
+                <div class="flex items-center p-3 bg-gray-100 rounded-lg border border-gray-200 shadow-sm">
+                    <div class="flex-grow">
+                        <p class="font-semibold text-accent">#${player.number || 'N/A'} ${player.name}</p>
+                        <p class="text-xs text-gray-500">${player.role}</p>
+                        <div class="mt-1 text-sm">
+                            <span class="mr-3">Gol: <input type="number" data-player-id="${player.id}" data-action-type="goal" value="${goals}" min="0" onchange="updatePlayerActions(this.dataset.playerId, this.dataset.actionType, this.value)" class="w-12 p-1 border rounded text-right"></span>
+                            <span>Assist: <input type="number" data-player-id="${player.id}" data-action-type="assist" value="${assists}" min="0" onchange="updatePlayerActions(this.dataset.playerId, this.dataset.actionType, this.value)" class="w-12 p-1 border rounded text-right"></span>
+                        </div>
+                    </div>
+                    <button onclick="removePlayerFromFormation('${player.id}')" class="text-red-500 hover:text-red-700 ml-4 p-1" title="Rimuovi Giocatore">
+                        <i data-lucide="minus-circle" class="lucide w-5 h-5"></i>
+                    </button>
+                </div>
+            `;
+            listContainer.insertAdjacentHTML('beforeend', html);
+        });
+        lucide.createIcons();
+    }
+    
+    /** Aggiunge un giocatore alla formazione in editing (assegnando posizioni di default) */
+    window.addPlayerToFormation = function() {
+        const select = document.getElementById('available-players-select');
+        const playerId = select.value;
+        if (!playerId) return;
+        
+        // Posizioni di default (basate su 7 giocatori, usaremo una posizione fissa per ogni aggiunta)
+        const defaultPositions = [
+            { x: 50, y: 5, role: 'Portiere' },
+            { x: 20, y: 30, role: 'Difensore' },
+            { x: 80, y: 30, role: 'Difensore' },
+            { x: 40, y: 55, role: 'Centrocampista' },
+            { x: 60, y: 55, role: 'Centrocampista' },
+            { x: 30, y: 85, role: 'Attaccante' },
+            { x: 70, y: 85, role: 'Attaccante' },
+        ];
+        
+        // Trova la prima posizione non occupata (per simulazione 7v7)
+        const occupiedCount = editingFormation.players.length;
+        const defaultPos = defaultPositions[occupiedCount];
+
+        if (occupiedCount >= 7) {
+            alert("Massimo 7 giocatori in campo per questa demo.");
+            return;
+        }
+        
+        if (defaultPos) {
+            editingFormation.players.push({
+                playerId: playerId,
+                x: defaultPos.x,
+                y: defaultPos.y,
+            });
+            renderFormationPlayersList();
+        }
+    }
+    
+    /** Rimuove un giocatore dalla formazione in editing */
+    window.removePlayerFromFormation = function(playerId) {
+        editingFormation.players = editingFormation.players.filter(p => p.playerId !== playerId);
+        editingFormation.actions = editingFormation.actions.filter(a => a.playerId !== playerId); // Rimuovi anche le azioni
+        renderFormationPlayersList();
+    }
+
+    /** Aggiorna il conteggio di gol/assist nella formazione in editing */
+    window.updatePlayerActions = function(playerId, type, count) {
+        const newCount = parseInt(count) || 0;
+        
+        // Rimuovi tutte le azioni precedenti di questo tipo per questo giocatore
+        editingFormation.actions = editingFormation.actions.filter(
+            a => !(a.playerId === playerId && a.type === type)
+        );
+
+        // Aggiungi il nuovo numero di azioni
+        for (let i = 0; i < newCount; i++) {
+            editingFormation.actions.push({
+                playerId: playerId,
+                type: type,
+                minute: 0 // Minuto non specificato nell'editor semplificato
+            });
+        }
+    }
+
+    /** Salva la formazione nell'oggetto partita su Firestore */
+    window.saveFormation = async function() {
+        if (!editingMatchId) {
+            alert("Devi prima salvare i dettagli della partita.");
+            return;
+        }
+        
+        const match = allMatches.find(m => m.id === editingMatchId);
+        if (!match) return;
+
+        const description = document.getElementById('formation-description-input').value.trim();
+        editingFormation.description = description || `Formazione Senza Descrizione`;
+
+        const index = document.getElementById('editing-formation-index').value;
+        const formations = match.formations || [];
+
+        if (index !== '') {
+            // Modifica
+            formations[parseInt(index)] = editingFormation;
+        } else {
+            // Aggiungi
+            formations.push(editingFormation);
+        }
+        
+        try {
+            const matchRef = doc(db, COLLECTIONS.MATCHES, editingMatchId);
+            await setDoc(matchRef, { formations: formations }, { merge: true }); // Aggiorna solo il campo formazioni
+            
+            closeFormationEditor();
+            loadMatchForEditing(editingMatchId); // Ricarica la lista per mostrare la formazione aggiornata
+            alert("Formazione salvata con successo!");
+            
+            // Aggiorna anche le statistiche globali (Gol/Assist)
+            updateGlobalPlayerStats();
+            
+        } catch (error) {
+            logError("Errore nel salvataggio della formazione.", error);
+            alert("Errore nel salvataggio della formazione. Controlla la console.");
+        }
+    }
+
+    /** Rimuove una formazione */
+    window.removeFormation = async function(index) {
+        if (!confirm(`Sei sicuro di voler rimuovere la Formazione #${index + 1}?`)) return;
+
+        const match = allMatches.find(m => m.id === editingMatchId);
+        if (!match) return;
+
+        const formations = match.formations || [];
+        formations.splice(index, 1);
+
+        try {
+            const matchRef = doc(db, COLLECTIONS.MATCHES, editingMatchId);
+            await setDoc(matchRef, { formations: formations }, { merge: true });
+            loadMatchForEditing(editingMatchId);
+            updateGlobalPlayerStats();
+            alert("Formazione rimossa con successo.");
+        } catch (error) {
+            logError("Errore nella rimozione della formazione.", error);
+            alert("Errore nella rimozione della formazione. Controlla la console.");
+        }
+    }
+
+    /** Ricalcola e salva le statistiche aggregate di tutti i giocatori */
+    async function updateGlobalPlayerStats() {
+        if (!db) return;
+        
+        // 1. Inizializza statistiche a zero
+        const playerStats = {};
+        allPlayers.forEach(p => {
+            playerStats[p.id] = { id: p.id, name: p.name, role: p.role, number: p.number, goals: 0, assists: 0 };
+        });
+
+        // 2. Aggrega da tutte le formazioni di tutte le partite
+        allMatches.forEach(match => {
+            if (match.formations) {
+                match.formations.forEach(formation => {
+                    if (formation.actions) {
+                        formation.actions.forEach(action => {
+                            if (playerStats[action.playerId]) {
+                                if (action.type === 'goal') {
+                                    playerStats[action.playerId].goals += 1;
+                                } else if (action.type === 'assist') {
+                                    playerStats[action.playerId].assists += 1;
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        // 3. Salva su Firestore con Transaction
+        try {
+            await runTransaction(db, async (transaction) => {
+                for (const playerId in playerStats) {
+                    const stats = playerStats[playerId];
+                    const docRef = doc(db, COLLECTIONS.PLAYERS, playerId);
+                    // Usiamo transaction.set per aggiornare le statistiche sul documento giocatore
+                    transaction.set(docRef, {
+                        goals: stats.goals,
+                        assists: stats.assists,
+                        name: stats.name, 
+                        role: stats.role,
+                        number: stats.number,
+                    });
+                }
+            });
+            console.log("Statistiche giocatori aggiornate con successo.");
+        } catch (error) {
+            logError("Errore durante l'aggiornamento delle statistiche globali.", error);
+        }
+    }
+    
+    // --- FUNZIONI DI RENDERIZZAZIONE (USER VIEW) ---
 
     /** Renderizza la lista dei giocatori ordinata per gol, poi assist */
     function renderPlayerList(players) {
@@ -429,7 +1012,7 @@
                         ${rank}
                     </span>
                     <div class="flex-grow">
-                        <p class="font-semibold text-accent">${player.name || 'Nome Sconosciuto'}</p>
+                        <p class="font-semibold text-accent">#${player.number || 'N/A'} ${player.name || 'Nome Sconosciuto'}</p>
                         <p class="text-sm text-gray-500">${player.role || 'Ruolo N/D'}</p>
                     </div>
                     <div class="text-right">
@@ -526,10 +1109,6 @@
         matchDetailModal.classList.remove('hidden');
     }
 
-    window.closeMatchDetail = function() {
-        matchDetailModal.classList.add('hidden');
-        currentMatchDetail = null;
-    }
     
     /** Renderizza la formazione corrente sul campo */
     function renderFormation() {
@@ -591,13 +1170,29 @@
                     <tbody>
         `;
 
+        // Ottieni la lista degli ID dei giocatori nella formazione per un lookup efficiente
+        const playersInFormationIds = formation.players.map(p => p.playerId);
+        
+        // Filtra le azioni relative a questa formazione
+        const formationActions = formation.actions || [];
+
+        // Raggruppa le azioni per giocatore
+        const playerActionsSummary = playersInFormationIds.reduce((acc, playerId) => {
+            acc[playerId] = {
+                goals: formationActions.filter(a => a.playerId === playerId && a.type === 'goal').length,
+                assists: formationActions.filter(a => a.playerId === playerId && a.type === 'assist').length
+            };
+            return acc;
+        }, {});
+
+
         formation.players.forEach(p => {
             const player = allPlayers.find(pl => pl.id === p.playerId);
             if (!player) return;
             
-            const actions = formation.actions ? formation.actions.filter(a => a.playerId === p.playerId) : [];
-            const goals = actions.filter(a => a.type === 'goal').length;
-            const assists = actions.filter(a => a.type === 'assist').length;
+            const summary = playerActionsSummary[p.playerId] || { goals: 0, assists: 0 };
+            const goals = summary.goals;
+            const assists = summary.assists;
 
             let actionText = '';
             if (goals > 0) actionText += `<span class="text-primary font-bold mr-1">${goals} G</span>`;
@@ -667,7 +1262,7 @@
                 {
                     opponent: 'FC Acquedotto',
                     location: 'Campo Comunale A',
-                    date: pastDate,
+                    date: Timestamp.fromDate(pastDate),
                     result: { score_us: 4, score_opponent: 2 }, 
                     formations: [
                         {
@@ -699,7 +1294,7 @@
                             ],
                             actions: [
                                 { playerId: 'p5_centrocampo', type: 'assist', minute: 40 },
-                                { playerId: 'p4_centrocampo', type: 'goal', minute: 50 }, // Gol del difensore avanzato
+                                { playerId: 'p4_centrocampo', type: 'goal', minute: 50 }, 
                                 { playerId: 'p2_difesa', type: 'assist', minute: 55 },
                                 { playerId: 'p7_attacco', type: 'goal', minute: 55 },
                             ]
@@ -710,7 +1305,7 @@
                 {
                     opponent: 'AC Trastevere',
                     location: 'Stadio Olimpico B',
-                    date: futureDate,
+                    date: Timestamp.fromDate(futureDate),
                     result: null, 
                     formations: [] 
                 },
@@ -738,17 +1333,16 @@
             });
 
             // Avviso di successo
-            const successMsg = document.getElementById('admin-modal').querySelector('h3');
+            const successMsg = document.getElementById('admin-modal-title');
             successMsg.textContent = 'Dati di Prova Inseriti con Successo!';
             successMsg.classList.add('text-green-600');
             setTimeout(() => { 
                 successMsg.textContent = 'Gestione Dati (Admin)';
                 successMsg.classList.remove('text-green-600');
-                window.toggleAdminModal(false);
             }, 3000);
 
         } catch (error) {
-            const errorArea = document.getElementById('admin-modal').querySelector('p:nth-child(2)');
+            const errorArea = document.getElementById('admin-modal').querySelector('p.text-sm.text-gray-600');
             errorArea.innerHTML = `<p class="text-sm text-red-600 mt-2 font-bold">ERRORE: Impossibile inserire i dati. Controlla che le credenziali siano corrette e che le regole di sicurezza permettano la scrittura.</p>`;
             logError("Errore durante l'inserimento dei dati di test in Firestore", error);
         } finally {
