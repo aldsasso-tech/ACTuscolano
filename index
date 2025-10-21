@@ -6,14 +6,14 @@
     <title>AC TUSCOLANO - Team Manager</title>
     
     <!-- 🔑 CORREZIONE CRITICA: Content Security Policy (CSP) -->
-    <!-- Ho aggiornato img-src per includere 'self', consentendo il caricamento di favicon.ico e altre immagini locali. -->
+    <!-- Rafforzo la direttiva font-src per permettere il caricamento di font locali (come quelli in /assets/ Sentient-Variable) -->
     <meta http-equiv="Content-Security-Policy" 
           content="default-src 'self'; 
                    script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com 'unsafe-inline'; 
                    style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; 
-                   font-src 'self' data:; 
+                   font-src 'self' data: https:; 
                    connect-src 'self' https://*.firebaseio.com https://firestore.googleapis.com; 
-                   img-src 'self' data: https:;" /> <!-- Modifica a img-src per includere https: -->
+                   img-src 'self' data: https:;" /> <!-- Modifica a font-src per includere 'self' e https: -->
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
