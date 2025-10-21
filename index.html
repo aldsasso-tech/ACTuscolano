@@ -11,6 +11,39 @@
     <script src="https://unpkg.com/react-dom/umd/react-dom.development.js"></script>
     <!-- Carica Babel per interpretare il JSX direttamente nel browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Caricamento delle librerie Firebase come ES Modules -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Espone le funzioni Firebase a livello globale
+        window.firebase = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getFirestore,
+            collection,
+            onSnapshot,
+            doc,
+            addDoc,
+            updateDoc,
+            deleteDoc,
+            serverTimestamp
+        };
+
+        // Inizializzazione di base per esporre istanze a livello globale (accessibili dal codice Babel)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        if (Object.keys(firebaseConfig).length > 0) {
+            window.firebaseApp = initializeApp(firebaseConfig);
+            window.firebaseAuth = getAuth(window.firebaseApp);
+            window.firebaseDb = getFirestore(window.firebaseApp);
+        }
+    </script>
+
     <style>
         /* Imposta il font Inter e uno sfondo leggero */
         body { font-family: 'Inter', sans-serif; background-color: #eef2f5; }
@@ -26,91 +59,284 @@
         // Dati Iniziali e Tipi di Ruolo
         // ===============================================
 
-        const { useState, useCallback } = React;
+        const { useState, useCallback, useEffect } = React;
 
-        const initialSquadra = [
-            { id: 1, nome: "Marco Rossi", ruolo: "Attaccante", attivo: true },
-            { id: 2, nome: "Luca Bianchi", ruolo: "Difensore", attivo: true },
-        ];
-
-        const initialCandidature = [
-            { id: 101, nome: "Giulia Neri", ruoloDesiderato: "Centrocampista" },
-            { id: 102, nome: "Andrea Gallo", ruoloDesiderato: "Portiere" },
-        ];
-        
         const ruoliDisponibili = ["Attaccante", "Centrocampista", "Difensore", "Portiere", "Allenatore"];
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // Componente di Messaggio (per sostituire alert/confirm)
+        function MessageBox({ message, onClose }) {
+            if (!message) return null;
+            return (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
+                        <p className="text-lg font-semibold text-gray-800 mb-4">{message}</p>
+                        <button
+                            onClick={onClose}
+                            className="bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                            Chiudi
+                        </button>
+                    </div>
+                </div>
+            );
+        }
 
         // ===============================================
         // Componente Principale
         // ===============================================
 
         function GestioneCompletaApp() {
-            const [squadra, setSquadra] = useState(initialSquadra);
-            const [candidature, setCandidature] = useState(initialCandidature);
-            
-            // Stato per il form di aggiunta Candidato
+            // Stato dei dati ora gestito da Firestore
+            const [squadra, setSquadra] = useState([]);
+            const [candidature, setCandidature] = useState([]);
             const [nuovoNomeCandidato, setNuovoNomeCandidato] = useState('');
             const [nuovoRuoloCandidato, setNuovoRuoloCandidato] = useState(ruoliDisponibili[0]);
+            
+            // Stati di Firebase
+            const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+            const [userId, setUserId] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [message, setMessage] = useState(null); // Usato per errori e messaggi utente
 
-            // Funzione per aggiungere un NUOVO CANDIDATO
-            const addCandidatura = useCallback(() => {
-                if (nuovoNomeCandidato.trim() === '') return;
+            // --- Logica di Inizializzazione e Autenticazione (Firestore) ---
+            useEffect(() => {
+                const initializeFirebase = async () => {
+                    // Controlla se le istanze globali sono disponibili (ESPOSIZIONE ERRATA = SCHERMO BIANCO)
+                    if (!window.firebaseApp || !window.firebaseAuth || !window.firebaseDb) {
+                        const errorMsg = "FATAL: I servizi Firebase non sono disponibili. La configurazione iniziale è fallita o non sono state caricate le variabili globali (__firebase_config).";
+                        console.error(errorMsg);
+                        setMessage(errorMsg);
+                        setLoading(false); // Blocca il caricamento e mostra l'errore
+                        return;
+                    }
+
+                    const auth = window.firebaseAuth;
+                    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+                    try {
+                        if (initialAuthToken) {
+                            await auth.signInWithCustomToken(initialAuthToken);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                    } catch (error) {
+                        console.error("Firebase Authentication Error:", error);
+                        setMessage(`Errore di autenticazione: ${error.message}`);
+                    }
+
+                    // Listener per lo stato di autenticazione (ottiene l'ID utente)
+                    const unsubscribe = window.firebase.onAuthStateChanged(auth, user => {
+                        if (user) {
+                            setUserId(user.uid);
+                        } else {
+                            // Fallback ID semplice in caso di autenticazione anonima/fallita
+                            setUserId('unauth-' + Math.random().toString(36).substring(2, 9)); 
+                        }
+                        setIsFirebaseReady(true);
+                        setLoading(false); // Fine caricamento
+                    });
+
+                    return () => unsubscribe();
+                };
+
+                initializeFirebase();
+            }, []); // Esegue solo al montaggio
+
+            // --- Logica di Caricamento Dati in Real-Time (onSnapshot) ---
+            useEffect(() => {
+                // Avvia i listener SOLO quando Firebase è pronto e l'ID utente è stato stabilito
+                if (!isFirebaseReady || !userId) return;
+
+                const db = window.firebaseDb;
+
+                // Percorsi nel database (Public Data per una lista di squadra condivisa)
+                // Usiamo Public Data per rendere le modifiche visibili a tutti gli utenti che usano la stessa APP_ID
+                const candidaturePath = window.firebase.collection(db, `artifacts/${APP_ID}/public/data/candidature`);
+                const squadraPath = window.firebase.collection(db, `artifacts/${APP_ID}/public/data/squadra`);
+
+                // Candidature Listener
+                const unsubscribeCandidature = window.firebase.onSnapshot(candidaturePath, (snapshot) => {
+                    // Ordina le candidature per timestamp decrescente
+                    const newCandidature = snapshot.docs.map(doc => ({
+                        ...doc.data(),
+                        id: doc.id
+                    })).sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); 
+                    setCandidature(newCandidature);
+                }, (error) => {
+                    console.error("Firestore Candidature Listener Error:", error);
+                    setMessage(`Errore caricamento candidature: ${error.message}`);
+                });
+
+                // Squadra Listener
+                const unsubscribeSquadra = window.firebase.onSnapshot(squadraPath, (snapshot) => {
+                     // Ordina la squadra per nome in ordine alfabetico
+                    const newSquadra = snapshot.docs.map(doc => ({
+                        ...doc.data(),
+                        id: doc.id
+                    })).sort((a, b) => (a.nome || '').localeCompare(b.nome || '')); 
+                    setSquadra(newSquadra);
+                }, (error) => {
+                    console.error("Firestore Squadra Listener Error:", error);
+                    setMessage(`Errore caricamento squadra: ${error.message}`);
+                });
+
+                return () => {
+                    unsubscribeCandidature();
+                    unsubscribeSquadra();
+                };
+            }, [isFirebaseReady, userId]);
+
+            // Funzione per aggiungere un NUOVO CANDIDATO (Persistenza su Firestore)
+            const addCandidatura = useCallback(async () => {
+                if (nuovoNomeCandidato.trim() === '' || !isFirebaseReady) return;
+
+                const db = window.firebaseDb;
+                const candidaturePath = window.firebase.collection(db, `artifacts/${APP_ID}/public/data/candidature`);
 
                 const newCandidato = {
-                    id: Date.now(),
                     nome: nuovoNomeCandidato.trim(),
                     ruoloDesiderato: nuovoRuoloCandidato,
+                    timestamp: window.firebase.serverTimestamp(),
                 };
-                setCandidature(prevCandidature => [...prevCandidature, newCandidato]);
-                setNuovoNomeCandidato('');
-                setNuovoRuoloCandidato(ruoliDisponibili[0]);
-            }, [nuovoNomeCandidato, nuovoRuoloCandidato]);
+                
+                try {
+                    await window.firebase.addDoc(candidaturePath, newCandidato);
+                    setNuovoNomeCandidato('');
+                    setNuovoRuoloCandidato(ruoliDisponibili[0]);
+                    setMessage(`Candidatura di ${nuovoNomeCandidato.trim()} inviata con successo.`);
+                } catch (error) {
+                    console.error("Error adding candidature: ", error);
+                    setMessage(`Errore nell'invio della candidatura: ${error.message}`);
+                }
+            }, [nuovoNomeCandidato, nuovoRuoloCandidato, isFirebaseReady]);
 
 
-            // Funzione per accettare una CANDIDATURA e spostarla nella Squadra
-            const accettaCandidato = useCallback((idCandidato) => {
-                const candidato = candidature.find(c => c.id === idCandidato);
+            // Funzione per accettare una CANDIDATURA (Aggiunge in Squadra e Rimuove da Candidature)
+            const accettaCandidato = useCallback(async (candidatoId) => {
+                if (!isFirebaseReady) return;
+                
+                const candidato = candidature.find(c => c.id === candidatoId);
                 if (!candidato) return;
 
-                // 1. Aggiungi alla squadra
-                const newMembro = {
-                    id: Date.now(), // Usa un nuovo ID per la squadra
-                    nome: candidato.nome,
-                    ruolo: candidato.ruoloDesiderato,
-                    attivo: true,
-                };
-                setSquadra(prevSquadra => [...prevSquadra, newMembro]);
+                const db = window.firebaseDb;
+                const candidaturaDocRef = window.firebase.doc(db, `artifacts/${APP_ID}/public/data/candidature`, candidatoId);
+                const squadraPath = window.firebase.collection(db, `artifacts/${APP_ID}/public/data/squadra`);
+                
+                try {
+                    // 1. Aggiungi alla squadra (come nuovo documento)
+                    const newMembro = {
+                        nome: candidato.nome,
+                        ruolo: candidato.ruoloDesiderato,
+                        attivo: true,
+                        timestamp: window.firebase.serverTimestamp(),
+                    };
+                    await window.firebase.addDoc(squadraPath, newMembro);
 
-                // 2. Rimuovi dalle candidature
-                setCandidature(prevCandidature => prevCandidature.filter(c => c.id !== idCandidato));
-            }, [candidature]);
+                    // 2. Rimuovi dalle candidature
+                    await window.firebase.deleteDoc(candidaturaDocRef);
+                    setMessage(`Candidato ${candidato.nome} accettato e aggiunto alla squadra.`);
+
+                } catch (error) {
+                    console.error("Error accepting candidate: ", error);
+                    setMessage(`Errore nell'accettazione del candidato: ${error.message}`);
+                }
+            }, [candidature, isFirebaseReady]);
 
 
-            // Funzione per rifiutare una CANDIDATURA
-            const rifiutaCandidato = useCallback((idCandidato) => {
-                setCandidature(prevCandidature => prevCandidature.filter(c => c.id !== idCandidato));
-            }, []);
+            // Funzione per rifiutare una CANDIDATURA (Rimuove da Firestore)
+            const rifiutaCandidato = useCallback(async (candidatoId) => {
+                if (!isFirebaseReady) return;
 
-            // Funzione per attivare/disattivare un membro della SQUADRA
-            const toggleAttivo = useCallback((id) => {
-                setSquadra(prevSquadra =>
-                    prevSquadra.map(membro =>
-                        membro.id === id ? { ...membro, attivo: !membro.attivo } : membro
-                    )
+                const db = window.firebaseDb;
+                const candidato = candidature.find(c => c.id === candidatoId);
+                const candidaturaDocRef = window.firebase.doc(db, `artifacts/${APP_ID}/public/data/candidature`, candidatoId);
+                
+                try {
+                    await window.firebase.deleteDoc(candidaturaDocRef);
+                    setMessage(`Candidatura di ${candidato?.nome || 'un candidato'} rifiutata.`);
+                } catch (error) {
+                    console.error("Error refusing candidate: ", error);
+                    setMessage(`Errore nel rifiuto della candidatura: ${error.message}`);
+                }
+            }, [candidature, isFirebaseReady]);
+
+            // Funzione per attivare/disattivare un membro della SQUADRA (Aggiorna Firestore)
+            const toggleAttivo = useCallback(async (membroId, currentAttivo) => {
+                if (!isFirebaseReady) return;
+                
+                const db = window.firebaseDb;
+                const membroDocRef = window.firebase.doc(db, `artifacts/${APP_ID}/public/data/squadra`, membroId);
+                
+                try {
+                    await window.firebase.updateDoc(membroDocRef, { attivo: !currentAttivo });
+                    setMessage(`Stato membro aggiornato a ${!currentAttivo ? 'Attivo' : 'Inattivo'}.`);
+                } catch (error) {
+                    console.error("Error toggling active status: ", error);
+                    setMessage(`Errore nell'aggiornamento dello stato: ${error.message}`);
+                }
+            }, [isFirebaseReady]);
+
+            // Funzione per rimuovere un membro dalla SQUADRA (Rimuove da Firestore)
+            const rimuoviMembro = useCallback(async (membroId) => {
+                if (!isFirebaseReady) return;
+
+                const db = window.firebaseDb;
+                const membroDocRef = window.firebase.doc(db, `artifacts/${APP_ID}/public/data/squadra`, membroId);
+
+                try {
+                    await window.firebase.deleteDoc(membroDocRef);
+                    setMessage('Membro rimosso dalla squadra.');
+                } catch (error) {
+                    console.error("Error removing member: ", error);
+                    setMessage(`Errore nella rimozione del membro: ${error.message}`);
+                }
+            }, [isFirebaseReady]);
+            
+            // Render di caricamento
+            if (loading) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-screen bg-eef2f5">
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
+                        <p className="mt-4 text-indigo-600 font-semibold">Caricamento servizi e autenticazione...</p>
+                        {message && (
+                            <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded max-w-md text-center">
+                                Errore (in attesa): {message}
+                            </div>
+                        )}
+                    </div>
                 );
-            }, []);
+            }
+            
+            // Render di errore CRITICO dopo il caricamento
+            if (message && !loading && !isFirebaseReady) {
+                 return (
+                    <div className="flex items-center justify-center h-screen">
+                        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-8 rounded-xl shadow-lg max-w-lg" role="alert">
+                            <p className="font-bold text-xl mb-2">⚠ Errore Critico di Avvio</p>
+                            <p>{message}</p>
+                            <p className="mt-3 text-sm text-red-600">Per favore, verifica la console del browser (F12) per i dettagli tecnici.</p>
+                        </div>
+                    </div>
+                 );
+            }
 
-            // Funzione per rimuovere un membro dalla SQUADRA
-            const rimuoviMembro = useCallback((id) => {
-                setSquadra(prevSquadra => prevSquadra.filter(membro => membro.id !== id));
-            }, []);
-
-
+            // Render dell'applicazione principale
             return (
                 <div className="bg-white shadow-2xl rounded-2xl p-6 md:p-10 w-full max-w-6xl transition-all duration-300">
-                    <h1 className="text-4xl font-extrabold text-indigo-800 mb-8 text-center">
+                    {/* Il MessageBox gestisce i messaggi di successo o gli errori di runtime */}
+                    <MessageBox 
+                        message={message && !message.startsWith("FATAL:") ? message : null} 
+                        onClose={() => setMessage(null)} 
+                    />
+                    
+                    <h1 className="text-4xl font-extrabold text-indigo-800 mb-2 text-center">
                         Sistema di Gestione Team
                     </h1>
+                    <p className="text-sm text-center text-gray-500 mb-6">
+                        ID App: <span className="font-mono text-xs bg-gray-100 p-1 rounded">{APP_ID}</span> | 
+                        ID Utente: <span className="font-mono text-xs bg-gray-100 p-1 rounded">{userId || 'N/A'}</span>
+                    </p>
                     
                     {/* Contenitore Flessibile per le Due Sezioni */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -143,7 +369,8 @@
                                     </select>
                                     <button
                                         onClick={addCandidatura}
-                                        className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow-md active:shadow-sm"
+                                        className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow-md active:shadow-sm disabled:opacity-50"
+                                        disabled={!isFirebaseReady || nuovoNomeCandidato.trim() === ''}
                                     >
                                         Invia Candidatura
                                     </button>
@@ -151,7 +378,7 @@
                             </div>
 
                             {/* Lista Candidature */}
-                            <div className="space-y-3">
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
                                 {candidature.length === 0 ? (
                                     <p className="text-center text-gray-500 italic p-4 bg-white rounded-lg">Nessuna candidatura in attesa.</p>
                                 ) : (
@@ -167,15 +394,17 @@
                                             <div className="flex space-x-2 ml-4">
                                                 <button
                                                     onClick={() => accettaCandidato(candidato.id)}
-                                                    className="bg-green-500 text-white p-2 rounded-full hover:bg-green-600 transition-colors shadow-md"
+                                                    className="bg-green-500 text-white p-2 rounded-full hover:bg-green-600 transition-colors shadow-md disabled:opacity-50"
                                                     title="Accetta e aggiungi alla Squadra"
+                                                    disabled={!isFirebaseReady}
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
                                                 </button>
                                                 <button
                                                     onClick={() => rifiutaCandidato(candidato.id)}
-                                                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-md"
+                                                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-md disabled:opacity-50"
                                                     title="Rifiuta Candidatura"
+                                                    disabled={!isFirebaseReady}
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                                                 </button>
@@ -192,24 +421,16 @@
                                 <span className="mr-2">👥</span> Squadra Attiva ({squadra.length})
                             </h2>
 
-                            {/* Form di Aggiunta Rapida (se necessario) - L'aggiunta principale avviene tramite Candidature */}
+                            {/* Info Utente */}
                             <div className="mb-6 p-4 bg-white rounded-lg border border-indigo-100">
-                                <h3 className="text-lg font-semibold text-indigo-700 mb-3">Aggiunta Veloce Membro</h3>
-                                <p className="text-sm text-gray-500 mb-2">
-                                    (Utilizzato per aggiunte immediate senza passare per la fase di candidatura)
-                                </p>
-                                <div className="flex justify-center text-center">
-                                    <span className="text-sm text-gray-400 italic">
-                                        Per semplicità, la funzione di aggiunta rapida è disabilitata.
-                                        Usa la sezione "Gestione Candidature" per aggiungere membri.
-                                    </span>
-                                </div>
+                                <h3 className="text-lg font-semibold text-indigo-700 mb-1">Stato del Roster</h3>
+                                <p className="text-sm text-gray-500">I dati sono sincronizzati con Firestore (ID App: `{APP_ID}`).</p>
                             </div>
                             
                             {/* Lista Membri Squadra */}
-                            <div className="space-y-3">
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
                                 {squadra.length === 0 ? (
-                                    <p className="text-center text-gray-500 italic p-4 bg-white rounded-lg">La squadra non ha membri attivi.</p>
+                                    <p className="text-center text-gray-500 italic p-4 bg-white rounded-lg">La squadra non ha membri attivi. Accetta una candidatura per iniziare.</p>
                                 ) : (
                                     squadra.map((membro) => (
                                         <div
@@ -227,11 +448,12 @@
                                                     {membro.attivo ? 'Attivo' : 'Inattivo'}
                                                 </span>
                                                 <button
-                                                    onClick={() => toggleAttivo(membro.id)}
-                                                    className={`text-white p-2 rounded-full text-sm shadow-md transition-colors ${
+                                                    onClick={() => toggleAttivo(membro.id, membro.attivo)}
+                                                    className={`text-white p-2 rounded-full text-sm shadow-md transition-colors disabled:opacity-50 ${
                                                         membro.attivo ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-indigo-500 hover:bg-indigo-600'
                                                     }`}
                                                     title={membro.attivo ? 'Disattiva' : 'Attiva'}
+                                                    disabled={!isFirebaseReady}
                                                 >
                                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                                         <path d={membro.attivo ? "M10 12a2 2 0 100-4 2 2 0 000 4z" : "M4 6h16v12H4V6z"} clipRule="evenodd" />
@@ -240,12 +462,12 @@
                                                 </button>
                                                 <button
                                                     onClick={() => rimuoviMembro(membro.id)}
-                                                    className="text-white p-2 rounded-full text-sm bg-gray-400 hover:bg-gray-500 transition-colors shadow-md"
+                                                    className="text-white p-2 rounded-full text-sm bg-gray-400 hover:bg-gray-500 transition-colors shadow-md disabled:opacity-50"
                                                     title="Rimuovi Membro"
+                                                    disabled={!isFirebaseReady}
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clipRule="evenodd" />
-                                                    </svg>
+                                                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clipRule="evenodd" /></svg>
                                                 </button>
                                             </div>
                                         </div>
