@@ -4,25 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AC TUSCOLANO - Team Manager</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; font-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com https://firestore.googleapis.com; img-src 'self' data: https:;" />
-
+    
+    <!-- Caricamento di Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="/style.css">
-
+    
+    <!-- 🔑 CORREZIONE CRITICA: Content Security Policy (CSP) -->
+    <!-- Rafforzo la direttiva per permettere le chiamate a Firebase/Google e l'uso di script/style inline -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self'; 
+        script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; 
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+        font-src 'self' data: https://fonts.gstatic.com;
+        connect-src 'self' https://*.firebaseio.com https://firestore.googleapis.com; 
+        img-src 'self' data: https:;" 
+    />
+    
+    <!-- Configurazione Tailwind -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        primary: '#C0392B',
-                        secondary: '#F1C40F',
-                        accent: '#2C3E50',
+                        primary: '#C0392B', // Rosso Scuro
+                        secondary: '#F1C40F', // Giallo/Oro
+                        accent: '#2C3E50', // Blu Scuro/Navy
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
+
+    <!-- 🎨 CORREZIONE CRITICA: Stili Custom incorporati (eliminato style.css) -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f4f9;
+        }
+        /* Garantisce che l'app sia visualizzata correttamente su mobile */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            max-width: 768px; /* Ottimizzato per mobile e tablet */
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Stile per il campo da gioco */
+        #pitch-container {
+            background: #1e8449; /* Verde campo */
+            background-image: linear-gradient(to right, #1e8449 0%, #1e8449 100%),
+                              linear-gradient(to right, #1e8449 0%, #1e8449 100%);
+            background-repeat: no-repeat;
+            background-position: center top, center bottom;
+            background-size: 100% 50%;
+            border: 4px solid rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Linee del campo */
+        #pitch-container::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            height: 90%;
+            border: 2px solid white;
+            border-radius: 10%;
+            /* Cerchio di centrocampo */
+            box-shadow: 0 0 0 2px white;
+        }
+
+        /* Cerchio Giocatore */
+        .player-circle {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #f1c40f; /* Secondary color */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #2c3e50; /* Accent color */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+            cursor: default;
+            transition: transform 0.3s ease-in-out;
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
 
@@ -39,7 +116,7 @@
             </button>
         </div>
         <div class="text-center text-xs text-gray-300 mt-1">
-            (Logo "AC Tuscolano" qui)
+            (App Team Manager)
         </div>
     </header>
 
@@ -57,14 +134,19 @@
         <section id="stats-view" class="view">
             <h2 class="text-2xl font-bold mb-4 text-accent border-b-2 pb-2 border-primary">Classifica Giocatori</h2>
             <div id="loading-stats" class="text-center text-gray-500 p-8">
+                <!-- Aggiungo l'icona di caricamento per coerenza visiva -->
+                <i data-lucide="loader" class="lucide w-8 h-8 mx-auto animate-spin mb-2 text-primary"></i>
                 Caricamento statistiche...
             </div>
-            <div id="player-list-container"></div>
+            <div id="player-list-container">
+                <!-- Lista giocatori -->
+            </div>
         </section>
 
         <section id="calendar-view" class="view hidden">
             <h2 class="text-2xl font-bold mb-4 text-accent border-b-2 pb-2 border-primary">Calendario Incontri (Clicca per Dettagli Partita)</h2>
             <div id="loading-calendar" class="text-center text-gray-500 p-8">
+                <i data-lucide="loader" class="lucide w-8 h-8 mx-auto animate-spin mb-2 text-primary"></i>
                 Caricamento calendario...
             </div>
             <div id="upcoming-matches" class="mb-6">
@@ -84,18 +166,18 @@
     </footer>
 </div>
 
+<!-- Modale Amministrazione -->
 <div id="admin-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center hidden">
     <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-lg">
         <h3 class="text-2xl font-bold text-accent mb-4 border-b pb-2">Gestione Dati (Admin)</h3>
         <p class="text-sm text-gray-600 mb-4">
-            <strong>ATTENZIONE:</strong> Questo codice utilizza variabili d'ambiente (non presenti su Github) per la configurazione di Firebase.
-            Per l'uso su GitHub, è necessario inserire le proprie credenziali valide di Firebase Config in <code>script.js</code>.
+            I dati di prova verranno salvati pubblicamente.
         </p>
         <p class="text-sm text-gray-600 mb-4">
             I dati di prova verranno salvati in:
             <ul class="list-disc list-inside space-y-1 ml-4 mt-2 text-xs font-mono bg-gray-50 p-2 rounded">
-                <li><strong>Giocatori:</strong> <span id="path-players" class="text-primary">/artifacts/[appId]/public/data/ac_tuscolano_players</span></li>
-                <li><strong>Partite:</strong> <span id="path-matches" class="text-primary">/artifacts/[appId]/public/data/ac_tuscolano_matches</span></li>
+                <li>**Giocatori:** <span id="path-players" class="text-primary"></span></li>
+                <li>**Partite:** <span id="path-matches" class="text-primary"></span></li>
             </ul>
         </p>
         <button onclick="addInitialMockData()" class="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-md">
@@ -107,6 +189,7 @@
     </div>
 </div>
 
+<!-- Modale Dettagli Partita -->
 <div id="match-detail-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-40 flex items-center justify-center hidden">
     <div class="bg-white p-6 rounded-lg shadow-2xl w-11/12 max-w-xl max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -121,26 +204,553 @@
 
         <div class="space-y-4">
             <div class="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
-                <button id="prev-formation-btn" onclick="navigateFormation(-1)" class="p-2 bg-primary text-white rounded-full disabled:bg-gray-400 hover:bg-red-700 transition-colors duration-300">
+                <button id="prev-formation-btn" onclick="navigateFormation(-1)" class="p-2 bg-primary text-white rounded-full disabled:bg-gray-400 hover:bg-red-700 transition-colors duration-300" disabled>
                     <i data-lucide="chevron-left" class="lucide w-5 h-5"></i>
                 </button>
                 <div class="text-center">
                     <p class="font-bold text-accent">Formazione: <span id="current-formation-index">1 di 1</span></p>
                     <p id="formation-description" class="text-sm text-gray-600 italic"></p>
                 </div>
-                <button id="next-formation-btn" onclick="navigateFormation(1)" class="p-2 bg-primary text-white rounded-full disabled:bg-gray-400 hover:bg-red-700 transition-colors duration-300">
+                <button id="next-formation-btn" onclick="navigateFormation(1)" class="p-2 bg-primary text-white rounded-full disabled:bg-gray-400 hover:bg-red-700 transition-colors duration-300" disabled>
                     <i data-lucide="chevron-right" class="lucide w-5 h-5"></i>
                 </button>
             </div>
 
-            <div id="pitch-container" class="relative w-full aspect-[2/3]"></div>
+            <!-- Ho aggiunto l'aspetto 2:3 anche qui per garantire le proporzioni del campo -->
+            <div id="pitch-container" class="relative w-full aspect-[2/3] mx-auto">
+            </div>
 
-            <div id="formation-table-container"></div>
+            <div id="formation-table-container">
+            </div>
         </div>
     </div>
 </div>
 
-<script type="module" src="/script.js"></script>
+<!-- 3. Caricamento Icone -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+
+<!-- 4. 🚀 LOGICA JAVASCRIPT INTEGRATA (Contenuto di script.js) -->
+<!-- Questa sezione include la configurazione di Firebase e tutte le funzioni dell'app, risolvendo l'errore 404. -->
+<script type="module">
+    // Importazioni Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, collection, query, addDoc, setDoc, getDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    
+    // Variabili Globali del Canvas
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    // Collezioni Firestore
+    const COLLECTIONS = {
+        PLAYERS: `artifacts/${appId}/public/data/ac_tuscolano_players`,
+        MATCHES: `artifacts/${appId}/public/data/ac_tuscolano_matches`,
+    };
+
+    // Stato Globale
+    let db, auth;
+    let userId;
+    let allPlayers = [];
+    let allMatches = [];
+    let currentMatchDetail = null;
+    let currentFormationIndex = 0;
+    
+    const adminButton = document.getElementById('admin-button');
+    const adminModal = document.getElementById('admin-modal');
+    const matchDetailModal = document.getElementById('match-detail-modal');
+
+    // --- FUNZIONI DI UTILITY ---
+
+    /** Mostra un errore nella console e opzionalmente sulla UI */
+    function logError(message, error) {
+        console.error("ERRORE APP:", message, error);
+        // Aggiorna l'elemento di caricamento con un messaggio di errore
+        const loadingElement = document.getElementById('loading-stats');
+        if (loadingElement) {
+            loadingElement.innerHTML = `
+                <i data-lucide="circle-x" class="lucide w-8 h-8 mx-auto mb-2 text-red-500"></i>
+                <p>Errore di caricamento: ${message}</p>
+                <p class="text-xs mt-1">Verifica la Console e le Regole di Sicurezza di Firestore.</p>
+            `;
+            // Rilancia le icone Lucide
+            lucide.createIcons();
+        }
+    }
+
+    /** Helper per formattare una data */
+    function formatDate(timestamp) {
+        if (!timestamp) return 'Data non specificata';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        return new Intl.DateTimeFormat('it-IT', { dateStyle: 'full', timeStyle: 'short' }).format(date);
+    }
+    
+    /** Aggiorna la vista corrente */
+    window.showView = function(viewId) {
+        document.querySelectorAll('.view').forEach(view => {
+            view.classList.add('hidden');
+        });
+        document.getElementById(`${viewId}-view`).classList.remove('hidden');
+
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.remove('text-accent', 'border-primary');
+            button.classList.add('text-gray-500', 'border-transparent', 'hover:border-gray-300');
+        });
+        document.getElementById(`nav-${viewId}`).classList.add('text-accent', 'border-primary');
+        document.getElementById(`nav-${viewId}`).classList.remove('text-gray-500', 'border-transparent', 'hover:border-gray-300');
+    }
+
+    /** Gestione modale Admin */
+    window.toggleAdminModal = function(show) {
+        if (show) {
+            adminModal.classList.remove('hidden');
+            // Aggiorna i percorsi nel modale
+            document.getElementById('path-players').textContent = COLLECTIONS.PLAYERS;
+            document.getElementById('path-matches').textContent = COLLECTIONS.MATCHES;
+        } else {
+            adminModal.classList.add('hidden');
+        }
+    }
+    
+    // --- FIREBASE E AUTENTICAZIONE ---
+
+    /** Inizializzazione Firebase e gestione Autenticazione */
+    async function setupFirebase() {
+        if (!firebaseConfig) {
+             return logError("Configurazione Firebase non trovata. Impossibile avviare l'app.", null);
+        }
+        
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            
+            // Log a livello Debug per vedere le operazioni di Firestore
+            // setLogLevel('Debug'); // Non disponibile con questa versione di CDN, useremo console.log
+
+            // Tentativo di autenticazione Custom o Anonima
+            if (initialAuthToken) {
+                await signInWithCustomToken(auth, initialAuthToken);
+            } else {
+                await signInAnonymously(auth);
+            }
+            
+            // L'osservatore garantisce che le funzioni di caricamento partano solo ad autenticazione avvenuta
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    adminButton.classList.remove('hidden'); // Mostra il pulsante Admin
+                    
+                    // Avvia i listener di dati in tempo reale
+                    startDataListeners();
+                } else {
+                    // Utente disconnesso (non dovrebbe accadere dopo signInAnonymously)
+                    logError("Utente non autenticato. Riprovare l'accesso.", null);
+                }
+            });
+
+        } catch (error) {
+            logError("Errore durante l'inizializzazione o l'autenticazione di Firebase", error);
+        }
+    }
+    
+    /** Avvia i listener onSnapshot per i dati in tempo reale */
+    function startDataListeners() {
+        if (!db) return;
+
+        // Listener per i Giocatori (Statistiche)
+        const playersQuery = collection(db, COLLECTIONS.PLAYERS);
+        onSnapshot(playersQuery, (snapshot) => {
+            allPlayers = [];
+            snapshot.forEach(doc => {
+                allPlayers.push({ id: doc.id, ...doc.data() });
+            });
+            renderPlayerList(allPlayers);
+        }, (error) => {
+            logError("Errore nel listener Giocatori", error);
+        });
+
+        // Listener per le Partite (Calendario)
+        const matchesQuery = query(collection(db, COLLECTIONS.MATCHES));
+        onSnapshot(matchesQuery, (snapshot) => {
+            allMatches = [];
+            snapshot.forEach(doc => {
+                allMatches.push({ id: doc.id, ...doc.data() });
+            });
+            renderCalendar(allMatches);
+        }, (error) => {
+            logError("Errore nel listener Partite", error);
+        });
+    }
+
+    // --- FUNZIONI DI RENDERIZZAZIONE ---
+
+    /** Renderizza la lista dei giocatori ordinata per gol, poi assist */
+    function renderPlayerList(players) {
+        const container = document.getElementById('player-list-container');
+        const loading = document.getElementById('loading-stats');
+
+        // Ordina: prima per Gol (decrescente), poi per Assist (decrescente), poi per Nome (crescente)
+        const sortedPlayers = players.sort((a, b) => {
+            if ((b.goals || 0) !== (a.goals || 0)) {
+                return (b.goals || 0) - (a.goals || 0);
+            }
+            if ((b.assists || 0) !== (a.assists || 0)) {
+                return (b.assists || 0) - (a.assists || 0);
+            }
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        if (loading) loading.classList.add('hidden');
+        if (sortedPlayers.length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-500 p-8">Nessun dato giocatore trovato. Usa il pulsante Admin per inserire dati di prova.</p>';
+            return;
+        }
+
+        let html = '';
+        sortedPlayers.forEach((player, index) => {
+            const rank = index + 1;
+            const rankColor = rank === 1 ? 'bg-secondary text-accent' : 
+                              rank === 2 ? 'bg-gray-300 text-accent' : 
+                              rank === 3 ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-600';
+
+            html += `
+                <div class="flex items-center p-3 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+                    <span class="w-8 h-8 flex items-center justify-center rounded-full font-bold mr-3 ${rankColor}">
+                        ${rank}
+                    </span>
+                    <div class="flex-grow">
+                        <p class="font-semibold text-accent">${player.name || 'Nome Sconosciuto'}</p>
+                        <p class="text-sm text-gray-500">${player.role || 'Ruolo N/D'}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-bold text-primary">${player.goals || 0} GOL</p>
+                        <p class="text-sm text-gray-500">${player.assists || 0} assist</p>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+    
+    /** Renderizza il calendario partite */
+    function renderCalendar(matches) {
+        const loading = document.getElementById('loading-calendar');
+        if (loading) loading.classList.add('hidden');
+
+        // Ordina le partite per data (la più recente/futura prima)
+        const sortedMatches = matches.sort((a, b) => {
+            const dateA = a.date ? a.date.toDate() : new Date(0);
+            const dateB = b.date ? b.date.toDate() : new Date(0);
+            return dateB - dateA; // Ordine decrescente
+        });
+
+        const now = new Date();
+        const upcomingList = document.getElementById('upcoming-list');
+        const pastList = document.getElementById('past-list');
+        upcomingList.innerHTML = '';
+        pastList.innerHTML = '';
+
+        if (sortedMatches.length === 0) {
+            upcomingList.innerHTML = '<p class="text-center text-gray-500 p-4">Nessuna partita programmata o giocata.</p>';
+            pastList.innerHTML = '';
+            return;
+        }
+
+        sortedMatches.forEach(match => {
+            const matchDate = match.date ? match.date.toDate() : new Date(0);
+            const isUpcoming = matchDate > now;
+            const statusColor = match.result ? (match.result.score_us > match.result.score_opponent ? 'bg-green-100 border-green-500' : 
+                                               match.result.score_us < match.result.score_opponent ? 'bg-red-100 border-red-500' : 'bg-yellow-100 border-yellow-500') : 'bg-blue-100 border-blue-500';
+            const statusText = match.result ? (match.result.score_us > match.result.score_opponent ? 'VITTORIA' : 
+                                               match.result.score_us < match.result.score_opponent ? 'SCONFITTA' : 'PAREGGIO') : 'DA GIOCARE';
+
+            const matchHtml = `
+                <div class="match-card p-4 rounded-xl border-l-4 ${statusColor} shadow-md cursor-pointer hover:shadow-lg transition-shadow duration-200" 
+                     onclick="openMatchDetail('${match.id}')">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm font-semibold text-gray-600">${formatDate(match.date)}</p>
+                        <span class="text-xs font-bold px-2 py-1 rounded-full ${statusColor}">${statusText}</span>
+                    </div>
+                    <p class="text-xl font-extrabold text-accent mt-1">${match.opponent || 'Avversario Sconosciuto'}</p>
+                    ${match.result ? 
+                        `<p class="text-2xl font-black text-primary mt-2">${match.result.score_us} - ${match.result.score_opponent}</p>` : 
+                        `<p class="text-lg font-medium text-gray-700 mt-2">Stadio: ${match.location || 'N/D'}</p>`
+                    }
+                </div>
+            `;
+            
+            if (isUpcoming) {
+                upcomingList.insertAdjacentHTML('beforeend', matchHtml);
+            } else {
+                pastList.insertAdjacentHTML('beforeend', matchHtml);
+            }
+        });
+        
+        // Se non ci sono partite future/passate, mostra un messaggio appropriato
+        if (upcomingList.innerHTML === '') upcomingList.innerHTML = '<p class="text-center text-gray-500 p-4">Non ci sono prossimi incontri in programma.</p>';
+        if (pastList.innerHTML === '') pastList.innerHTML = '<p class="text-center text-gray-500 p-4">Non ci sono risultati precedenti.</p>';
+    }
+
+    // --- FUNZIONI DETTAGLIO PARTITA E CAMPO ---
+
+    window.openMatchDetail = function(matchId) {
+        currentMatchDetail = allMatches.find(m => m.id === matchId);
+        if (!currentMatchDetail) {
+            logError("Dettaglio partita non trovato.", null);
+            return;
+        }
+
+        document.getElementById('match-detail-title').textContent = `Partita vs ${currentMatchDetail.opponent}`;
+        document.getElementById('match-detail-subtitle').textContent = currentMatchDetail.result ? `Risultato: ${currentMatchDetail.result.score_us} - ${currentMatchDetail.result.score_opponent}` : 'Pre-Partita';
+
+        if (currentMatchDetail.formations && currentMatchDetail.formations.length > 0) {
+            currentFormationIndex = 0; // Inizia sempre dalla prima formazione
+            renderFormation();
+        } else {
+            document.getElementById('current-formation-index').textContent = '0 di 0';
+            document.getElementById('formation-description').textContent = 'Formazione non disponibile.';
+            document.getElementById('pitch-container').innerHTML = '<p class="text-center text-gray-500 p-8">Dati formazione mancanti.</p>';
+            document.getElementById('formation-table-container').innerHTML = '';
+            document.getElementById('prev-formation-btn').disabled = true;
+            document.getElementById('next-formation-btn').disabled = true;
+        }
+
+        matchDetailModal.classList.remove('hidden');
+    }
+
+    window.closeMatchDetail = function() {
+        matchDetailModal.classList.add('hidden');
+        currentMatchDetail = null;
+    }
+    
+    /** Renderizza la formazione corrente sul campo */
+    function renderFormation() {
+        const formation = currentMatchDetail.formations[currentFormationIndex];
+        const pitch = document.getElementById('pitch-container');
+        const totalFormations = currentMatchDetail.formations.length;
+        
+        // Aggiorna navigazione
+        document.getElementById('current-formation-index').textContent = `${currentFormationIndex + 1} di ${totalFormations}`;
+        document.getElementById('formation-description').textContent = formation.description || `Formazione ${currentFormationIndex + 1}`;
+        document.getElementById('prev-formation-btn').disabled = currentFormationIndex === 0;
+        document.getElementById('next-formation-btn').disabled = currentFormationIndex === totalFormations - 1;
+
+        // Renderizza il campo
+        pitch.innerHTML = ''; // Pulisci il campo
+
+        if (!formation.players) {
+            pitch.innerHTML = '<p class="text-center text-gray-500 p-8">Giocatori non specificati per questa formazione.</p>';
+            return;
+        }
+        
+        const pitchWidth = 100; // Unità percentuale
+        const pitchHeight = 150; // Unità percentuale (per ratio 2:3)
+
+        formation.players.forEach(p => {
+            const player = allPlayers.find(pl => pl.id === p.playerId);
+            if (!player) return;
+
+            // Le coordinate sono espresse in percentuale (0-100) per larghezza e altezza del campo 
+            // Vengono scalate rispetto al padding-top di 150%
+            const left = p.x; 
+            const top = (p.y * 100) / pitchHeight; // Normalizzazione 0-100% dell'altezza visibile
+
+            // Cerchio Giocatore
+            const circle = document.createElement('div');
+            circle.className = 'player-circle transition-all duration-500';
+            circle.style.left = `calc(${left}% - 20px)`; // Centra orizzontalmente (- metà larghezza)
+            circle.style.top = `${top}%`; 
+            circle.style.transform = 'translateY(-50%)'; // Centra verticalmente
+            circle.innerHTML = player.number || 'N/A';
+            circle.title = `${player.name} (${player.role})`;
+            
+            pitch.appendChild(circle);
+        });
+        
+        renderFormationTable(formation);
+    }
+    
+    /** Renderizza la tabella dei giocatori per la formazione corrente */
+    function renderFormationTable(formation) {
+        const tableContainer = document.getElementById('formation-table-container');
+        let tableHtml = `
+            <h4 class="text-lg font-bold text-accent mb-2 mt-4">Lista Giocatori in Campo</h4>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600">N.</th>
+                            <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600">Nome</th>
+                            <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600">Ruolo</th>
+                            <th class="py-2 px-4 border-b text-right text-xs font-semibold text-gray-600">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        formation.players.forEach(p => {
+            const player = allPlayers.find(pl => pl.id === p.playerId);
+            if (!player) return;
+            
+            // Trova gol e assist nella formazione, se presenti
+            const actions = formation.actions ? formation.actions.filter(a => a.playerId === p.playerId) : [];
+            const goals = actions.filter(a => a.type === 'goal').length;
+            const assists = actions.filter(a => a.type === 'assist').length;
+
+            let actionText = '';
+            if (goals > 0) actionText += `<span class="text-primary font-bold mr-1">${goals} G</span>`;
+            if (assists > 0) actionText += `<span class="text-green-600 font-bold">${assists} A</span>`;
+            if (!actionText) actionText = '-';
+
+            tableHtml += `
+                <tr class="hover:bg-gray-50">
+                    <td class="py-2 px-4 border-b text-sm text-accent font-mono">${player.number || '-'}</td>
+                    <td class="py-2 px-4 border-b text-sm text-gray-800">${player.name}</td>
+                    <td class="py-2 px-4 border-b text-sm text-gray-600">${player.role}</td>
+                    <td class="py-2 px-4 border-b text-right text-sm">${actionText}</td>
+                </tr>
+            `;
+        });
+        
+        tableHtml += '</tbody></table></div>';
+        tableContainer.innerHTML = tableHtml;
+    }
+
+    /** Naviga tra le formazioni */
+    window.navigateFormation = function(direction) {
+        const totalFormations = currentMatchDetail.formations.length;
+        let newIndex = currentFormationIndex + direction;
+
+        if (newIndex >= 0 && newIndex < totalFormations) {
+            currentFormationIndex = newIndex;
+            renderFormation();
+        }
+    }
+
+    // --- FUNZIONI MOCK DATA (per l'Admin) ---
+    
+    /** Aggiunge dati iniziali di test a Firestore */
+    window.addInitialMockData = async function() {
+        if (!db || !userId) {
+            logError("Firebase non è ancora pronto o autenticato.", null);
+            return;
+        }
+        
+        const button = document.querySelector('#admin-modal button[onclick="addInitialMockData()"]');
+        button.disabled = true;
+        button.textContent = 'Inserimento in corso...';
+
+        try {
+            // 1. Dati Giocatori (Usiamo ID statici per poterli riferire nelle Partite)
+            const mockPlayers = [
+                { id: 'p1_portiere', name: 'Mario Rossi', role: 'Portiere', number: 1, goals: 0, assists: 0 },
+                { id: 'p2_difesa', name: 'Luca Bianchi', role: 'Difensore', number: 2, goals: 1, assists: 0 },
+                { id: 'p3_difesa', name: 'Marco Verdi', role: 'Difensore', number: 3, goals: 0, assists: 1 },
+                { id: 'p4_centrocampo', name: 'Andrea Gialli', role: 'Centrocampista', number: 8, goals: 3, assists: 2 },
+                { id: 'p5_centrocampo', name: 'Giovanni Neri', role: 'Centrocampista', number: 10, goals: 5, assists: 3 },
+                { id: 'p6_attacco', name: 'Daniele Marroni', role: 'Attaccante', number: 9, goals: 10, assists: 4 },
+                { id: 'p7_attacco', name: 'Simone Viola', role: 'Attaccante', number: 11, goals: 2, assists: 0 },
+            ];
+
+            // 2. Dati Partite
+            const now = new Date();
+            const pastDate = new Date();
+            pastDate.setDate(now.getDate() - 7); // Partita di 7 giorni fa
+            
+            const futureDate = new Date();
+            futureDate.setDate(now.getDate() + 7); // Partita tra 7 giorni
+
+            const mockMatches = [
+                // Partita Passata con Dettagli
+                {
+                    opponent: 'FC Acquedotto',
+                    location: 'Campo Comunale A',
+                    date: pastDate,
+                    result: { score_us: 4, score_opponent: 2 }, // Vittoria
+                    formations: [
+                        {
+                            description: 'Formazione Iniziale (4-4-2)',
+                            players: [
+                                { playerId: 'p1_portiere', x: 50, y: 10 },
+                                { playerId: 'p2_difesa', x: 25, y: 30 },
+                                { playerId: 'p3_difesa', x: 75, y: 30 },
+                                { playerId: 'p4_centrocampo', x: 40, y: 60 },
+                                { playerId: 'p5_centrocampo', x: 60, y: 60 },
+                                { playerId: 'p6_attacco', x: 30, y: 90 },
+                                { playerId: 'p7_attacco', x: 70, y: 90 },
+                            ],
+                            actions: [
+                                { playerId: 'p6_attacco', type: 'goal', minute: 15 },
+                                { playerId: 'p6_attacco', type: 'goal', minute: 45 },
+                                { playerId: 'p6_attacco', type: 'assist', minute: 45 }, // Assist per p5 (non è un gol, è un assist)
+                                { playerId: 'p5_centrocampo', type: 'goal', minute: 45 },
+                                { playerId: 'p4_centrocampo', type: 'assist', minute: 70 },
+                                { playerId: 'p2_difesa', type: 'goal', minute: 70 },
+                            ]
+                        }
+                    ]
+                },
+                // Partita Futura (Semplice)
+                {
+                    opponent: 'AC Trastevere',
+                    location: 'Stadio Olimpico B',
+                    date: futureDate,
+                    result: null, // Nessun risultato
+                    formations: [] // Nessuna formazione predefinita
+                },
+            ];
+
+            // Esegue un batch per garantire il salvataggio dei giocatori e delle partite
+            await runTransaction(db, async (transaction) => {
+                // 1. Salva i Giocatori (sovrascrive se esistono)
+                mockPlayers.forEach(player => {
+                    const docRef = doc(db, COLLECTIONS.PLAYERS, player.id);
+                    transaction.set(docRef, { 
+                        name: player.name, 
+                        role: player.role, 
+                        number: player.number, 
+                        goals: player.goals, 
+                        assists: player.assists 
+                    });
+                });
+
+                // 2. Salva le Partite (usa addDoc per ID generati automaticamente)
+                mockMatches.forEach(match => {
+                    const colRef = collection(db, COLLECTIONS.MATCHES);
+                    transaction.set(doc(colRef), match); // Usa setDoc con doc() vuoto per generare un ID
+                });
+            });
+
+            // Avviso di successo
+            const successMsg = document.getElementById('admin-modal').querySelector('h3');
+            successMsg.textContent = 'Dati di Prova Inseriti con Successo!';
+            successMsg.classList.add('text-green-600');
+            setTimeout(() => { 
+                successMsg.textContent = 'Gestione Dati (Admin)';
+                successMsg.classList.remove('text-green-600');
+                window.toggleAdminModal(false);
+            }, 3000);
+
+        } catch (error) {
+            logError("Errore durante l'inserimento dei dati di test in Firestore", error);
+            alert("Errore durante l'inserimento dei dati di test in Firestore. Controlla la console.");
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Inserisci Dati di Prova in Firestore';
+        }
+    }
+
+
+    // --- AVVIO DELL'APPLICAZIONE ---
+    
+    // Assicurati che Lucide sia pronto e che l'app si avvii
+    window.onload = () => {
+        lucide.createIcons();
+        setupFirebase();
+    }
+</script>
 
 </body>
 </html>
