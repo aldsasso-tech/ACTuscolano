@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AC Tuscolano | Gestione Squadra</title>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
+
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
@@ -13,13 +18,13 @@
         // 1. CONFIGURAZIONE FIREBASE - SOSTITUIRE CON LE TUE CHIAVI! 🔑
         // ----------------------------------------------------
         const firebaseConfig = {
-          apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
-  authDomain: "actuscolano.firebaseapp.com",
-  projectId: "actuscolano",
-  storageBucket: "actuscolano.firebasestorage.app",
-  messagingSenderId: "62685359731",
-  appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
-  measurementId: "G-TSVH8PH4RC"
+            apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
+            authDomain: "actuscolano.firebaseapp.com",
+            projectId: "actuscolano",
+            storageBucket: "actuscolano.firebasestorage.app",
+            messagingSenderId: "62685359731",
+            appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+            measurementId: "G-TSVH8PH4RC"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -27,19 +32,22 @@
         const db = getDatabase(app);
 
         // UID dell'utente Admin - SOSTITUIRE CON L'UID REALE DELL'ADMIN! 👑
-        const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2"; 
+        const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2";
         let isAdmin = false;
 
         // ----------------------------------------------------
         // 2. FUNZIONI UTILITY INTERFACCIA
         // ----------------------------------------------------
-        
+
         // Nasconde tutte le sezioni tranne l'header e il menu principale
         function hideAllSections() {
             document.querySelectorAll('section').forEach(section => {
                 section.style.display = 'none';
             });
             document.getElementById('admin-menu').style.display = 'none';
+            // Pulisci i form temporanei admin
+            const adminStatisticheForm = document.getElementById('admin-statistiche-form');
+            if(adminStatisticheForm) adminStatisticheForm.innerHTML = '';
         }
 
         // Mostra una specifica sezione
@@ -51,11 +59,11 @@
                  document.getElementById('admin-menu').style.display = 'block';
             }
         }
-        
+
         // Logica per il reindirizzamento al click del menu
         function navigate(sectionId) {
             // Se è una sezione Admin e non è loggato come Admin, non fare nulla
-            if (sectionId.startsWith('admin-') && !isAdmin) return; 
+            if (sectionId.startsWith('admin-') && !isAdmin) return;
 
             showSection(sectionId);
             // Carica o aggiorna i dati in base alla sezione
@@ -63,6 +71,14 @@
             if (sectionId === 'calendario-section') loadProssimeGiornate(false); // Utente base
             if (sectionId === 'admin-calendario-section') loadProssimeGiornate(true); // Admin
             if (sectionId === 'statistiche-section') loadStatistiche();
+            
+            // Inizializza i widget JQuery UI (Datepicker)
+            if (sectionId === 'admin-inserimento-giornate-section') {
+                $("#match-data").datepicker({
+                    dateFormat: "dd/mm/yy",
+                    minDate: 0 
+                });
+            }
         }
 
         window.navigate = navigate; // Rende la funzione accessibile dal DOM
@@ -73,48 +89,51 @@
 
         // Gestione Login
         document.addEventListener('DOMContentLoaded', () => {
-             const loginForm = document.getElementById('login-form');
-             if (loginForm) {
-                 loginForm.addEventListener('submit', (e) => {
-                     e.preventDefault();
-                     const email = document.getElementById('login-email').value;
-                     const password = document.getElementById('login-password').value;
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('login-email').value;
+                    const password = document.getElementById('login-password').value;
 
-                     signInWithEmailAndPassword(auth, email, password)
-                         .then((userCredential) => {
-                             // Login riuscito, onAuthStateChanged gestirà il resto
-                             console.log("Utente loggato:", userCredential.user.email);
-                         })
-                         .catch((error) => {
-                             alert("Errore Login: " + error.message);
-                         });
-                 });
-             }
+                    signInWithEmailAndPassword(auth, email, password)
+                        .then((userCredential) => {
+                            // Login riuscito, onAuthStateChanged gestirà il resto
+                            console.log("Utente loggato:", userCredential.user.email);
+                        })
+                        .catch((error) => {
+                            alert("Errore Login: " + error.message);
+                        });
+                });
+            }
         });
-        
+
         // Stato Autenticazione
         onAuthStateChanged(auth, (user) => {
             const loginSection = document.getElementById('login-section');
             const navLinks = document.querySelectorAll('.nav-link');
-            const adminNav = document.getElementById('admin-nav');
             const logoutBtn = document.getElementById('logout-btn');
+            const adminLinks = document.querySelectorAll('#admin-menu .nav-link');
 
             if (user) {
                 // Utente loggato
                 const uid = user.uid;
                 isAdmin = (uid === ADMIN_UID);
-                
+
                 // Nascondi Login, mostra Logout
                 loginSection.style.display = 'none';
                 logoutBtn.style.display = 'inline';
 
                 // Mostra/Nascondi le voci di menu Admin
+                adminLinks.forEach(link => {
+                    link.style.display = isAdmin ? 'block' : 'none';
+                });
+                
+                // Nascondi i link admin nel menu principale (se erano stati aggiunti lì)
                 navLinks.forEach(link => {
                     const sectionId = link.getAttribute('onclick').split("'")[1];
                     if (sectionId.startsWith('admin-')) {
-                        link.style.display = isAdmin ? 'block' : 'none';
-                    } else {
-                        link.style.display = 'block'; // Voci base sempre visibili
+                        link.style.display = 'none';
                     }
                 });
 
@@ -131,16 +150,9 @@
                 showSection('login-section');
                 logoutBtn.style.display = 'none';
 
-                // Imposta la navigazione per i non loggati
-                navLinks.forEach(link => {
-                    const sectionId = link.getAttribute('onclick').split("'")[1];
-                    // I non-admin vedono solo le sezioni di base (Rosa, Calendario, Statistiche) e Login
-                    if (!sectionId.startsWith('admin-')) {
-                        link.style.display = 'block';
-                    } else {
-                        link.style.display = 'none';
-                    }
-                });
+                // Nascondi tutti i link admin
+                adminLinks.forEach(link => link.style.display = 'none');
+                
             }
         });
 
@@ -157,7 +169,7 @@
         // ----------------------------------------------------
         // 4. FUNZIONI DATABASE - Realtime Database
         // ----------------------------------------------------
-        
+
         const RUOLI = ["Portiere", "Terzino sinistro", "Terzino destro", "Difensore centrale", "Centrocampista centrale", "Centrocampista sinistro", "Centrocampista destro", "Attaccante centrale"];
 
         // Funzione Admin: Inserimento Giocatore
@@ -183,6 +195,7 @@
                     voto: 0, 
                     assist: 0, 
                     goal: 0,
+                    partite: 0 // Aggiunto per tracciare la media voti
                 }).then(() => {
                     alert("Giocatore inserito con successo!");
                     document.getElementById('giocatore-form').reset();
@@ -232,12 +245,25 @@
                         id: key 
                     })).sort((a, b) => a.numero - b.numero); // Ordina per numero maglia
 
+                    // Utilizzo JQuery UI Accordion
+                    let htmlContent = '';
                     players.forEach(player => {
-                        const li = document.createElement('li');
-                        li.innerHTML = `
-                            **${player.numero} - ${player.nome} ${player.cognome}** (Ruolo: ${player.ruolo} | Status: ${player.stato})
+                        htmlContent += `
+                            <h3>N.${player.numero} - ${player.nome} ${player.cognome}</h3>
+                            <div>
+                                <p><strong>Ruolo:</strong> ${player.ruolo}</p>
+                                <p><strong>Status:</strong> ${player.stato}</p>
+                                <p><strong>Voto Medio:</strong> ${player.voto.toFixed(1)}</p>
+                                <p><strong>Goal/Assist:</strong> ${player.goal} / ${player.assist}</p>
+                            </div>
                         `;
-                        rosaList.appendChild(li);
+                    });
+                    
+                    rosaList.innerHTML = `<div id="accordion-rosa">${htmlContent}</div>`;
+                    $('#accordion-rosa').accordion({
+                        collapsible: true,
+                        active: false,
+                        heightStyle: "content"
                     });
                 } else {
                     rosaList.innerHTML = '<p>Nessun giocatore inserito.</p>';
@@ -301,13 +327,13 @@
                         
                         let statoCandidatura = '';
                         if (!forAdmin && auth.currentUser) {
-                           // Controlla se l'utente attuale si è già candidato
-                           const isCandidato = match.candidature && match.candidature[auth.currentUser.uid];
-                           if (isCandidato) {
-                              statoCandidatura = '<span style="color:red; font-weight:bold;">✅ Candidato</span>';
-                           } else {
-                              statoCandidatura = `<button class="candidati-btn" onclick="candidati('${match.id}')">Candidatura</button>`;
-                           }
+                            // Controlla se l'utente attuale si è già candidato
+                            const isCandidato = match.candidature && match.candidature[auth.currentUser.uid];
+                            if (isCandidato) {
+                                statoCandidatura = '<span style="color:#008000; font-weight:bold;">✅ Candidato</span>';
+                            } else {
+                                statoCandidatura = `<button class="candidati-btn" onclick="candidati('${match.id}')">Candidatura</button>`;
+                            }
                         }
 
                         let adminActions = '';
@@ -324,6 +350,7 @@
                             **vs ${match.avversaria}** (${match.casa ? 'Casa 🏠' : 'Trasferta 🚌'}) - 
                             Data: ${match.data} ${match.orario} 
                             Campo: ${match.campo}
+                            ${match.risultato !== 'N/D' ? `<span style="font-weight:bold; color:red;">Risultato: ${match.risultato}</span>` : ''}
                             ${forAdmin ? '' : statoCandidatura}
                             ${adminActions}
                         `;
@@ -343,8 +370,8 @@
             document.getElementById('admin-statistiche-form').innerHTML = `
                 <h3>Risultato Partita vs ${avversaria}</h3>
                 <form onsubmit="saveMatchResult(event, '${matchId}')">
-                    <label>AC Tuscolano Goal:</label><input type="number" id="tuscolano-goal" required><br>
-                    <label>${avversaria} Goal:</label><input type="number" id="avversaria-goal" required><br>
+                    <label>AC Tuscolano Goal:</label><input type="number" id="tuscolano-goal" min="0" required><br>
+                    <label>${avversaria} Goal:</label><input type="number" id="avversaria-goal" min="0" required><br>
                     <button type="submit" class="admin-btn">Salva Risultato</button>
                 </form>
             `;
@@ -363,8 +390,7 @@
             update(matchRef, { risultato: risultato })
             .then(() => {
                 alert(`Risultato salvato: ${risultato}`);
-                // Aggiorna anche le statistiche di squadra (Utente Base)
-                loadStatistiche(); 
+                showSection('admin-calendario-section'); // Torna al calendario admin
             })
             .catch(error => {
                 console.error("Errore salvataggio risultato:", error);
@@ -413,9 +439,12 @@
                 if (data) {
                     Object.values(data).forEach(player => {
                         const li = document.createElement('li');
+                        // Logica per Voto Medio, tiene conto delle partite giocate
+                        const votoMedio = (player.voto / (player.partite > 0 ? player.partite : 1)).toFixed(2);
+
                         li.innerHTML = `
                             **${player.nome} ${player.cognome}** (N.${player.numero}): 
-                            Voto Medio: ${player.voto.toFixed(1)} | Goal: ${player.goal} | Assist: ${player.assist}
+                            Voto Medio: ${votoMedio} | Goal: ${player.goal} | Assist: ${player.assist}
                         `;
                         votiList.appendChild(li);
                     });
@@ -428,35 +457,21 @@
         // Funzione per mostrare il form di valutazione giocatore (Admin)
         window.showValutazioneForm = function() {
             if (!isAdmin) return;
-            // Carica i giocatori nel menu a discesa
-            get(ref(db, 'rosa')).then((snapshot) => {
-                const players = snapshot.val();
-                const selectPlayer = document.getElementById('valutazione-giocatore');
-                selectPlayer.innerHTML = '<option value="">Seleziona Giocatore</option>';
-                if (players) {
-                    Object.keys(players).forEach(key => {
-                        const player = players[key];
-                        const option = document.createElement('option');
-                        option.value = key;
-                        option.textContent = `${player.nome} ${player.cognome} (N.${player.numero})`;
-                        selectPlayer.appendChild(option);
-                    });
-                }
-            });
-
             showSection('admin-statistiche-section'); // Assicurati che sia visibile
+            
             document.getElementById('admin-statistiche-form').innerHTML = `
-                <h3>Valutazione Singolo Giocatore</h3>
+                <h3>Valutazione Singolo Giocatore (Post-Partita)</h3>
                 <form onsubmit="savePlayerStats(event)">
                     <label>Giocatore:</label>
                     <select id="valutazione-giocatore" required></select><br>
                     <label>Voto (0-10):</label><input type="number" id="valutazione-voto" min="0" max="10" step="0.5" required><br>
-                    <label>Goal:</label><input type="number" id="valutazione-goal" min="0" required><br>
-                    <label>Assist:</label><input type="number" id="valutazione-assist" min="0" required><br>
+                    <label>Goal nella partita:</label><input type="number" id="valutazione-goal" min="0" value="0" required><br>
+                    <label>Assist nella partita:</label><input type="number" id="valutazione-assist" min="0" value="0" required><br>
                     <button type="submit" class="admin-btn">Salva Statistiche</button>
                 </form>
             `;
-            // Ricarica la lista dei giocatori nel form (chiamata due volte per popolare il select)
+            
+            // Carica i giocatori nel menu a discesa
             get(ref(db, 'rosa')).then((snapshot) => {
                 const players = snapshot.val();
                 const selectPlayer = document.getElementById('valutazione-giocatore');
@@ -489,21 +504,19 @@
                 if (snapshot.exists()) {
                     const currentStats = snapshot.val();
                     
-                    // La logica per calcolare la media voti è complessa e richiede di tracciare 
-                    // il numero di partite giocate. Qui semplifichiamo: 
-                    // si assume che il voto inserito sia il voto della partita, 
-                    // e si aggiornano goal/assist come totali.
-                    // Per semplicità, in questa demo, la logica complessa della media non è inclusa.
-                    
-                    // L'esempio seguente aggiorna solo goal e assist e sovrascrive il voto.
+                    // Calcolo della nuova media voti e numero di partite
+                    const newTotalVoto = (currentStats.voto || 0) + voto;
+                    const newPartite = (currentStats.partite || 0) + 1;
+
                     update(playerRef, {
-                        voto: voto, // Semplificazione: assume che questo sia il voto della singola partita
-                        goal: currentStats.goal + goal, // Aggiunge i goal/assist della partita
-                        assist: currentStats.assist + assist
+                        voto: newTotalVoto, 
+                        goal: (currentStats.goal || 0) + goal, 
+                        assist: (currentStats.assist || 0) + assist,
+                        partite: newPartite
                     }).then(() => {
                         alert("Statistiche giocatore aggiornate!");
                         document.getElementById('admin-statistiche-form').querySelector('form').reset();
-                        loadStatistiche(); // Ricarica la sezione utente base
+                        showValutazioneForm(); // Ricarica il form
                     });
                 } else {
                     alert("Giocatore non trovato.");
@@ -515,35 +528,38 @@
         }
         
         // Funzione Admin: Sezione Inserimento Formazione (Solo Struttura Base)
+        // **DA COMPLETARE CON LA LOGICA DI SELEZIONE DEI CANDIDATI E SALVATAGGIO SU DB**
         window.showFormazioneForm = function(matchId, avversaria) {
             if (!isAdmin) return;
             showSection('admin-formazione-section'); 
             
-            // Logica per popolare il form con i giocatori e le candidature 
-            // e salvare in 'calendario/matchId/formazioneTitolare'
             document.getElementById('formazione-content').innerHTML = `
-                <h3>Formazione e Sostituzioni vs ${avversaria}</h3>
-                <p>⚠️ **Nota:** Le sezioni "Formazione per singola giornata" e "Sostituzioni" con simulazione grafica sono state omesse/semplificate a causa della loro complessità di sviluppo che va oltre un singolo file HTML/JS vanilla. Qui forniamo solo un segnaposto per la loro implementazione.
-                </p>
+                <h3>Formazione e Sostituzioni vs ${avversaria} (ID Partita: ${matchId})</h3>
+                <p>⚠️ **Nota:** Per implementare la selezione della formazione e delle sostituzioni in modo completo (con i candidati della partita) è necessario un codice più esteso. Qui la funzione è semplificata.</p>
                 <form onsubmit="alert('Formazione salvata (simulazione)'); return false;">
                     <h4>1. Seleziona Titolari (3-3-1)</h4>
-                    <label>Portiere:</label><select><option>Giocatore 1</option></select><br>
-                    <label>Difensore Centrale 1:</label><select><option>Giocatore 2</option></select><br>
+                    <label>Portiere:</label><select><option>Giocatore (Candidato)</option></select><br>
+                    <label>Difesa:</label><select><option>Giocatore (Candidato)</option></select><br>
+                    <label>Centrocampo:</label><select><option>Giocatore (Candidato)</option></select><br>
+                    <label>Attacco:</label><select><option>Giocatore (Candidato)</option></select><br>
                     <label>Panchina:</label><textarea rows="5" placeholder="Elenco riserve qui..."></textarea><br>
                     
                     <hr>
-                    <h4>2. Inserimento Sostituzioni (Simulazione)</h4>
-                    <p>
-                        Qui dovrebbe esserci la logica per inserire le 8 sostituzioni e il codice che genera la rappresentazione grafica delle 9 formazioni.
-                    </p>
-                    <div id="campo-di-gioco-simulazione" style="background-color: green; color: white; height: 300px; text-align: center; line-height: 300px; border: 2px solid white;">
-                        [Campo da Gioco 3-3-1 Grafico (Richiede Canvas/SVG)]
+                    <div id="campo-di-gioco-simulazione" style="background-color: #006400; color: white; height: 300px; text-align: center; line-height: 300px; border: 2px solid #fff; border-radius: 10px;">
+                        [Visualizzazione Grafica 3-3-1 qui]
                     </div>
                     <button type="submit" class="admin-btn">Salva Formazione & Sostituzioni</button>
                 </form>
             `;
         }
 
+        // ----------------------------------------------------
+        // 5. INIZIALIZZAZIONE JQUERY
+        // ----------------------------------------------------
+        $(document).ready(function() {
+            // Aggiungi qui eventuali inizializzazioni JQuery
+            // Il Datepicker è inizializzato nella funzione navigate.
+        });
         
     </script>
 
@@ -646,7 +662,8 @@
         form input[type="date"],
         form input[type="time"],
         form select,
-        form textarea {
+        form textarea,
+        .ui-datepicker-trigger {
             width: 100%;
             padding: 10px;
             margin-top: 5px;
@@ -690,6 +707,23 @@
             border-radius: 4px;
         }
 
+        /* Stile per JQuery UI Accordion */
+        #accordion-rosa .ui-accordion-header {
+            background-color: var(--color-secondary);
+            color: var(--color-text);
+            font-weight: bold;
+            border-left: 5px solid var(--color-accent);
+            padding: 10px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        #accordion-rosa .ui-accordion-content {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+        
         /* Responsive Design */
         @media (max-width: 600px) {
             h1 {
@@ -721,67 +755,60 @@
         <div id="admin-menu" style="display:none; margin-top: 10px; background-color: var(--color-accent); padding: 5px 0;">
             <span style="color:var(--color-primary); font-weight:bold;">🛠️ Menu Admin:</span>
             <a class="nav-link" onclick="navigate('admin-inserimento-giocatori-section')" style="background-color:#FFD700; color:#333;">Ins. Giocatori</a>
-            <a class="nav-link" onclick="navigate('admin-calendario-section')" style="background-color:#FFD700; color:#333;">Ins. Giornate</a>
-            <a class="nav-link" onclick="navigate('admin-formazione-section')" style="background-color:#FFD700; color:#333;">Ins. Formazione</a>
-            <a class="nav-link" onclick="navigate('admin-statistiche-section')" style="background-color:#FFD700; color:#333;">Ins. Statistiche</a>
+            <a class="nav-link" onclick="navigate('admin-inserimento-giornate-section')" style="background-color:#FFD700; color:#333;">Ins. Giornate</a>
+            <a class="nav-link" onclick="navigate('admin-calendario-section')" style="background-color:#FFD700; color:#333;">Gest. Partite</a>
+            <a class="nav-link" onclick="navigate('admin-statistiche-section'); showValutazioneForm();" style="background-color:#FFD700; color:#333;">Gest. Statistiche</a>
         </div>
     </nav>
-    
-    <section id="login-section" style="display: block;">
+
+    <section id="login-section">
         <h2>Accesso</h2>
         <form id="login-form">
             <label for="login-email">Email:</label>
-            <input type="email" id="login-email" required>
-            
+            <input type="email" id="login-email" required><br>
             <label for="login-password">Password:</label>
-            <input type="password" id="login-password" required>
-            
-            <button type="submit">Accedi</button>
-            <p>Usa le credenziali admin per accedere alle funzioni di gestione.</p>
+            <input type="password" id="login-password" required><br>
+            <button type="submit">Login</button>
         </form>
     </section>
 
     <section id="rosa-section">
-        <h2>Rosa Giocatori</h2>
+        <h2>Rosa Ufficiale 🧑‍🤝‍🧑</h2>
         <ul id="rosa-list">
-            <li>Caricamento Rosa...</li>
-        </ul>
+            </ul>
     </section>
 
     <section id="calendario-section">
-        <h2>Prossime Giornate & Candidature</h2>
+        <h2>Prossime Giornate 📅</h2>
+        <p>Clicca su "Candidatura" per confermare la tua disponibilità per la partita.</p>
         <ul id="calendario-list">
-            <li>Caricamento Calendario...</li>
-        </ul>
-        <p>Clicca sul pulsante **Candidatura** per confermare la tua disponibilità.</p>
+            </ul>
     </section>
     
     <section id="statistiche-section">
-        <h2>Prestazioni e Statistiche</h2>
-
-        <h3>Risultati Squadra</h3>
+        <h2>Statistiche Squadra 📊</h2>
+        
+        <h3>Risultati Partite</h3>
         <ul id="statistiche-risultati-list">
             </ul>
-        
-        <h3>Statistiche Giocatori</h3>
+
+        <h3>Voti Giocatori</h3>
         <ul id="statistiche-voti-list">
             </ul>
     </section>
 
     <section id="admin-inserimento-giocatori-section">
-        <h2>🛠️ Admin: Inserimento Giocatori</h2>
+        <h2>Admin: Inserimento Giocatori ➕</h2>
         <form id="giocatore-form" onsubmit="addPlayer(event)">
             <label for="giocatore-nome">Nome:</label>
-            <input type="text" id="giocatore-nome" required>
-            
+            <input type="text" id="giocatore-nome" required><br>
             <label for="giocatore-cognome">Cognome:</label>
-            <input type="text" id="giocatore-cognome" required>
-            
+            <input type="text" id="giocatore-cognome" required><br>
             <label for="giocatore-numero">Numero Maglia:</label>
-            <input type="number" id="giocatore-numero" min="1" max="99" required>
-            
+            <input type="number" id="giocatore-numero" min="1" max="99" required><br>
             <label for="giocatore-ruolo">Ruolo:</label>
             <select id="giocatore-ruolo" required>
+                <option value="">Seleziona Ruolo</option>
                 <option value="Portiere">Portiere</option>
                 <option value="Terzino sinistro">Terzino sinistro</option>
                 <option value="Terzino destro">Terzino destro</option>
@@ -790,63 +817,56 @@
                 <option value="Centrocampista sinistro">Centrocampista sinistro</option>
                 <option value="Centrocampista destro">Centrocampista destro</option>
                 <option value="Attaccante centrale">Attaccante centrale</option>
-            </select>
-            
-            <label for="giocatore-titolare">Titolare o Riserva:</label>
+            </select><br>
+            <label for="giocatore-titolare">Status (Titolare/Riserva):</label>
             <select id="giocatore-titolare" required>
                 <option value="Titolare">Titolare</option>
                 <option value="Riserva">Riserva</option>
-            </select>
-            
+            </select><br>
             <button type="submit" class="admin-btn">Inserisci Giocatore</button>
+        </form>
+    </section>
+    
+    <section id="admin-inserimento-giornate-section">
+        <h2>Admin: Inserimento Nuova Giornata 📅</h2>
+        <form id="match-form" onsubmit="addMatch(event)">
+            <label for="match-avversaria">Avversaria:</label>
+            <input type="text" id="match-avversaria" required><br>
+            <label for="match-data">Data Partita:</label>
+            <input type="text" id="match-data" required placeholder="Clicca per selezionare la data"><br> <label for="match-orario">Orario:</label>
+            <input type="time" id="match-orario" required><br>
+            <label for="match-campo">Campo da Gioco:</label>
+            <input type="text" id="match-campo" required><br>
+            <label for="match-casa">Casa o Trasferta?</label>
+            <select id="match-casa" required>
+                <option value="si">Casa</option>
+                <option value="no">Trasferta</option>
+            </select><br>
+            <button type="submit" class="admin-btn">Inserisci Giornata</button>
         </form>
     </section>
 
     <section id="admin-calendario-section">
-        <h2>🛠️ Admin: Inserimento Prossime Giornate</h2>
-        <form id="match-form" onsubmit="addMatch(event)">
-            <label for="match-avversaria">Nome Squadra Avversaria:</label>
-            <input type="text" id="match-avversaria" required>
-            
-            <label for="match-data">Data:</label>
-            <input type="date" id="match-data" required>
-            
-            <label for="match-orario">Orario:</label>
-            <input type="time" id="match-orario" required>
-            
-            <label for="match-campo">Campo di Gioco:</label>
-            <input type="text" id="match-campo" required>
-            
-            <label for="match-casa">In Casa o Fuori Casa:</label>
-            <select id="match-casa" required>
-                <option value="si">In Casa</option>
-                <option value="no">Fuori Casa</option>
-            </select>
-            
-            <button type="submit" class="admin-btn">Inserisci Giornata</button>
-        </form>
-        
-        <h3>Prossime Giornate Inserite</h3>
+        <h2>Admin: Gestione Partite & Candidature ⚙️</h2>
+        <p>Seleziona una partita per inserire la Formazione o il Risultato.</p>
         <ul id="admin-calendario-list">
-            <li>Caricamento Calendario Admin...</li>
-        </ul>
+            </ul>
     </section>
 
     <section id="admin-formazione-section">
-        <h2>🛠️ Admin: Inserimento Formazione & Sostituzioni</h2>
+        <h2>Admin: Inserimento Formazione 📝</h2>
         <div id="formazione-content">
-            <p>Seleziona una partita dalla sezione "Inserimento Prossime Giornate" per gestire la formazione e le sostituzioni.</p>
-        </div>
+            </div>
     </section>
     
     <section id="admin-statistiche-section">
-        <h2>🛠️ Admin: Gestione Statistiche</h2>
-        
-        <button onclick="showValutazioneForm()" class="admin-btn">Inserisci Voto/Goal Giocatore</button>
-        <p>I risultati delle partite vengono inseriti direttamente dalla sezione "Inserimento Prossime Giornate".</p>
-
+        <h2>Admin: Inserimento Risultati / Valutazioni 📈</h2>
         <div id="admin-statistiche-form">
             </div>
+        <p>
+            <button class="admin-btn" onclick="navigate('admin-calendario-section')">Gestisci Risultati Partita</button>
+            <button class="admin-btn" onclick="showValutazioneForm()">Valuta Voto/Goal/Assist</button>
+        </p>
     </section>
 
 </body>
