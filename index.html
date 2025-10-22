@@ -9,559 +9,591 @@
     <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
 
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
-        import { getDatabase, ref, set, push, onValue, get, update } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
+<script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
+    import { getDatabase, ref, set, push, onValue, get, update } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
-        // ----------------------------------------------------
-        // 1. CONFIGURAZIONE FIREBASE - SOSTITUIRE CON LE TUE CHIAVI! 🔑
-        // ----------------------------------------------------
-        const firebaseConfig = {
-            apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
-            authDomain: "actuscolano.firebaseapp.com",
-            projectId: "actuscolano",
-            storageBucket: "actuscolano.firebasestorage.app",
-            messagingSenderId: "62685359731",
-            appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
-            measurementId: "G-TSVH8PH4RC"
-        };
+    // ----------------------------------------------------
+    // 1. CONFIGURAZIONE FIREBASE - SOSTITUIRE CON LE TUE CHIAVI! 🔑
+    // ----------------------------------------------------
+    const firebaseConfig = {
+        apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
+        authDomain: "actuscolano.firebaseapp.com",
+        projectId: "actuscolano",
+        storageBucket: "actuscolano.firebasestorage.app",
+        messagingSenderId: "62685359731",
+        appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+        measurementId: "G-TSVH8PH4RC"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getDatabase(app);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
 
-        // UID dell'utente Admin - SOSTITUIRE CON L'UID REALE DELL'ADMIN! 👑
-        const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2";
-        let isAdmin = false;
+    // UID dell'utente Admin - SOSTITUIRE CON L'UID REALE DELL'ADMIN! 👑
+    const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2";
+    let isAdmin = false;
 
-        // ----------------------------------------------------
-        // 2. FUNZIONI UTILITY INTERFACCIA
-        // ----------------------------------------------------
+    // ----------------------------------------------------
+    // 2. FUNZIONI UTILITY INTERFACCIA
+    // ----------------------------------------------------
 
-        // Nasconde tutte le sezioni tranne l'header e il menu principale
-        function hideAllSections() {
-            document.querySelectorAll('section').forEach(section => {
-                section.style.display = 'none';
-            });
-            document.getElementById('admin-menu').style.display = 'none';
-            // Pulisci i form temporanei admin
-            const adminStatisticheForm = document.getElementById('admin-statistiche-form');
-            if(adminStatisticheForm) adminStatisticheForm.innerHTML = '';
+    // Nasconde tutte le sezioni tranne l'header e il menu principale
+    function hideAllSections() {
+        document.querySelectorAll('section').forEach(section => {
+            section.style.display = 'none';
+        });
+        document.getElementById('admin-menu').style.display = 'none';
+        // Pulisci i form temporanei admin
+        const adminStatisticheForm = document.getElementById('admin-statistiche-form');
+        if(adminStatisticheForm) adminStatisticheForm.innerHTML = '';
+    }
+
+    // Mostra una specifica sezione
+    function showSection(id) {
+        hideAllSections();
+        const section = document.getElementById(id);
+        if (section) section.style.display = 'block';
+        if (isAdmin && id !== 'login-section') {
+             document.getElementById('admin-menu').style.display = 'block';
         }
+    }
 
-        // Mostra una specifica sezione
-        function showSection(id) {
+    // Logica per il reindirizzamento al click del menu
+    function navigate(sectionId) {
+        // Se è una sezione Admin e non è loggato come Admin, non fare nulla
+        if (sectionId.startsWith('admin-') && !isAdmin) return;
+
+        showSection(sectionId);
+        // Carica o aggiorna i dati in base alla sezione
+        if (sectionId === 'rosa-section') loadRosa();
+        if (sectionId === 'calendario-section') loadProssimeGiornate(false); // Utente base
+        if (sectionId === 'admin-calendario-section') loadProssimeGiornate(true); // Admin
+        if (sectionId === 'statistiche-section') loadStatistiche();
+        
+        // Inizializza i widget JQuery UI (Datepicker)
+        if (sectionId === 'admin-inserimento-giornate-section') {
+            $("#match-data").datepicker({
+                dateFormat: "dd/mm/yy",
+                minDate: 0 
+            });
+        }
+        // Inizializza il form di valutazione all'apertura della sezione Admin Statistiche
+        if (sectionId === 'admin-statistiche-section') {
+             showValutazioneForm();
+        }
+    }
+
+    window.navigate = navigate; // Rende la funzione accessibile dal DOM
+
+    // ----------------------------------------------------
+    // 3. AUTENTICAZIONE FIREBASE
+    // ----------------------------------------------------
+
+    // Gestione Login
+    document.addEventListener('DOMContentLoaded', () => {
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+
+                signInWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        // Login riuscito, onAuthStateChanged gestirà il resto
+                        console.log("Utente loggato:", userCredential.user.email);
+                    })
+                    .catch((error) => {
+                        alert("Errore Login: " + error.message);
+                    });
+            });
+        }
+    });
+
+    // Stato Autenticazione
+    onAuthStateChanged(auth, (user) => {
+        const loginSection = document.getElementById('login-section');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const logoutBtn = document.getElementById('logout-btn');
+        const adminLinks = document.querySelectorAll('#admin-menu .nav-link');
+
+        if (user) {
+            // Utente loggato
+            const uid = user.uid;
+            isAdmin = (uid === ADMIN_UID);
+
+            // Nascondi Login, mostra Logout
+            loginSection.style.display = 'none';
+            logoutBtn.style.display = 'inline';
+
+            // Mostra/Nascondi le voci di menu Admin
+            adminLinks.forEach(link => {
+                link.style.display = isAdmin ? 'block' : 'none';
+            });
+            
+            // Nascondi i link admin nel menu principale (se erano stati aggiunti lì)
+            navLinks.forEach(link => {
+                const sectionId = link.getAttribute('onclick').split("'")[1];
+                if (sectionId.startsWith('admin-')) {
+                    link.style.display = 'none';
+                }
+            });
+
+            if (isAdmin) {
+                // Inizializza sulla sezione principale Admin
+                showSection('admin-inserimento-giocatori-section');
+            } else {
+                showSection('rosa-section');
+            }
+
+        } else {
+            // Utente NON loggato
+            isAdmin = false;
             hideAllSections();
-            const section = document.getElementById(id);
-            if (section) section.style.display = 'block';
-            if (isAdmin && id !== 'login-section') {
-                 document.getElementById('admin-menu').style.display = 'block';
-            }
-        }
+            showSection('login-section');
+            logoutBtn.style.display = 'none';
 
-        // Logica per il reindirizzamento al click del menu
-        function navigate(sectionId) {
-            // Se è una sezione Admin e non è loggato come Admin, non fare nulla
-            if (sectionId.startsWith('admin-') && !isAdmin) return;
-
-            showSection(sectionId);
-            // Carica o aggiorna i dati in base alla sezione
-            if (sectionId === 'rosa-section') loadRosa();
-            if (sectionId === 'calendario-section') loadProssimeGiornate(false); // Utente base
-            if (sectionId === 'admin-calendario-section') loadProssimeGiornate(true); // Admin
-            if (sectionId === 'statistiche-section') loadStatistiche();
+            // Nascondi tutti i link admin
+            adminLinks.forEach(link => link.style.display = 'none');
             
-            // Inizializza i widget JQuery UI (Datepicker)
-            if (sectionId === 'admin-inserimento-giornate-section') {
-                $("#match-data").datepicker({
-                    dateFormat: "dd/mm/yy",
-                    minDate: 0 
-                });
-            }
         }
+    });
 
-        window.navigate = navigate; // Rende la funzione accessibile dal DOM
-
-        // ----------------------------------------------------
-        // 3. AUTENTICAZIONE FIREBASE
-        // ----------------------------------------------------
-
-        // Gestione Login
-        document.addEventListener('DOMContentLoaded', () => {
-            const loginForm = document.getElementById('login-form');
-            if (loginForm) {
-                loginForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const email = document.getElementById('login-email').value;
-                    const password = document.getElementById('login-password').value;
-
-                    signInWithEmailAndPassword(auth, email, password)
-                        .then((userCredential) => {
-                            // Login riuscito, onAuthStateChanged gestirà il resto
-                            console.log("Utente loggato:", userCredential.user.email);
-                        })
-                        .catch((error) => {
-                            alert("Errore Login: " + error.message);
-                        });
-                });
-            }
+    // Gestione Logout
+    window.handleLogout = function() {
+        signOut(auth).then(() => {
+            alert("Logout effettuato.");
+            showSection('login-section');
+        }).catch((error) => {
+            console.error("Errore Logout:", error);
         });
+    }
 
-        // Stato Autenticazione
-        onAuthStateChanged(auth, (user) => {
-            const loginSection = document.getElementById('login-section');
-            const navLinks = document.querySelectorAll('.nav-link');
-            const logoutBtn = document.getElementById('logout-btn');
-            const adminLinks = document.querySelectorAll('#admin-menu .nav-link');
+    // ----------------------------------------------------
+    // 4. FUNZIONI DATABASE - Realtime Database
+    // ----------------------------------------------------
 
-            if (user) {
-                // Utente loggato
-                const uid = user.uid;
-                isAdmin = (uid === ADMIN_UID);
+    const RUOLI = ["Portiere", "Terzino sinistro", "Terzino destro", "Difensore centrale", "Centrocampista centrale", "Centrocampista sinistro", "Centrocampista destro", "Attaccante centrale"];
 
-                // Nascondi Login, mostra Logout
-                loginSection.style.display = 'none';
-                logoutBtn.style.display = 'inline';
+    // Funzione Admin: Inserimento Giocatore
+    window.addPlayer = function(e) {
+        if (e) e.preventDefault();
+        if (!isAdmin) return alert("Accesso negato.");
 
-                // Mostra/Nascondi le voci di menu Admin
-                adminLinks.forEach(link => {
-                    link.style.display = isAdmin ? 'block' : 'none';
-                });
-                
-                // Nascondi i link admin nel menu principale (se erano stati aggiunti lì)
-                navLinks.forEach(link => {
-                    const sectionId = link.getAttribute('onclick').split("'")[1];
-                    if (sectionId.startsWith('admin-')) {
-                        link.style.display = 'none';
-                    }
-                });
-
-                if (isAdmin) {
-                    showSection('admin-inserimento-giocatori-section');
-                } else {
-                    showSection('rosa-section');
-                }
-
-            } else {
-                // Utente NON loggato
-                isAdmin = false;
-                hideAllSections();
-                showSection('login-section');
-                logoutBtn.style.display = 'none';
-
-                // Nascondi tutti i link admin
-                adminLinks.forEach(link => link.style.display = 'none');
-                
-            }
-        });
-
-        // Gestione Logout
-        window.handleLogout = function() {
-            signOut(auth).then(() => {
-                alert("Logout effettuato.");
-                showSection('login-section');
-            }).catch((error) => {
-                console.error("Errore Logout:", error);
-            });
-        }
-
-        // ----------------------------------------------------
-        // 4. FUNZIONI DATABASE - Realtime Database
-        // ----------------------------------------------------
-
-        const RUOLI = ["Portiere", "Terzino sinistro", "Terzino destro", "Difensore centrale", "Centrocampista centrale", "Centrocampista sinistro", "Centrocampista destro", "Attaccante centrale"];
-
-        // Funzione Admin: Inserimento Giocatore
-        window.addPlayer = function(e) {
-            if (e) e.preventDefault();
-            if (!isAdmin) return alert("Accesso negato.");
-
-            const nome = document.getElementById('giocatore-nome').value;
-            const cognome = document.getElementById('giocatore-cognome').value;
-            const numero = parseInt(document.getElementById('giocatore-numero').value);
-            const ruolo = document.getElementById('giocatore-ruolo').value;
-            const titolare = document.getElementById('giocatore-titolare').value;
-            
-            if (nome && cognome && numero && ruolo) {
-                const newPlayerRef = push(ref(db, 'rosa'));
-                set(newPlayerRef, {
-                    nome: nome,
-                    cognome: cognome,
-                    numero: numero,
-                    ruolo: ruolo,
-                    stato: titolare, // Titolare o Riserva
-                    // Statistiche iniziali
-                    voto: 0, 
-                    assist: 0, 
-                    goal: 0,
-                    partite: 0 // Aggiunto per tracciare la media voti
-                }).then(() => {
-                    alert("Giocatore inserito con successo!");
-                    document.getElementById('giocatore-form').reset();
-                }).catch((error) => {
-                    console.error("Errore inserimento giocatore:", error);
-                    alert("Errore inserimento: " + error.message);
-                });
-            } else {
-                alert("Compila tutti i campi!");
-            }
-        }
+        const nome = document.getElementById('giocatore-nome').value;
+        const cognome = document.getElementById('giocatore-cognome').value;
+        const numero = parseInt(document.getElementById('giocatore-numero').value);
+        const ruolo = document.getElementById('giocatore-ruolo').value;
+        const titolare = document.getElementById('giocatore-titolare').value;
         
-        // Funzione Utente Base: Candidatura
-        window.candidati = function(matchId) {
-            const user = auth.currentUser;
-            if (!user) return alert("Devi essere loggato per candidarti.");
-
-            const nomeCompleto = user.email.split('@')[0]; // Uso l'email come ID base
-            
-            // Logica di candidatura molto semplificata:
-            const matchRef = ref(db, 'calendario/' + matchId + '/candidature/' + user.uid);
-            set(matchRef, { 
-                email: user.email, 
-                dataCandidatura: new Date().toISOString() 
+        if (nome && cognome && numero && ruolo) {
+            const newPlayerRef = push(ref(db, 'rosa'));
+            set(newPlayerRef, {
+                nome: nome,
+                cognome: cognome,
+                numero: numero,
+                ruolo: ruolo,
+                stato: titolare, // Titolare o Riserva
+                // Statistiche iniziali
+                voto: 0, 
+                assist: 0, 
+                goal: 0,
+                partite: 0 // Aggiunto per tracciare la media voti
             }).then(() => {
-                alert("Candidatura inviata per la partita!");
-                loadProssimeGiornate(false); // Ricarica per aggiornare lo stato
-            }).catch(error => {
-                console.error("Errore candidatura:", error);
-                alert("Errore nell'invio della candidatura.");
+                alert("Giocatore inserito con successo!");
+                document.getElementById('giocatore-form').reset();
+            }).catch((error) => {
+                console.error("Errore inserimento giocatore:", error);
+                alert("Errore inserimento: " + error.message);
             });
+        } else {
+            alert("Compila tutti i campi!");
         }
+    }
+    
+    // Funzione Utente Base: Candidatura
+    window.candidati = function(matchId) {
+        const user = auth.currentUser;
+        if (!user) return alert("Devi essere loggato per candidarti.");
 
-        // Carica e Visualizza la Rosa (Utente Base)
-        function loadRosa() {
-            const rosaList = document.getElementById('rosa-list');
-            const rosaRef = ref(db, 'rosa');
+        const nomeCompleto = user.email.split('@')[0]; // Uso l'email come ID base
+        
+        // Logica di candidatura molto semplificata:
+        const matchRef = ref(db, 'calendario/' + matchId + '/candidature/' + user.uid);
+        set(matchRef, { 
+            email: user.email, 
+            dataCandidatura: new Date().toISOString() 
+        }).then(() => {
+            alert("Candidatura inviata per la partita!");
+            loadProssimeGiornate(false); // Ricarica per aggiornare lo stato
+        }).catch(error => {
+            console.error("Errore candidatura:", error);
+            alert("Errore nell'invio della candidatura.");
+        });
+    }
+
+    // Carica e Visualizza la Rosa (Utente Base)
+    function loadRosa() {
+        const rosaList = document.getElementById('rosa-list');
+        const rosaRef = ref(db, 'rosa');
+        
+        // Listener in tempo reale per la rosa
+        onValue(rosaRef, (snapshot) => {
+            const data = snapshot.val();
+            rosaList.innerHTML = '';
             
-            // Listener in tempo reale per la rosa
-            onValue(rosaRef, (snapshot) => {
-                const data = snapshot.val();
-                rosaList.innerHTML = '';
-                
-                if (data) {
-                    const players = Object.keys(data).map(key => ({ 
-                        ...data[key], 
-                        id: key 
-                    })).sort((a, b) => a.numero - b.numero); // Ordina per numero maglia
+            if (data) {
+                const players = Object.keys(data).map(key => ({ 
+                    ...data[key], 
+                    id: key 
+                })).sort((a, b) => a.numero - b.numero); // Ordina per numero maglia
 
-                    // Utilizzo JQuery UI Accordion
-                    let htmlContent = '';
-                    players.forEach(player => {
-                        htmlContent += `
-                            <h3>N.${player.numero} - ${player.nome} ${player.cognome}</h3>
-                            <div>
-                                <p><strong>Ruolo:</strong> ${player.ruolo}</p>
-                                <p><strong>Status:</strong> ${player.stato}</p>
-                                <p><strong>Voto Medio:</strong> ${player.voto.toFixed(1)}</p>
-                                <p><strong>Goal/Assist:</strong> ${player.goal} / ${player.assist}</p>
-                            </div>
-                        `;
-                    });
+                // Utilizzo JQuery UI Accordion
+                let htmlContent = '';
+                players.forEach(player => {
+                    // Calcolo del Voto Medio in tempo reale
+                    const votoMedio = (player.voto / (player.partite > 0 ? player.partite : 1)).toFixed(2);
                     
-                    rosaList.innerHTML = `<div id="accordion-rosa">${htmlContent}</div>`;
-                    $('#accordion-rosa').accordion({
-                        collapsible: true,
-                        active: false,
-                        heightStyle: "content"
-                    });
-                } else {
-                    rosaList.innerHTML = '<p>Nessun giocatore inserito.</p>';
-                }
-            });
-        }
-
-        // Funzione Admin: Inserimento Giornata
-        window.addMatch = function(e) {
-            if (e) e.preventDefault();
-            if (!isAdmin) return alert("Accesso negato.");
-            
-            const avversaria = document.getElementById('match-avversaria').value;
-            const data = document.getElementById('match-data').value;
-            const orario = document.getElementById('match-orario').value;
-            const campo = document.getElementById('match-campo').value;
-            const casa = document.getElementById('match-casa').value;
-
-            if (avversaria && data && orario && campo && casa) {
-                const newMatchRef = push(ref(db, 'calendario'));
-                set(newMatchRef, {
-                    avversaria: avversaria,
-                    data: data,
-                    orario: orario,
-                    campo: campo,
-                    casa: (casa === 'si'),
-                    risultato: 'N/D',
-                    candidature: {}, // Inizializza candidature vuote
-                    formazioneTitolare: {},
-                    sostituzioni: {},
-                }).then(() => {
-                    alert("Giornata inserita con successo!");
-                    document.getElementById('match-form').reset();
-                    navigate('calendario-section'); // Torna alla visualizzazione
-                }).catch((error) => {
-                    console.error("Errore inserimento giornata:", error);
-                    alert("Errore inserimento: " + error.message);
+                    htmlContent += `
+                        <h3>N.${player.numero} - ${player.nome} ${player.cognome}</h3>
+                        <div>
+                            <p><strong>Ruolo:</strong> ${player.ruolo}</p>
+                            <p><strong>Status:</strong> ${player.stato}</p>
+                            <p><strong>Voto Medio:</strong> ${votoMedio}</p>
+                            <p><strong>Goal/Assist:</strong> ${player.goal} / ${player.assist}</p>
+                        </div>
+                    `;
+                });
+                
+                rosaList.innerHTML = `<div id="accordion-rosa">${htmlContent}</div>`;
+                $('#accordion-rosa').accordion({
+                    collapsible: true,
+                    active: false,
+                    heightStyle: "content"
                 });
             } else {
-                alert("Compila tutti i campi!");
+                rosaList.innerHTML = '<p>Nessun giocatore inserito.</p>';
             }
-        }
-        
-        // Carica e Visualizza Prossime Giornate (Utente Base e Admin)
-        function loadProssimeGiornate(forAdmin) {
-            const listElement = document.getElementById(forAdmin ? 'admin-calendario-list' : 'calendario-list');
-            const calendarRef = ref(db, 'calendario');
-            
-            onValue(calendarRef, (snapshot) => {
-                const data = snapshot.val();
-                listElement.innerHTML = '';
-                
-                if (data) {
-                    const matches = Object.keys(data).map(key => ({ 
-                        ...data[key], 
-                        id: key 
-                    }));
+        });
+    }
 
-                    matches.forEach(match => {
-                        const li = document.createElement('li');
-                        
-                        let statoCandidatura = '';
-                        if (!forAdmin && auth.currentUser) {
-                            // Controlla se l'utente attuale si è già candidato
-                            const isCandidato = match.candidature && match.candidature[auth.currentUser.uid];
-                            if (isCandidato) {
-                                statoCandidatura = '<span style="color:#008000; font-weight:bold;">✅ Candidato</span>';
-                            } else {
+    // Funzione Admin: Inserimento Giornata
+    window.addMatch = function(e) {
+        if (e) e.preventDefault();
+        if (!isAdmin) return alert("Accesso negato.");
+        
+        const avversaria = document.getElementById('match-avversaria').value;
+        const data = document.getElementById('match-data').value;
+        const orario = document.getElementById('match-orario').value;
+        const campo = document.getElementById('match-campo').value;
+        const casa = document.getElementById('match-casa').value;
+
+        if (avversaria && data && orario && campo && casa) {
+            const newMatchRef = push(ref(db, 'calendario'));
+            set(newMatchRef, {
+                avversaria: avversaria,
+                data: data,
+                orario: orario,
+                campo: campo,
+                casa: (casa === 'si'),
+                risultato: 'N/D',
+                candidature: {}, // Inizializza candidature vuote
+                formazioneTitolare: {},
+                sostituzioni: {},
+            }).then(() => {
+                alert("Giornata inserita con successo!");
+                document.getElementById('match-form').reset();
+                navigate('admin-calendario-section'); // Torna alla visualizzazione Admin
+            }).catch((error) => {
+                console.error("Errore inserimento giornata:", error);
+                alert("Errore inserimento: " + error.message);
+            });
+        } else {
+            alert("Compila tutti i campi!");
+        }
+    }
+    
+    // Carica e Visualizza Prossime Giornate (Utente Base e Admin)
+    function loadProssimeGiornate(forAdmin) {
+        const listElement = document.getElementById(forAdmin ? 'admin-calendario-list' : 'calendario-list');
+        const calendarRef = ref(db, 'calendario');
+        
+        onValue(calendarRef, (snapshot) => {
+            const data = snapshot.val();
+            listElement.innerHTML = '';
+            
+            if (data) {
+                const matches = Object.keys(data).map(key => ({ 
+                    ...data[key], 
+                    id: key 
+                }));
+
+                matches.forEach(match => {
+                    const li = document.createElement('li');
+                    
+                    let statoCandidatura = '';
+                    if (!forAdmin && auth.currentUser) {
+                        // Controlla se l'utente attuale si è già candidato
+                        const isCandidato = match.candidature && match.candidature[auth.currentUser.uid];
+                        if (isCandidato) {
+                            statoCandidatura = '<span style="color:#008000; font-weight:bold;">✅ Candidato</span>';
+                        } else {
+                            // Non mostrare il bottone se il risultato è già inserito (partita giocata)
+                            if (match.risultato === 'N/D') {
                                 statoCandidatura = `<button class="candidati-btn" onclick="candidati('${match.id}')">Candidatura</button>`;
                             }
                         }
+                    }
 
-                        let adminActions = '';
-                        if (forAdmin) {
-                            adminActions = `
-                                <br>
-                                <small>Candidature: ${match.candidature ? Object.keys(match.candidature).length : 0}</small>
-                                <button class="admin-btn" onclick="showFormazioneForm('${match.id}', '${match.avversaria}')">Formazione</button>
-                                <button class="admin-btn" onclick="showRisultatoForm('${match.id}', '${match.avversaria}')">Risultato</button>
-                            `;
-                        }
-
-                        li.innerHTML = `
-                            **vs ${match.avversaria}** (${match.casa ? 'Casa 🏠' : 'Trasferta 🚌'}) - 
-                            Data: ${match.data} ${match.orario} 
-                            Campo: ${match.campo}
-                            ${match.risultato !== 'N/D' ? `<span style="font-weight:bold; color:red;">Risultato: ${match.risultato}</span>` : ''}
-                            ${forAdmin ? '' : statoCandidatura}
-                            ${adminActions}
+                    let adminActions = '';
+                    if (forAdmin) {
+                        // Mostra azioni admin
+                        const numCandidature = match.candidature ? Object.keys(match.candidature).length : 0;
+                        adminActions = `
+                            <br>
+                            <small>Candidature: ${numCandidature}</small>
+                            <button class="admin-btn" onclick="showFormazioneForm('${match.id}', '${match.avversaria}')">Formazione</button>
+                            <button class="admin-btn" onclick="showRisultatoForm('${match.id}', '${match.avversaria}')">Risultato</button>
                         `;
-                        listElement.appendChild(li);
-                    });
-                } else {
-                    listElement.innerHTML = '<p>Nessuna prossima giornata in calendario.</p>';
-                }
-            });
-        }
-        
-        // Funzione per mostrare il form di inserimento risultato
-        window.showRisultatoForm = function(matchId, avversaria) {
-            if (!isAdmin) return;
-            // Sposta nella sezione statistiche admin
-            showSection('admin-statistiche-section'); 
-            document.getElementById('admin-statistiche-form').innerHTML = `
-                <h3>Risultato Partita vs ${avversaria}</h3>
-                <form onsubmit="saveMatchResult(event, '${matchId}')">
-                    <label>AC Tuscolano Goal:</label><input type="number" id="tuscolano-goal" min="0" required><br>
-                    <label>${avversaria} Goal:</label><input type="number" id="avversaria-goal" min="0" required><br>
-                    <button type="submit" class="admin-btn">Salva Risultato</button>
-                </form>
-            `;
-        }
-        
-        // Funzione per salvare il risultato della partita
-        window.saveMatchResult = function(e, matchId) {
-            e.preventDefault();
-            if (!isAdmin) return;
+                    }
 
-            const goalTuscolano = document.getElementById('tuscolano-goal').value;
-            const goalAvversaria = document.getElementById('avversaria-goal').value;
-            const risultato = `${goalTuscolano}-${goalAvversaria}`;
-
-            const matchRef = ref(db, 'calendario/' + matchId);
-            update(matchRef, { risultato: risultato })
-            .then(() => {
-                alert(`Risultato salvato: ${risultato}`);
-                showSection('admin-calendario-section'); // Torna al calendario admin
-            })
-            .catch(error => {
-                console.error("Errore salvataggio risultato:", error);
-                alert("Errore salvataggio risultato.");
-            });
-        }
-        
-        // Carica le statistiche (Utente Base)
-        function loadStatistiche() {
-            // Sezione Risultati Squadra
-            const risultatiList = document.getElementById('statistiche-risultati-list');
-            const calendarRef = ref(db, 'calendario');
-            
-            onValue(calendarRef, (snapshot) => {
-                const data = snapshot.val();
-                risultatiList.innerHTML = '';
-                
-                if (data) {
-                    const matches = Object.keys(data).map(key => ({ 
-                        ...data[key], 
-                        id: key 
-                    }));
-
-                    matches.filter(m => m.risultato !== 'N/D').forEach(match => {
-                        const li = document.createElement('li');
-                        li.innerHTML = `
-                            **vs ${match.avversaria}**: 
-                            Risultato: ${match.risultato} 
-                            (${match.casa ? 'Casa' : 'Trasferta'})
-                        `;
-                        risultatiList.appendChild(li);
-                    });
-                } else {
-                    risultatiList.innerHTML = '<p>Nessun risultato registrato.</p>';
-                }
-            });
-
-            // Sezione Voti Giocatori
-            const votiList = document.getElementById('statistiche-voti-list');
-            const rosaRef = ref(db, 'rosa');
-
-            onValue(rosaRef, (snapshot) => {
-                const data = snapshot.val();
-                votiList.innerHTML = '';
-                
-                if (data) {
-                    Object.values(data).forEach(player => {
-                        const li = document.createElement('li');
-                        // Logica per Voto Medio, tiene conto delle partite giocate
-                        const votoMedio = (player.voto / (player.partite > 0 ? player.partite : 1)).toFixed(2);
-
-                        li.innerHTML = `
-                            **${player.nome} ${player.cognome}** (N.${player.numero}): 
-                            Voto Medio: ${votoMedio} | Goal: ${player.goal} | Assist: ${player.assist}
-                        `;
-                        votiList.appendChild(li);
-                    });
-                } else {
-                    votiList.innerHTML = '<p>Nessun dato giocatore disponibile.</p>';
-                }
-            });
-        }
-        
-        // Funzione per mostrare il form di valutazione giocatore (Admin)
-        window.showValutazioneForm = function() {
-            if (!isAdmin) return;
-            showSection('admin-statistiche-section'); // Assicurati che sia visibile
-            
-            document.getElementById('admin-statistiche-form').innerHTML = `
-                <h3>Valutazione Singolo Giocatore (Post-Partita)</h3>
-                <form onsubmit="savePlayerStats(event)">
-                    <label>Giocatore:</label>
-                    <select id="valutazione-giocatore" required></select><br>
-                    <label>Voto (0-10):</label><input type="number" id="valutazione-voto" min="0" max="10" step="0.5" required><br>
-                    <label>Goal nella partita:</label><input type="number" id="valutazione-goal" min="0" value="0" required><br>
-                    <label>Assist nella partita:</label><input type="number" id="valutazione-assist" min="0" value="0" required><br>
-                    <button type="submit" class="admin-btn">Salva Statistiche</button>
-                </form>
-            `;
-            
-            // Carica i giocatori nel menu a discesa
-            get(ref(db, 'rosa')).then((snapshot) => {
-                const players = snapshot.val();
-                const selectPlayer = document.getElementById('valutazione-giocatore');
-                selectPlayer.innerHTML = '<option value="">Seleziona Giocatore</option>';
-                if (players) {
-                    Object.keys(players).forEach(key => {
-                        const player = players[key];
-                        const option = document.createElement('option');
-                        option.value = key;
-                        option.textContent = `${player.nome} ${player.cognome} (N.${player.numero})`;
-                        selectPlayer.appendChild(option);
-                    });
-                }
-            });
-        }
-        
-        // Funzione per salvare le statistiche del giocatore (Admin)
-        window.savePlayerStats = function(e) {
-            e.preventDefault();
-            if (!isAdmin) return;
-
-            const playerId = document.getElementById('valutazione-giocatore').value;
-            const voto = parseFloat(document.getElementById('valutazione-voto').value);
-            const goal = parseInt(document.getElementById('valutazione-goal').value);
-            const assist = parseInt(document.getElementById('valutazione-assist').value);
-
-            const playerRef = ref(db, 'rosa/' + playerId);
-            
-            get(playerRef).then(snapshot => {
-                if (snapshot.exists()) {
-                    const currentStats = snapshot.val();
+                    // Se è N/D, la partita è futura o non giocata; altrimenti mostra il risultato.
+                    const risultatoDisplay = match.risultato !== 'N/D' 
+                        ? `<span style="font-weight:bold; color:red;">Risultato: ${match.risultato}</span>` 
+                        : '';
                     
-                    // Calcolo della nuova media voti e numero di partite
-                    const newTotalVoto = (currentStats.voto || 0) + voto;
-                    const newPartite = (currentStats.partite || 0) + 1;
+                    const isCasa = match.casa ? 'Casa 🏠' : 'Trasferta 🚌';
 
-                    update(playerRef, {
-                        voto: newTotalVoto, 
-                        goal: (currentStats.goal || 0) + goal, 
-                        assist: (currentStats.assist || 0) + assist,
-                        partite: newPartite
-                    }).then(() => {
-                        alert("Statistiche giocatore aggiornate!");
-                        document.getElementById('admin-statistiche-form').querySelector('form').reset();
-                        showValutazioneForm(); // Ricarica il form
-                    });
-                } else {
-                    alert("Giocatore non trovato.");
-                }
-            }).catch(error => {
-                console.error("Errore salvataggio stats:", error);
-                alert("Errore salvataggio statistiche.");
-            });
-        }
-        
-        // Funzione Admin: Sezione Inserimento Formazione (Solo Struttura Base)
-        // **DA COMPLETARE CON LA LOGICA DI SELEZIONE DEI CANDIDATI E SALVATAGGIO SU DB**
-        window.showFormazioneForm = function(matchId, avversaria) {
-            if (!isAdmin) return;
-            showSection('admin-formazione-section'); 
-            
-            document.getElementById('formazione-content').innerHTML = `
-                <h3>Formazione e Sostituzioni vs ${avversaria} (ID Partita: ${matchId})</h3>
-                <p>⚠️ **Nota:** Per implementare la selezione della formazione e delle sostituzioni in modo completo (con i candidati della partita) è necessario un codice più esteso. Qui la funzione è semplificata.</p>
-                <form onsubmit="alert('Formazione salvata (simulazione)'); return false;">
-                    <h4>1. Seleziona Titolari (3-3-1)</h4>
-                    <label>Portiere:</label><select><option>Giocatore (Candidato)</option></select><br>
-                    <label>Difesa:</label><select><option>Giocatore (Candidato)</option></select><br>
-                    <label>Centrocampo:</label><select><option>Giocatore (Candidato)</option></select><br>
-                    <label>Attacco:</label><select><option>Giocatore (Candidato)</option></select><br>
-                    <label>Panchina:</label><textarea rows="5" placeholder="Elenco riserve qui..."></textarea><br>
-                    
-                    <hr>
-                    <div id="campo-di-gioco-simulazione" style="background-color: #006400; color: white; height: 300px; text-align: center; line-height: 300px; border: 2px solid #fff; border-radius: 10px;">
-                        [Visualizzazione Grafica 3-3-1 qui]
-                    </div>
-                    <button type="submit" class="admin-btn">Salva Formazione & Sostituzioni</button>
-                </form>
-            `;
-        }
-
-        // ----------------------------------------------------
-        // 5. INIZIALIZZAZIONE JQUERY
-        // ----------------------------------------------------
-        $(document).ready(function() {
-            // Aggiungi qui eventuali inizializzazioni JQuery
-            // Il Datepicker è inizializzato nella funzione navigate.
+                    li.innerHTML = `
+                        **vs ${match.avversaria}** (${isCasa}) - 
+                        Data: ${match.data} ${match.orario} 
+                        Campo: ${match.campo}
+                        ${risultatoDisplay}
+                        ${forAdmin ? '' : statoCandidatura}
+                        ${adminActions}
+                    `;
+                    listElement.appendChild(li);
+                });
+            } else {
+                listElement.innerHTML = '<p>Nessuna prossima giornata in calendario.</p>';
+            }
         });
+    }
+    
+    // Funzione per mostrare il form di inserimento risultato
+    window.showRisultatoForm = function(matchId, avversaria) {
+        if (!isAdmin) return;
+        // Sposta nella sezione statistiche admin
+        showSection('admin-statistiche-section'); 
+        document.getElementById('admin-statistiche-form').innerHTML = `
+            <h3>Risultato Partita vs ${avversaria}</h3>
+            <form onsubmit="saveMatchResult(event, '${matchId}')">
+                <label>AC Tuscolano Goal:</label><input type="number" id="tuscolano-goal" min="0" required><br>
+                <label>${avversaria} Goal:</label><input type="number" id="avversaria-goal" min="0" required><br>
+                <button type="submit" class="admin-btn">Salva Risultato</button>
+            </form>
+        `;
+    }
+    
+    // Funzione per salvare il risultato della partita
+    window.saveMatchResult = function(e, matchId) {
+        e.preventDefault();
+        if (!isAdmin) return;
+
+        const goalTuscolano = document.getElementById('tuscolano-goal').value;
+        const goalAvversaria = document.getElementById('avversaria-goal').value;
+        const risultato = `${goalTuscolano}-${goalAvversaria}`;
+
+        const matchRef = ref(db, 'calendario/' + matchId);
+        update(matchRef, { risultato: risultato })
+        .then(() => {
+            alert(`Risultato salvato: ${risultato}`);
+            showSection('admin-calendario-section'); // Torna al calendario admin
+        })
+        .catch(error => {
+            console.error("Errore salvataggio risultato:", error);
+            alert("Errore salvataggio risultato.");
+        });
+    }
+    
+    // Carica le statistiche (Utente Base)
+    function loadStatistiche() {
+        // Sezione Risultati Squadra
+        const risultatiList = document.getElementById('statistiche-risultati-list');
+        const calendarRef = ref(db, 'calendario');
         
-    </script>
+        onValue(calendarRef, (snapshot) => {
+            const data = snapshot.val();
+            risultatiList.innerHTML = '';
+            
+            if (data) {
+                const matches = Object.keys(data).map(key => ({ 
+                    ...data[key], 
+                    id: key 
+                }));
+
+                matches.filter(m => m.risultato !== 'N/D').forEach(match => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        **vs ${match.avversaria}**: 
+                        Risultato: ${match.risultato} 
+                        (${match.casa ? 'Casa' : 'Trasferta'})
+                    `;
+                    risultatiList.appendChild(li);
+                });
+            } else {
+                risultatiList.innerHTML = '<p>Nessun risultato registrato.</p>';
+            }
+        });
+
+        // Sezione Voti Giocatori
+        const votiList = document.getElementById('statistiche-voti-list');
+        const rosaRef = ref(db, 'rosa');
+
+        onValue(rosaRef, (snapshot) => {
+            const data = snapshot.val();
+            votiList.innerHTML = '';
+            
+            if (data) {
+                // Ordina per Voto Medio Decrescente
+                const players = Object.values(data).sort((a, b) => {
+                    const avgA = a.partite > 0 ? a.voto / a.partite : 0;
+                    const avgB = b.partite > 0 ? b.voto / b.partite : 0;
+                    return avgB - avgA; // Ordine decrescente
+                });
+
+                players.forEach(player => {
+                    const li = document.createElement('li');
+                    // Logica per Voto Medio, tiene conto delle partite giocate
+                    const votoMedio = (player.voto / (player.partite > 0 ? player.partite : 1)).toFixed(2);
+
+                    li.innerHTML = `
+                        **${player.nome} ${player.cognome}** (N.${player.numero}): 
+                        Voto Medio: ${votoMedio} | Goal: ${player.goal} | Assist: ${player.assist}
+                    `;
+                    votiList.appendChild(li);
+                });
+            } else {
+                votiList.innerHTML = '<p>Nessun dato giocatore disponibile.</p>';
+            }
+        });
+    }
+    
+    // Funzione per mostrare il form di valutazione giocatore (Admin)
+    window.showValutazioneForm = function() {
+        if (!isAdmin) return;
+        showSection('admin-statistiche-section'); // Assicurati che sia visibile
+        
+        document.getElementById('admin-statistiche-form').innerHTML = `
+            <h3>Valutazione Singolo Giocatore (Post-Partita)</h3>
+            <form onsubmit="savePlayerStats(event)">
+                <label>Giocatore:</label>
+                <select id="valutazione-giocatore" required></select><br>
+                <label>Voto (0-10):</label><input type="number" id="valutazione-voto" min="0" max="10" step="0.5" required><br>
+                <label>Goal nella partita:</label><input type="number" id="valutazione-goal" min="0" value="0" required><br>
+                <label>Assist nella partita:</label><input type="number" id="valutazione-assist" min="0" value="0" required><br>
+                <button type="submit" class="admin-btn">Salva Statistiche</button>
+            </form>
+        `;
+        
+        // Carica i giocatori nel menu a discesa
+        get(ref(db, 'rosa')).then((snapshot) => {
+            const players = snapshot.val();
+            const selectPlayer = document.getElementById('valutazione-giocatore');
+            selectPlayer.innerHTML = '<option value="">Seleziona Giocatore</option>';
+            if (players) {
+                // Ordina per numero di maglia
+                const sortedPlayers = Object.keys(players).map(key => ({
+                    id: key,
+                    ...players[key]
+                })).sort((a, b) => a.numero - b.numero);
+
+                sortedPlayers.forEach(player => {
+                    const option = document.createElement('option');
+                    option.value = player.id;
+                    option.textContent = `${player.nome} ${player.cognome} (N.${player.numero})`;
+                    selectPlayer.appendChild(option);
+                });
+            }
+        });
+    }
+    
+    // Funzione per salvare le statistiche del giocatore (Admin)
+    window.savePlayerStats = function(e) {
+        e.preventDefault();
+        if (!isAdmin) return;
+
+        const playerId = document.getElementById('valutazione-giocatore').value;
+        const voto = parseFloat(document.getElementById('valutazione-voto').value);
+        const goal = parseInt(document.getElementById('valutazione-goal').value);
+        const assist = parseInt(document.getElementById('valutazione-assist').value);
+
+        const playerRef = ref(db, 'rosa/' + playerId);
+        
+        get(playerRef).then(snapshot => {
+            if (snapshot.exists()) {
+                const currentStats = snapshot.val();
+                
+                // Calcolo della nuova media voti e numero di partite
+                const newTotalVoto = (currentStats.voto || 0) + voto;
+                const newPartite = (currentStats.partite || 0) + 1;
+
+                update(playerRef, {
+                    voto: newTotalVoto, 
+                    goal: (currentStats.goal || 0) + goal, 
+                    assist: (currentStats.assist || 0) + assist,
+                    partite: newPartite
+                }).then(() => {
+                    alert(`Statistiche giocatore ${snapshot.val().nome} aggiornate!`);
+                    document.getElementById('admin-statistiche-form').querySelector('form').reset();
+                    showValutazioneForm(); // Ricarica il form
+                });
+            } else {
+                alert("Giocatore non trovato.");
+            }
+        }).catch(error => {
+            console.error("Errore salvataggio stats:", error);
+            alert("Errore salvataggio statistiche.");
+        });
+    }
+    
+    // Funzione Admin: Sezione Inserimento Formazione (Solo Struttura Base)
+    // **DA COMPLETARE CON LA LOGICA DI SELEZIONE DEI CANDIDATI E SALVATAGGIO SU DB**
+    window.showFormazioneForm = function(matchId, avversaria) {
+        if (!isAdmin) return;
+        showSection('admin-formazione-section'); 
+        
+        document.getElementById('formazione-content').innerHTML = `
+            <h3>Formazione e Sostituzioni vs ${avversaria} (ID Partita: ${matchId})</h3>
+            <p>⚠️ **Nota:** Per implementare la selezione della formazione e delle sostituzioni in modo completo (con i candidati della partita) è necessario un codice più esteso. Qui la funzione è semplificata.</p>
+            <form onsubmit="alert('Formazione salvata (simulazione)'); navigate('admin-calendario-section'); return false;">
+                <h4>1. Seleziona Titolari (3-3-1)</h4>
+                <label>Portiere:</label><select><option>Giocatore (Candidato)</option></select><br>
+                <label>Difesa:</label><select><option>Giocatore (Candidato)</option></select><br>
+                <label>Centrocampo:</label><select><option>Giocatore (Candidato)</option></select><br>
+                <label>Attacco:</label><select><option>Giocatore (Candidato)</option></select><br>
+                <label>Panchina:</label><textarea rows="5" placeholder="Elenco riserve qui..."></textarea><br>
+                
+                <hr>
+                <div id="campo-di-gioco-simulazione" style="background-color: #006400; color: white; height: 300px; text-align: center; line-height: 300px; border: 2px solid #fff; border-radius: 10px;">
+                    [Visualizzazione Grafica 3-3-1 qui]
+                </div>
+                <button type="submit" class="admin-btn">Salva Formazione & Sostituzioni</button>
+            </form>
+            <p><button class="admin-btn" onclick="navigate('admin-calendario-section')">Annulla e Torna al Calendario</button></p>
+        `;
+    }
+
+    // ----------------------------------------------------
+    // 5. INIZIALIZZAZIONE JQUERY
+    // ----------------------------------------------------
+    $(document).ready(function() {
+        // Nessuna inizializzazione aggiuntiva necessaria qui, Datepicker gestito in navigate
+    });
+    
+</script>
 
     <style>
         /* CSS Responsive per AC Tuscolano */
