@@ -1,903 +1,251 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AC Tuscolano | Gestione Squadra</title>
-    
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
-
-<script type="module">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AC Tuscolano | Gestione Squadra</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
+  <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
-    import { getDatabase, ref, set, push, onValue, get, update } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
+    import { getDatabase, ref, set, push, get, update } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
-    // ----------------------------------------------------
-    // 1. CONFIGURAZIONE FIREBASE - SOSTITUIRE CON LE TUE CHIAVI! 🔑
-    // ----------------------------------------------------
     const firebaseConfig = {
-        apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
-        authDomain: "actuscolano.firebaseapp.com",
-        projectId: "actuscolano",
-        storageBucket: "actuscolano.firebasestorage.app",
-        messagingSenderId: "62685359731",
-        appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
-        measurementId: "G-TSVH8PH4RC"
+      apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
+      authDomain: "actuscolano.firebaseapp.com",
+      projectId: "actuscolano",
+      storageBucket: "actuscolano.firebasestorage.app",
+      messagingSenderId: "62685359731",
+      appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+      measurementId: "G-TSVH8PH4RC"
     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
-
-    // UID dell'utente Admin - SOSTITUIRE CON L'UID REALE DELL'ADMIN! 👑
-    const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2"; // <--- INSERISCI QUI IL TUO UID REALE!!!
+    const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2";
     let isAdmin = false;
 
-    // ----------------------------------------------------
-    // 2. FUNZIONI UTILITY INTERFACCIA
-    // ----------------------------------------------------
+    const POSIZIONI = {
+      'Portiere': { top: '90%', left: '50%' },
+      'Difensore sinistro': { top: '70%', left: '25%' },
+      'Difensore centrale': { top: '70%', left: '50%' },
+      'Difensore destro': { top: '70%', left: '75%' },
+      'Centrocampista sinistro': { top: '45%', left: '25%' },
+      'Centrocampista destro': { top: '45%', left: '75%' },
+      'Attaccante': { top: '20%', left: '50%' }
+    };
 
     function hideAllSections() {
-        document.querySelectorAll('section').forEach(section => {
-            section.style.display = 'none';
-        });
-        document.getElementById('admin-menu').style.display = 'none';
-        const adminStatisticheForm = document.getElementById('admin-statistiche-form');
-        if(adminStatisticheForm) adminStatisticheForm.innerHTML = '';
+      document.querySelectorAll('section').forEach(s => s.style.display = 'none');
+      document.getElementById('admin-menu').style.display = 'none';
     }
 
     function showSection(id) {
-        hideAllSections();
-        const section = document.getElementById(id);
-        if (section) section.style.display = 'block';
-        if (isAdmin && id !== 'login-section') {
-             document.getElementById('admin-menu').style.display = 'block';
-        }
+      hideAllSections();
+      const section = document.getElementById(id);
+      if (section) section.style.display = 'block';
+      if (isAdmin) document.getElementById('admin-menu').style.display = 'block';
     }
 
     function navigate(sectionId) {
-        if (sectionId.startsWith('admin-') && !isAdmin) return;
-
-        showSection(sectionId);
-        if (sectionId === 'rosa-section') loadRosa();
-        if (sectionId === 'calendario-section') loadProssimeGiornate(false);
-        if (sectionId === 'admin-calendario-section') loadProssimeGiornate(true);
-        if (sectionId === 'statistiche-section') loadStatistiche();
-        
-        if (sectionId === 'admin-inserimento-giornate-section') {
-            $("#match-data").datepicker({
-                dateFormat: "dd/mm/yy",
-                minDate: 0 
-            });
-        }
-        if (sectionId === 'admin-statistiche-section') {
-             // Quando si apre la sezione Statistiche Admin, mostra di default il form Valutazione
-             showValutazioneForm(); 
-        }
+      if (sectionId.startsWith('admin-') && !isAdmin) return;
+      showSection(sectionId);
     }
-
     window.navigate = navigate;
 
-    // ----------------------------------------------------
-    // 3. AUTENTICAZIONE FIREBASE
-    // ----------------------------------------------------
-
     document.addEventListener('DOMContentLoaded', () => {
-        const loginForm = document.getElementById('login-form');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const email = document.getElementById('login-email').value;
-                const password = document.getElementById('login-password').value;
-
-                signInWithEmailAndPassword(auth, email, password)
-                    .then((userCredential) => {
-                        console.log("Utente loggato:", userCredential.user.email);
-                    })
-                    .catch((error) => {
-                        alert("Errore Login: " + error.message);
-                    });
-            });
-        }
+      const loginForm = document.getElementById('login-form');
+      if (loginForm) {
+        loginForm.addEventListener('submit', e => {
+          e.preventDefault();
+          const email = document.getElementById('login-email').value;
+          const password = document.getElementById('login-password').value;
+          signInWithEmailAndPassword(auth, email, password).catch(error => alert("Errore Login: " + error.message));
+        });
+      }
     });
 
     onAuthStateChanged(auth, (user) => {
-        const loginSection = document.getElementById('login-section');
-        const navLinks = document.querySelectorAll('.nav-link');
-        const logoutBtn = document.getElementById('logout-btn');
-        const adminLinks = document.querySelectorAll('#admin-menu .nav-link');
-
-        if (user) {
-            const uid = user.uid;
-            // IL CONTROLLO CRITICO: ADMIN_UID
-            isAdmin = (uid === ADMIN_UID);
-
-            loginSection.style.display = 'none';
-            logoutBtn.style.display = 'inline';
-
-            adminLinks.forEach(link => {
-                link.style.display = isAdmin ? 'inline-block' : 'none';
-            });
-            
-            navLinks.forEach(link => {
-                const sectionId = link.getAttribute('onclick').split("'")[1];
-                if (sectionId.startsWith('admin-')) {
-                    link.style.display = 'none';
-                }
-            });
-
-            if (isAdmin) {
-                // Inizializza sulla sezione Inserimento Giocatori all'accesso Admin
-                showSection('admin-inserimento-giocatori-section');
-            } else {
-                showSection('rosa-section');
-            }
-
+      const logoutBtn = document.getElementById('logout-btn');
+      if (user) {
+        isAdmin = (user.uid === ADMIN_UID);
+        logoutBtn.style.display = 'inline';
+        document.getElementById('login-section').style.display = 'none';
+        if (isAdmin) {
+          document.getElementById('admin-menu').style.display = 'block';
+          showSection('admin-inserimento-giornate-section');
         } else {
-            isAdmin = false;
-            hideAllSections();
-            showSection('login-section');
-            logoutBtn.style.display = 'none';
-            adminLinks.forEach(link => link.style.display = 'none');
+          showSection('rosa-section');
         }
+      } else {
+        isAdmin = false;
+        hideAllSections();
+        document.getElementById('login-section').style.display = 'block';
+        logoutBtn.style.display = 'none';
+      }
     });
 
     window.handleLogout = function() {
-        signOut(auth).then(() => {
-            alert("Logout effettuato.");
-            showSection('login-section');
-        }).catch((error) => {
-            console.error("Errore Logout:", error);
-        });
+      signOut(auth).then(() => {
+        alert("Logout effettuato.");
+        showSection('login-section');
+      });
     }
 
-    // ----------------------------------------------------
-    // 4. FUNZIONI DATABASE (ADMIN)
-    // ----------------------------------------------------
-
-    window.addPlayer = function(e) {
-        if (e) e.preventDefault();
-        if (!isAdmin) return alert("Accesso negato.");
-
-        const nome = document.getElementById('giocatore-nome').value;
-        const cognome = document.getElementById('giocatore-cognome').value;
-        const numero = parseInt(document.getElementById('giocatore-numero').value);
-        const ruolo = document.getElementById('giocatore-ruolo').value;
-        const titolare = document.getElementById('giocatore-titolare').value;
-        
-        if (nome && cognome && numero && ruolo) {
-            const newPlayerRef = push(ref(db, 'rosa'));
-            set(newPlayerRef, {
-                nome: nome,
-                cognome: cognome,
-                numero: numero,
-                ruolo: ruolo,
-                stato: titolare,
-                voto: 0, 
-                assist: 0, 
-                goal: 0,
-                partite: 0 
-            }).then(() => {
-                alert("Giocatore inserito con successo!");
-                document.getElementById('giocatore-form').reset();
-            }).catch((error) => {
-                console.error("Errore inserimento giocatore:", error);
-                alert("Errore inserimento: " + error.message);
-            });
-        } else {
-            alert("Compila tutti i campi!");
-        }
-    }
-    
     window.addMatch = function(e) {
-        if (e) e.preventDefault();
-        if (!isAdmin) return alert("Accesso negato.");
-        
-        const avversaria = document.getElementById('match-avversaria').value;
-        const data = document.getElementById('match-data').value;
-        const orario = document.getElementById('match-orario').value;
-        const campo = document.getElementById('match-campo').value;
-        const casa = document.getElementById('match-casa').value;
+      e.preventDefault();
+      if (!isAdmin) return alert("Accesso negato.");
 
-        if (avversaria && data && orario && campo && casa) {
-            const newMatchRef = push(ref(db, 'calendario'));
-            set(newMatchRef, {
-                avversaria: avversaria,
-                data: data,
-                orario: orario,
-                campo: campo,
-                casa: (casa === 'si'),
-                risultato: 'N/D',
-                formazioni: {} // Nuova struttura per salvare tutte le formazioni (titolare + 8 subs)
-            }).then(() => {
-                alert("Giornata inserita con successo!");
-                document.getElementById('match-form').reset();
-                navigate('admin-calendario-section');
-            }).catch((error) => {
-                console.error("Errore inserimento giornata:", error);
-                alert("Errore inserimento: " + error.message);
-            });
-        } else {
-            alert("Compila tutti i campi!");
-        }
+      const avversaria = document.getElementById('match-avversaria').value;
+      const data = document.getElementById('match-data').value;
+      const orario = document.getElementById('match-orario').value;
+      const campo = document.getElementById('match-campo').value;
+      const casa = document.getElementById('match-casa').value;
+
+      if (avversaria && data && orario && campo && casa) {
+        const newMatchRef = push(ref(db, 'calendario'));
+        set(newMatchRef, { avversaria, data, orario, campo, casa: casa === 'si', risultato: 'N/D' }).then(() => {
+          alert("Giornata inserita con successo!");
+          document.getElementById('match-form').reset();
+        });
+      } else alert("Compila tutti i campi!");
     }
 
-    function loadRosa() { /* ... (Logica esistente per Rosa) ... */ }
-    window.candidati = function(matchId) { /* ... (Logica esistente per Candidatura) ... */ }
-    window.saveMatchResult = function(e, matchId) { /* ... (Logica esistente per Risultato) ... */ }
-    window.showRisultatoForm = function(matchId, avversaria) { /* ... (Logica esistente per form Risultato) ... */ }
-    function loadStatistiche() { /* ... (Logica esistente per Statistiche) ... */ }
-    window.showValutazioneForm = function() { /* ... (Logica esistente per form Valutazione) ... */ }
-    window.savePlayerStats = function(e) { /* ... (Logica esistente per Salva Statistiche) ... */ }
-    
-    // Rendi visibili le funzioni esistenti nel tuo codice (omesse qui per brevità)
-    // Se non hai modificato il codice tra riga 317 e 549, puoi saltare queste righe.
-
-    // ----------------------------------------------------
-    // 5. FUNZIONE NUOVA: INSERIMENTO FORMAZIONE E SOSTITUZIONI
-    // ----------------------------------------------------
-    
-    // Mappa posizioni 3-3-1 per visualizzazione
-    const POSIZIONI_331 = {
-        'Portiere': { top: '90%', left: '50%' },
-        'Difensore centrale': { top: '70%', left: '50%' },
-        'Terzino sinistro': { top: '70%', left: '25%' },
-        'Terzino destro': { top: '70%', left: '75%' },
-        'Centrocampista centrale': { top: '40%', left: '50%' },
-        'Centrocampista sinistro': { top: '40%', left: '25%' },
-        'Centrocampista destro': { top: '40%', left: '75%' },
-        'Attaccante centrale': { top: '15%', left: '50%' }
-    };
-
-    /**
-     * Mostra il form per selezionare titolari, panchina e definire le 8 sostituzioni.
-     */
-    window.showFormazioneForm = function(matchId, avversaria) {
-        if (!isAdmin) return;
-        showSection('admin-formazione-section'); 
-        
-        get(ref(db, 'rosa')).then((snapshot) => {
-            const players = snapshot.val() || {};
-            const playerList = Object.keys(players).map(key => ({ 
-                id: key, 
-                nomeCompleto: `${players[key].nome} ${players[key].cognome}`,
-                ruolo: players[key].ruolo
-            })).sort((a, b) => a.ruolo.localeCompare(b.ruolo));
-
-            // Funzione per generare le opzioni del select
-            const getPlayerOptions = (selectedId = '') => {
-                let options = '<option value="">Seleziona Giocatore</option>';
-                playerList.forEach(player => {
-                    options += `<option value="${player.id}" data-ruolo="${player.ruolo}" ${player.id === selectedId ? 'selected' : ''}>${player.nomeCompleto} (${player.ruolo})</option>`;
-                });
-                return options;
-            };
-
-            // HTML del form di base
-            let formHTML = `
-                <h3>Formazione e Sostituzioni vs ${avversaria}</h3>
-                <form id="formazione-save-form" onsubmit="saveFormation(event, '${matchId}')">
-                    
-                    <h4>1. Seleziona Formazione Titolare (7 Titolari, 3-3-1)</h4>
-                    <p>
-                        <small>Attenzione: Scegli 7 titolari diversi. Il sistema ti guiderà a selezionare i ruoli chiave per il modulo 3-3-1.</small>
-                    </p>
-                    <div id="titolari-selezioni">
-                        <label>Portiere:</label>
-                        <select id="titolare-Portiere" required onchange="updateFormationPreview()">${getPlayerOptions()}</select><br>
-                        
-                        <label>Terzino sinistro:</label>
-                        <select id="titolare-Terzino sinistro" required onchange="updateFormationPreview()">${getPlayerOptions()}</select><br>
-                        
-                        <label>Terzino destro:</label>
-                        <select id="titolare-Terzino destro" required onchange="updateFormationPreview()">${getPlayerOptions()}</select><br>
-                        
-                        <label>Difensore centrale:</label>
-                        <select id="titolare-Difensore centrale" required onchange="updateFormationPreview()">${getPlayerOptions()}</select><br>
-
-                        <label>Centrocampista centrale:</label>
-                        <select id="titolare-Centrocampista centrale" required onchange="updateFormationPreview()">${getPlayerOptions()}</select><br>
-                        
-                        <label>Centrocampista sinistro/destro (A):</label>
-                        <select id="titolare-Centrocampista A" required onchange="updateFormationPreview()">${getPlayerOptions()}</select><br>
-                        
-                        <label>Attaccante centrale:</label>
-                        <select id="titolare-Attaccante centrale" required onchange="updateFormationPreview()">${getPlayerOptions()}</select><br>
-                    </div>
-
-                    <div id="campo-di-gioco-simulazione" style="height: 350px; position: relative; background-color: #006400; color: white; border: 2px solid #fff; border-radius: 10px; margin-top: 20px;">
-                        <h4 style="text-align:center; padding: 5px;">Formazione Titolare (3-3-1)</h4>
-                    </div>
-                    
-                    <hr>
-                    
-                    <h4>2. Definisci 8 Sostituzioni (Intervallo 5 min)</h4>
-                    <p>
-                        <small>Per ogni sostituzione (dal 5° al 40°), indica chi entra e chi esce.</small>
-                    </p>
-                    <div id="sostituzioni-list">
-                        </div>
-
-                    <button type="submit" class="admin-btn">Salva Formazione & Genera 9 Mappe</button>
-                </form>
-                <p><button class="admin-btn" onclick="navigate('admin-calendario-section')">Annulla e Torna al Calendario</button></p>
-            `;
-            
-            document.getElementById('formazione-content').innerHTML = formHTML;
-            
-            // Popola i form di sostituzione dinamicamente
-            const subsList = document.getElementById('sostituzioni-list');
-            subsList.innerHTML = '';
-            for (let i = 1; i <= 8; i++) {
-                const minuto = i * 5;
-                const subsHTML = `
-                    <fieldset style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
-                        <legend>Sostituzione al Minuto ${minuto}:</legend>
-                        <label>ENTRA:</label>
-                        <select id="entra-${i}" class="sostituzione-entra" required>${getPlayerOptions()}</select><br>
-                        <label>ESCE:</label>
-                        <select id="esce-${i}" class="sostituzione-esce" required>${getPlayerOptions()}</select>
-                    </fieldset>
-                `;
-                subsList.innerHTML += subsHTML;
-            }
-
-            // Inizializza la visualizzazione iniziale
-            updateFormationPreview();
-        });
+    async function getPlayers() {
+      const snapshot = await get(ref(db, 'rosa'));
+      return snapshot.exists() ? snapshot.val() : {};
     }
 
-    /**
-     * Aggiorna la visualizzazione grafica della formazione titolare.
-     */
-    window.updateFormationPreview = function() {
-        const preview = document.getElementById('campo-di-gioco-simulazione');
-        let currentFormation = {};
-        
-        // Raccogli i titolari dal form
-        const titolareSelects = document.querySelectorAll('#titolari-selezioni select');
-        titolareSelects.forEach(select => {
-            if (select.value) {
-                const playerId = select.value;
-                // Usa il ruolo dall'ID del select per posizionare il giocatore
-                let ruolo = select.id.replace('titolare-', ''); 
-                
-                // Gestione dei ruoli Centrocampo A/B per il modulo 3-3-1
-                if (ruolo === 'Centrocampista A') {
-                    // Mappa l'id generico ad una posizione specifica per il 3-3-1
-                    // In questo modulo, Centrocampista A può essere il "Centrocampista destro" libero
-                    ruolo = 'Centrocampista destro'; 
-                }
+    window.generateFormazioni = async function() {
+      showSection('admin-formazione-section');
+      const container = document.getElementById('campo-container');
+      container.innerHTML = '';
+      const players = await getPlayers();
+      const playerOptions = Object.keys(players).map(id => `<option value="${id}">${players[id].nome} ${players[id].cognome}</option>`).join('');
 
-                currentFormation[playerId] = {
-                    ruolo: ruolo,
-                    posizione: POSIZIONI_331[ruolo]
-                };
-            }
+      const baseFormation = ['Portiere','Difensore sinistro','Difensore centrale','Difensore destro','Centrocampista sinistro','Centrocampista destro','Attaccante'];
+
+      for (let i = 0; i <= 8; i++) {
+        const minuto = i * 5;
+        const campo = document.createElement('div');
+        campo.className = 'campo';
+        campo.innerHTML = `<h4>Formazione Minuto ${minuto}</h4>`;
+        baseFormation.forEach(r => {
+          const p = POSIZIONI[r];
+          const select = document.createElement('select');
+          select.innerHTML = `<option value="">${r}</option>${playerOptions}`;
+          select.dataset.ruolo = r;
+          select.addEventListener('change', saveFormationData);
+          const marker = document.createElement('div');
+          marker.className = 'player';
+          marker.style.top = p.top;
+          marker.style.left = p.left;
+          marker.appendChild(select);
+          campo.appendChild(marker);
         });
-
-        // Genera la visualizzazione sul campo
-        let vizHTML = '<h4 style="text-align:center; padding: 5px; color: white;">Formazione Titolare (3-3-1)</h4>';
-        
-        // Pulisci i vecchi giocatori
-        Array.from(preview.querySelectorAll('.player-marker')).forEach(marker => marker.remove());
-
-        // Aggiungi i nuovi marcatori
-        Object.keys(currentFormation).forEach(playerId => {
-            const playerInfo = currentFormation[playerId];
-            const selectElement = document.getElementById(`titolare-${playerInfo.ruolo}`);
-            if (selectElement && selectElement.options[selectElement.selectedIndex]) {
-                const playerName = selectElement.options[selectElement.selectedIndex].text.split(' (')[0];
-            
-                const marker = document.createElement('div');
-                marker.className = 'player-marker';
-                marker.style.cssText = `
-                    position: absolute;
-                    top: ${playerInfo.posizione.top};
-                    left: ${playerInfo.posizione.left};
-                    transform: translate(-50%, -50%);
-                    background-color: var(--color-secondary);
-                    color: var(--color-text);
-                    border: 1px solid var(--color-primary);
-                    border-radius: 50%;
-                    padding: 5px;
-                    width: 70px;
-                    height: 30px;
-                    text-align: center;
-                    font-size: 10px;
-                    line-height: 10px;
-                    z-index: 10;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                `;
-                marker.innerHTML = `<strong>${playerName.split(' ')[0]}</strong><br>(${playerInfo.ruolo.split(' ')[0]})`;
-                preview.appendChild(marker);
-            }
-        });
+        container.appendChild(campo);
+      }
     }
 
-    /**
-     * Salva la formazione completa e le sostituzioni su Firebase.
-     */
-    window.saveFormation = function(e, matchId) {
-        e.preventDefault();
-        if (!isAdmin) return;
-
-        // 1. Raccogli i titolari
-        const titolari = {};
-        const titolareSelects = document.querySelectorAll('#titolari-selezioni select');
-        titolareSelects.forEach(select => {
-            const playerId = select.value;
-            if (playerId) {
-                let ruolo = select.id.replace('titolare-', ''); 
-                if (ruolo === 'Centrocampista A') {
-                    // Mappa il ruolo generico alla posizione effettiva sulla mappa 3-3-1
-                    ruolo = 'Centrocampista destro'; 
-                }
-                titolari[ruolo] = playerId;
-            }
-        });
-
-        // 2. Raccogli le 8 sostituzioni
-        const sostituzioni = [];
-        for (let i = 1; i <= 8; i++) {
-            const entra = document.getElementById(`entra-${i}`).value;
-            const esce = document.getElementById(`esce-${i}`).value;
-            if (entra && esce) {
-                sostituzioni.push({
-                    minuto: i * 5,
-                    entra: entra,
-                    esce: esce
-                });
-            } else {
-                 return alert(`Errore: Devi selezionare Giocatore Entrante e Uscente per la sostituzione al minuto ${i*5}.`);
-            }
-        }
-
-        // 3. LOGICA DI GENERAZIONE DELLE 9 FORMAZIONI (come richiesto)
-        // La prima formazione è 'titolare' (minuto 0)
-        let formazioniComplete = {
-            '0': {
-                minuto: 0,
-                formazione: titolari
-            }
-        };
-
-        let currentFormazione = { ...titolari };
-
-        // Simula le 8 sostituzioni e crea le successive 8 formazioni
-        sostituzioni.forEach(sub => {
-            const playerEntraId = sub.entra;
-            const playerEsceId = sub.esce;
-            
-            // Trova il ruolo del giocatore uscente
-            const ruoloEsce = Object.keys(currentFormazione).find(ruolo => currentFormazione[ruolo] === playerEsceId);
-            
-            // Trova il ruolo del giocatore entrante dalla lista dei giocatori (richiede un'altra get, ma per semplicità usiamo un placeholder)
-            // Nel tuo codice reale dovrai fare una get su 'rosa' per trovare il ruolo dell'entrante se non è un titolare
-            // Qui assumiamo che il ruolo dell'uscente venga preso dall'entrante per mantenere il modulo (la cosa più semplice)
-            
-            if (ruoloEsce) {
-                // Esegui la sostituzione: il giocatore entrante prende il ruolo di quello uscente
-                currentFormazione[ruoloEsce] = playerEntraId; 
-                
-                // Salva la nuova formazione
-                formazioniComplete[sub.minuto.toString()] = {
-                    minuto: sub.minuto,
-                    formazione: { ...currentFormazione } // Deep copy
-                };
-            }
-        });
-
-        // 4. Salva il blocco formazioni nel match su Firebase
-        const matchRef = ref(db, 'calendario/' + matchId);
-        update(matchRef, { formazioni: formazioniComplete })
-        .then(() => {
-            alert("Formazione e 8 Sostituzioni salvate con successo!");
-            // Opzionale: Mostra la visualizzazione grafica delle 9 formazioni
-            visualizeAllFormations(matchId, avversaria, formazioniComplete);
-        })
-        .catch(error => {
-            console.error("Errore salvataggio formazione:", error);
-            alert("Errore salvataggio formazione: " + error.message);
-        });
+    async function saveFormationData() {
+      if (!isAdmin) return;
+      const container = document.getElementById('campo-container');
+      const formationData = [];
+      container.querySelectorAll('select').forEach(sel => {
+        if (sel.value) formationData.push({ ruolo: sel.dataset.ruolo, playerId: sel.value });
+      });
+      await set(ref(db, 'formazioni'), formationData);
+      console.log('Formazione salvata', formationData);
     }
-    
-    /**
-     * Visualizza graficamente le 9 formazioni dopo il salvataggio.
-     */
-    function visualizeAllFormations(matchId, avversaria, formazioniData) {
-        showSection('admin-formazione-section'); 
+  </script>
 
-        get(ref(db, 'rosa')).then(snapshot => {
-            const playersData = snapshot.val() || {};
-            const playerMap = Object.keys(playersData).reduce((acc, key) => {
-                acc[key] = {
-                    nome: playersData[key].nome,
-                    cognome: playersData[key].cognome,
-                    ruolo: playersData[key].ruolo
-                };
-                return acc;
-            }, {});
-
-            let visualizationHTML = `
-                <h2>Visualizzazione 9 Formazioni vs ${avversaria}</h2>
-                <p>Ecco le 9 formazioni generate in base alle tue sostituzioni (una ogni 5 minuti in un match da 50 minuti).</p>
-                <button class="admin-btn" onclick="navigate('admin-calendario-section')">Torna al Calendario</button>
-                <hr>
-                <div id="visualizzazione-campi" style="display: flex; flex-wrap: wrap; gap: 20px;">
-            `;
-
-            Object.keys(formazioniData).forEach(minuto => {
-                const data = formazioniData[minuto];
-                const formazione = data.formazione;
-
-                let fieldHTML = `
-                    <div style="width: 300px; height: 350px; position: relative; background-color: #006400; color: white; border: 2px solid #fff; border-radius: 10px; margin-bottom: 20px;">
-                        <h4 style="text-align:center; padding: 5px; color: white; margin: 0;">Minuto: ${minuto} ${minuto === '0' ? '(Titolare)' : ''}</h4>
-                `;
-
-                Object.keys(formazione).forEach(ruolo => {
-                    const playerId = formazione[ruolo];
-                    const playerInfo = playerMap[playerId];
-                    const posizione = POSIZIONI_331[ruolo];
-                    
-                    if (posizione && playerInfo) {
-                         fieldHTML += `
-                            <div class="player-marker" style="
-                                position: absolute;
-                                top: ${posizione.top};
-                                left: ${posizione.left};
-                                transform: translate(-50%, -50%);
-                                background-color: var(--color-secondary);
-                                color: var(--color-text);
-                                border: 1px solid var(--color-primary);
-                                border-radius: 50%;
-                                padding: 5px;
-                                width: 70px;
-                                height: 30px;
-                                text-align: center;
-                                font-size: 10px;
-                                line-height: 10px;
-                                z-index: 10;
-                                white-space: nowrap;
-                                overflow: hidden;
-                                text-overflow: ellipsis;
-                            ">
-                                <strong>${playerInfo.cognome}</strong><br>(${ruolo.split(' ')[0]})
-                            </div>
-                        `;
-                    }
-                });
-
-                fieldHTML += '</div>';
-                visualizationHTML += fieldHTML;
-            });
-
-            visualizationHTML += '</div>';
-            document.getElementById('formazione-content').innerHTML = visualizationHTML;
-        });
-    }
-
-    // ----------------------------------------------------
-    // 6. INIZIALIZZAZIONE JQUERY
-    // ----------------------------------------------------
-    $(document).ready(function() {
-        // Nessuna inizializzazione aggiuntiva necessaria qui
-    });
-    
-</script>
-
-    <style>
-        /* CSS Responsive per AC Tuscolano */
-        :root {
-            --color-primary: #FFF;     /* Bianco */
-            --color-secondary: #FFD700; /* Giallo (Oro) */
-            --color-accent: #FF0000;    /* Rosso */
-            --color-text: #333;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--color-primary);
-            color: var(--color-text);
-            line-height: 1.6;
-        }
-
-        /* Intestazione (Header) */
-        header {
-            background-color: var(--color-accent);
-            color: var(--color-primary);
-            padding: 20px 10px;
-            text-align: center;
-            border-bottom: 5px solid var(--color-secondary);
-        }
-
-        h1 {
-            margin: 0;
-            font-size: 2em;
-        }
-
-        /* Menu di Navigazione */
-        nav {
-            background-color: var(--color-secondary);
-            padding: 10px 0;
-            text-align: center;
-        }
-
-        .nav-link {
-            display: inline-block;
-            color: var(--color-text);
-            text-decoration: none;
-            padding: 10px 15px;
-            margin: 0 5px;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .nav-link:hover {
-            background-color: var(--color-primary);
-        }
-        
-        /* Bottone Logout */
-        #logout-btn {
-            display: none;
-            background-color: var(--color-accent);
-            color: var(--color-primary);
-            border: none;
-            padding: 8px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-left: 10px;
-        }
-
-        /* Sezioni Contenuto */
-        section {
-            padding: 20px;
-            margin: 20px auto;
-            max-width: 90%;
-            background-color: var(--color-primary);
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            display: none; /* Inizialmente nascoste */
-        }
-        
-        h2 {
-            color: var(--color-accent);
-            border-bottom: 2px solid var(--color-secondary);
-            padding-bottom: 5px;
-            margin-top: 0;
-        }
-
-        /* Form e Input */
-        form label {
-            display: block;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-
-        form input[type="email"], 
-        form input[type="password"],
-        form input[type="text"],
-        form input[type="number"],
-        form input[type="date"],
-        form input[type="time"],
-        form select,
-        form textarea,
-        .ui-datepicker-trigger {
-            width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-            max-width: 400px;
-        }
-        
-        form button, .candidati-btn, .admin-btn {
-            background-color: var(--color-accent);
-            color: var(--color-primary);
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 15px;
-            transition: background-color 0.3s;
-        }
-        
-        form button:hover, .candidati-btn:hover, .admin-btn:hover {
-            background-color: #CC0000;
-        }
-        
-        .admin-btn {
-            background-color: #333;
-            margin-right: 5px;
-        }
-
-        /* Liste (Rosa, Calendario, Statistiche) */
-        ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        ul li {
-            background-color: #f9f9f9;
-            margin-bottom: 10px;
-            padding: 15px;
-            border-left: 5px solid var(--color-secondary);
-            border-radius: 4px;
-        }
-
-        /* Stile per JQuery UI Accordion */
-        #accordion-rosa .ui-accordion-header {
-            background-color: var(--color-secondary);
-            color: var(--color-text);
-            font-weight: bold;
-            border-left: 5px solid var(--color-accent);
-            padding: 10px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        #accordion-rosa .ui-accordion-content {
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-top: none;
-        }
-        
-        /* Responsive Design */
-        @media (max-width: 600px) {
-            h1 {
-                font-size: 1.5em;
-            }
-
-            .nav-link {
-                display: block;
-                margin: 5px 0;
-            }
-        }
-    </style>
+  <style>
+    :root { --accent:#e10600; --gold:#ffd700; --dark:#222; }
+    body { font-family:Poppins, sans-serif; background:#fff; margin:0; }
+    header { background:var(--accent); color:white; text-align:center; padding:10px; }
+    nav { background:var(--gold); text-align:center; padding:8px; }
+    .nav-link { display:inline-block; background:white; margin:3px; padding:6px 12px; border-radius:20px; cursor:pointer; text-decoration:none; color:var(--dark); font-weight:bold; }
+    .nav-link:hover { background:var(--accent); color:white; }
+    #logout-btn { background:var(--accent); color:white; border:none; border-radius:20px; padding:6px 12px; }
+    #admin-menu { background:var(--dark); padding:10px; text-align:center; }
+    #admin-menu .nav-link { background:var(--gold); color:var(--dark); margin:3px; }
+    section { display:none; margin:20px auto; padding:20px; max-width:1000px; background:white; border-radius:8px; box-shadow:0 0 8px rgba(0,0,0,0.1); }
+    h2 { border-bottom:3px solid var(--gold); }
+    label { display:block; font-weight:bold; margin-top:10px; }
+    input, select { width:100%; padding:8px; margin-top:5px; border-radius:4px; border:1px solid #ccc; }
+    button { background:var(--accent); color:white; padding:8px 14px; border:none; border-radius:4px; margin-top:10px; cursor:pointer; }
+    .campo { position:relative; width:300px; height:400px; background:#006400; border-radius:10px; margin:10px; color:white; display:inline-block; vertical-align:top; }
+    .player { position:absolute; transform:translate(-50%,-50%); background:rgba(255,215,0,0.8); color:var(--dark); border-radius:10px; width:90px; height:50px; display:flex; align-items:center; justify-content:center; font-size:10px; text-align:center; }
+    #campo-container { display:flex; flex-wrap:wrap; justify-content:center; gap:20px; }
+  </style>
 </head>
 <body>
+  <header><h1>AC Tuscolano ⚽</h1></header>
+  <nav>
+    <a class="nav-link" onclick="navigate('rosa-section')">Rosa</a>
+    <a class="nav-link" onclick="navigate('calendario-section')">Calendario</a>
+    <a class="nav-link" onclick="navigate('statistiche-section')">Statistiche</a>
+    <a class="nav-link" href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank">Torneo</a>
+    <button id="logout-btn" onclick="handleLogout()">Logout</button>
+  </nav>
 
-    <header>
-        <h1>AC Tuscolano ⚽</h1>
-    </header>
+  <div id="admin-menu" style="display:none;">
+    <a class="nav-link" onclick="navigate('admin-inserimento-giornate-section')">Ins. Giornate</a>
+    <a class="nav-link" onclick="generateFormazioni()">Formazioni 9 Mappe</a>
+    <a class="nav-link" onclick="navigate('admin-statistiche-section')">Statistiche</a>
+  </div>
 
-    <nav>
-        <div id="main-nav">
-            <a class="nav-link" onclick="navigate('login-section')" style="display:none;">Login 🔑</a>
-            <a class="nav-link" onclick="navigate('rosa-section')">Rosa 🧑‍🤝‍🧑</a>
-            <a class="nav-link" onclick="navigate('calendario-section')">Calendario 📅</a>
-            <a class="nav-link" onclick="navigate('statistiche-section')">Statistiche 📊</a>
-            <button id="logout-btn" onclick="handleLogout()">Logout</button>
-        </div>
-        
-        <div id="admin-menu" style="display:none; margin-top: 10px; background-color: var(--color-accent); padding: 5px 0;">
-            <span style="color:var(--color-primary); font-weight:bold;">🛠️ Menu Admin:</span>
-            <a class="nav-link" onclick="navigate('admin-inserimento-giocatori-section')" style="background-color:#FFD700; color:#333;">Ins. Giocatori</a>
-            <a class="nav-link" onclick="navigate('admin-inserimento-giornate-section')" style="background-color:#FFD700; color:#333;">Ins. Giornate</a>
-            <a class="nav-link" onclick="navigate('admin-calendario-section')" style="background-color:#FFD700; color:#333;">Gest. Partite</a>
-            <a class="nav-link" onclick="navigate('admin-statistiche-section'); showValutazioneForm();" style="background-color:#FFD700; color:#333;">Gest. Statistiche</a>
-        </div>
-    </nav>
+  <section id="login-section">
+    <h2>Accesso</h2>
+    <form id="login-form">
+      <label>Email</label>
+      <input type="email" id="login-email" required>
+      <label>Password</label>
+      <input type="password" id="login-password" required>
+      <button type="submit">Login</button>
+    </form>
+  </section>
 
-    <section id="login-section">
-        <h2>Accesso</h2>
-        <form id="login-form">
-            <label for="login-email">Email:</label>
-            <input type="email" id="login-email" required><br>
-            <label for="login-password">Password:</label>
-            <input type="password" id="login-password" required><br>
-            <button type="submit">Login</button>
-        </form>
-    </section>
+  <section id="rosa-section"><h2>Rosa</h2><ul id="rosa-list"></ul></section>
+  <section id="calendario-section"><h2>Calendario</h2><ul id="calendario-list"></ul></section>
+  <section id="statistiche-section"><h2>Statistiche</h2><ul id="statistiche-list"></ul></section>
 
-    <section id="rosa-section">
-        <h2>Rosa Ufficiale 🧑‍🤝‍🧑</h2>
-        <ul id="rosa-list">
-            </ul>
-    </section>
+  <section id="admin-inserimento-giornate-section">
+    <h2>Inserimento Prossime Giornate</h2>
+    <form id="match-form" onsubmit="addMatch(event)">
+      <label>Nome Squadra Avversaria</label><input id="match-avversaria" type="text" required>
+      <label>Data</label><input id="match-data" type="date" required>
+      <label>Orario</label><input id="match-orario" type="time" required>
+      <label>Campo di Gioco</label><input id="match-campo" type="text" required>
+      <label>Casa o Fuori Casa</label><select id="match-casa" required><option value="si">Casa</option><option value="no">Fuori Casa</option></select>
+      <button type="submit">Inserisci Giornata</button>
+    </form>
+  </section>
 
-    <section id="calendario-section">
-        <h2>Prossime Giornate 📅</h2>
-        <p>Clicca su "Candidatura" per confermare la tua disponibilità per la partita.</p>
-        <ul id="calendario-list">
-            </ul>
-    </section>
-    
-    <section id="statistiche-section">
-        <h2>Statistiche Squadra 📊</h2>
-        
-        <h3>Risultati Partite</h3>
-        <ul id="statistiche-risultati-list">
-            </ul>
+  <section id="admin-formazione-section">
+    <h2>9 Formazioni Automatiche (Modulo 3-3-1)</h2>
+    <div id="campo-container"></div>
+  </section>
 
-        <h3>Voti Giocatori</h3>
-        <ul id="statistiche-voti-list">
-            </ul>
-    </section>
-
-    <section id="admin-inserimento-giocatori-section">
-        <h2>Admin: Inserimento Giocatori ➕</h2>
-        <form id="giocatore-form" onsubmit="addPlayer(event)">
-            <label for="giocatore-nome">Nome:</label>
-            <input type="text" id="giocatore-nome" required><br>
-            <label for="giocatore-cognome">Cognome:</label>
-            <input type="text" id="giocatore-cognome" required><br>
-            <label for="giocatore-numero">Numero Maglia:</label>
-            <input type="number" id="giocatore-numero" min="1" max="99" required><br>
-            <label for="giocatore-ruolo">Ruolo:</label>
-            <select id="giocatore-ruolo" required>
-                <option value="">Seleziona Ruolo</option>
-                <option value="Portiere">Portiere</option>
-                <option value="Terzino sinistro">Terzino sinistro</option>
-                <option value="Terzino destro">Terzino destro</option>
-                <option value="Difensore centrale">Difensore centrale</option>
-                <option value="Centrocampista centrale">Centrocampista centrale</option>
-                <option value="Centrocampista sinistro">Centrocampista sinistro</option>
-                <option value="Centrocampista destro">Centrocampista destro</option>
-                <option value="Attaccante centrale">Attaccante centrale</option>
-            </select><br>
-            <label for="giocatore-titolare">Status (Titolare/Riserva):</label>
-            <select id="giocatore-titolare" required>
-                <option value="Titolare">Titolare</option>
-                <option value="Riserva">Riserva</option>
-            </select><br>
-            <button type="submit" class="admin-btn">Inserisci Giocatore</button>
-        </form>
-    </section>
-    
-    <section id="admin-inserimento-giornate-section">
-        <h2>Admin: Inserimento Nuova Giornata 📅</h2>
-        <form id="match-form" onsubmit="addMatch(event)">
-            <label for="match-avversaria">Avversaria:</label>
-            <input type="text" id="match-avversaria" required><br>
-            <label for="match-data">Data Partita:</label>
-            <input type="text" id="match-data" required placeholder="Clicca per selezionare la data"><br> <label for="match-orario">Orario:</label>
-            <input type="time" id="match-orario" required><br>
-            <label for="match-campo">Campo da Gioco:</label>
-            <input type="text" id="match-campo" required><br>
-            <label for="match-casa">Casa o Trasferta?</label>
-            <select id="match-casa" required>
-                <option value="si">Casa</option>
-                <option value="no">Trasferta</option>
-            </select><br>
-            <button type="submit" class="admin-btn">Inserisci Giornata</button>
-        </form>
-    </section>
-
-    <section id="admin-calendario-section">
-        <h2>Admin: Gestione Partite & Candidature ⚙️</h2>
-        <p>Seleziona una partita per inserire la Formazione o il Risultato.</p>
-        <ul id="admin-calendario-list">
-            </ul>
-    </section>
-
-    <section id="admin-formazione-section">
-        <h2>Admin: Inserimento Formazione 📝</h2>
-        <div id="formazione-content">
-            </div>
-    </section>
-    
-    <section id="admin-statistiche-section">
-        <h2>Admin: Inserimento Risultati / Valutazioni 📈</h2>
-        <div id="admin-statistiche-form">
-            </div>
-        <p>
-            <button class="admin-btn" onclick="navigate('admin-calendario-section')">Gestisci Risultati Partita</button>
-            <button class="admin-btn" onclick="showValutazioneForm()">Valuta Voto/Goal/Assist</button>
-        </p>
-    </section>
-
+  <section id="admin-statistiche-section">
+    <h2>Statistiche</h2>
+    <h3>Giocatori</h3>
+    <label>Giocatore</label><select><option>Giocatore 1</option></select>
+    <label>Voto</label><input type="number" min="0" max="10">
+    <label>Assist</label><input type="number" min="0">
+    <label>Goal</label><input type="number" min="0">
+    <button>Salva</button>
+    <hr>
+    <h3>Risultati Squadra</h3>
+    <label>Partita</label><select><option>Partita 1</option></select>
+    <label>Risultato</label><input type="text" placeholder="es. 2-1">
+    <button>Salva Risultato</button>
+  </section>
 </body>
 </html>
+
 
 
