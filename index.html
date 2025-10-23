@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
 
-  <!-- jQuery + jQuery UI (datepicker) -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css"/>
@@ -127,12 +126,31 @@
     function toggleAdminUI(){ byId('admin-menu').style.display = isAdmin ? 'block' : 'none'; }
     function setAuthButton(user){ const b=byId('auth-toggle-btn'); if(user){ b.textContent='Logout'; b.classList.add('btn--accent'); } else { b.textContent='Login'; b.classList.remove('btn--accent'); } }
 
+    /* Navigazione Pubblica - Modifica per visualizzazione singola sezione */
+    const PUBLIC_SECTIONS = [
+      'rosa-section',
+      'calendario-section',
+      'statistiche-section'
+    ];
+
+    /**
+     * Nasconde tutte le sezioni pubbliche e mostra solo quella con l'ID specificato.
+     */
+    window.showPublicSection = (id = 'rosa-section') => {
+      PUBLIC_SECTIONS.forEach(secId => {
+        const el = document.getElementById(secId);
+        if (el) el.style.display = (secId === id) ? 'block' : 'none';
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    /* Fine Navigazione Pubblica */
+
     /* Auth */
     onAuthStateChanged(auth,(user)=>{
       isAdmin = !!user && (user.uid===ADMIN_UID);
       setAuthButton(user);
       toggleAdminUI();
-      // Sezioni pubbliche sempre visibili
+      // Le sezioni pubbliche vengono caricate ma la loro visibilità è gestita da showPublicSection
       loadRosa();
       loadProssimeGiornate(false);
       loadStatistiche();
@@ -514,7 +532,7 @@
       if(Object.keys(updates).length){ await update(ref(db), updates); }
     }
 
-    // MOSTRA sezioni admin (fix: funzione globale)
+    // MOSTRA sezioni admin (funzione globale esistente)
     window.showAdminSection = (id) => {
       const SECTIONS = [
         'admin-inserimento-giocatori-section',
@@ -577,15 +595,17 @@
       loadStatistiche();
     };
 
-    // Caricamento iniziale (default: Rosa già visibile)
+    // Caricamento iniziale
     document.addEventListener('DOMContentLoaded',()=>{
-      loadRosa(); loadProssimeGiornate(false); loadStatistiche();
+      window.showPublicSection('rosa-section'); // MOSTRA SOLO 'ROSA'
+      loadRosa(); 
+      loadProssimeGiornate(false); 
+      loadStatistiche();
     });
   </script>
 </head>
 <body>
 
-  <!-- Header -->
   <header>
     <div class="hero">
       <img src="Logo.png" alt="Logo AC Tuscolano" />
@@ -596,18 +616,16 @@
     </div>
   </header>
 
-  <!-- Nav -->
   <nav>
     <div class="nav-wrap">
-      <a class="nav-link" href="#rosa-section">Rosa</a>
-      <a class="nav-link" href="#calendario-section">Calendario</a>
-      <a class="nav-link" href="#statistiche-section">Prestazioni</a>
+      <a class="nav-link" href="#" onclick="showPublicSection('rosa-section')">Rosa</a>
+      <a class="nav-link" href="#" onclick="showPublicSection('calendario-section')">Calendario</a>
+      <a class="nav-link" href="#" onclick="showPublicSection('statistiche-section')">Prestazioni</a>
       <a class="nav-link" href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank" rel="noopener">Torneo ↗</a>
 
       <button id="auth-toggle-btn" class="btn" onclick="handleAuthToggle()">Login</button>
     </div>
 
-    <!-- Menu admin -->
     <div id="admin-menu">
       <div class="nav-wrap" style="padding-left:0;padding-right:0">
         <span style="color:#fff;font-weight:800;margin-right:6px">Pannello Admin:</span>
@@ -622,7 +640,6 @@
   </nav>
 
   <main>
-    <!-- Login (on demand) -->
     <section id="login-section">
       <h2>Accesso</h2>
       <form id="login-form">
@@ -638,19 +655,18 @@
       <div class="help">Le sezioni pubbliche restano sempre visibili. Il login è richiesto solo per <b>candidarti</b> a una partita o accedere all’area Admin.</div>
     </section>
 
-    <!-- PUBBLICO -->
     <section id="rosa-section">
       <h2>Rosa</h2>
       <ul id="rosa-list"></ul>
     </section>
 
-    <section id="calendario-section">
+    <section id="calendario-section" style="display:none">
       <h2>Prossime giornate</h2>
       <div class="help">Premi “Candidatura” per dare disponibilità. Ti chiederemo il login al momento della candidatura.</div>
       <ul id="calendario-list"></ul>
     </section>
 
-    <section id="statistiche-section">
+    <section id="statistiche-section" style="display:none">
       <h2>Prestazioni</h2>
       <h3>Risultati squadra</h3>
       <ul id="statistiche-risultati-list"></ul>
@@ -658,7 +674,6 @@
       <ul id="statistiche-voti-list"></ul>
     </section>
 
-    <!-- ADMIN (mostrate solo se admin) -->
     <section id="admin-inserimento-giocatori-section" style="display:none">
       <h2>Admin · Inserimento giocatori</h2>
       <form id="giocatore-form" onsubmit="addPlayer(event)">
