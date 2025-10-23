@@ -227,24 +227,46 @@
       });
     }
 
-    async function loadProssimeGiornate(asAdmin){
-      const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
-      const ul = byId(listId); if(!ul) return; ul.innerHTML='';
-      const snap = await get(ref(db,'calendario'));
-      const val = snap.val() || {};
-      let entries = Object.entries(val);
-      const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
-      entries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
+async function loadProssimeGiornate(asAdmin){
+    const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
+    const ul = byId(listId); if(!ul) return; ul.innerHTML='';
+    const snap = await get(ref(db,'calendario'));
+    const val = snap.val() || {};
+    let entries = Object.entries(val);
+    
+    // Funzione per convertire la data (gg/mm/aaaa)
+    const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+    
+    // Data di oggi normalizzata a mezzanotte per confronto
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); 
+    
+    entries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
 
-      if(!entries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
-      ul.className='grid cols-3';
+    if(!entries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
+    ul.className='grid cols-3';
 
-      for(const [matchId,m] of entries){
+    for(const [matchId,m] of entries){
         const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
         const cand = candSnap.val() || {};
         const candCount = Object.values(cand).filter(Boolean).length;
         const isPublished = m.formazionePubblicata === true;
+        
+        // Nuovo controllo sulla data della partita
+        const matchDate = toDate(m.data);
+        // È nel passato se la data della partita è strettamente precedente a 'today' (normalizzato)
+        const isPast = matchDate < today; 
 
+        // Generazione condizionale del pulsante di candidatura
+        let candButton = '';
+        if (isPast) {
+            // Partita passata: bottone disabilitato con testo aggiornato
+            candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
+        } else {
+            // Partita futura: bottone attivo
+            candButton = `<button class="btn btn--accent" onclick="candidati('${matchId}')">Candidatura</button>`;
+        }
+        
         const li = document.createElement('li'); li.className='card';
         li.innerHTML = `
           <div class="row" style="justify-content:space-between;align-items:flex-start">
@@ -256,7 +278,7 @@
             </div>
             <div class="row">
               ${!asAdmin ? `
-                <button class="btn btn--accent" onclick="candidati('${matchId}')">Candidatura</button>
+                ${candButton}
                 ${isPublished ? `<button class="btn" onclick="showFormazionePubblica('${matchId}','${escapeHtml(m.avversaria)}')">Vedi Formazione</button>` : ''}
               `:''}
               ${asAdmin ? `
@@ -266,8 +288,8 @@
             </div>
           </div>`;
         ul.appendChild(li);
-      }
     }
+}
 
     window.candidati = async(matchId)=>{
       const user = auth.currentUser;
