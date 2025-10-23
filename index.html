@@ -5,38 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AC Tuscolano | Gestione Squadra</title>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
-  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css">
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
+    import { getDatabase, ref, onValue, push, set, update, remove } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
-    import { getDatabase, ref, set, push, get, update } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
       authDomain: "actuscolano.firebaseapp.com",
+      databaseURL: "https://actuscolano-default-rtdb.firebaseio.com",
       projectId: "actuscolano",
       storageBucket: "actuscolano.firebasestorage.app",
       messagingSenderId: "62685359731",
-      appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
-      measurementId: "G-TSVH8PH4RC"
+      appId: "1:62685359731:web:26819bedd94fcb1ce8c406"
     };
 
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
     const db = getDatabase(app);
+    const auth = getAuth(app);
     const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2";
     let isAdmin = false;
-
-    const POSIZIONI = {
-      'Portiere': { top: '90%', left: '50%' },
-      'Difensore sinistro': { top: '70%', left: '25%' },
-      'Difensore centrale': { top: '70%', left: '50%' },
-      'Difensore destro': { top: '70%', left: '75%' },
-      'Centrocampista sinistro': { top: '45%', left: '25%' },
-      'Centrocampista destro': { top: '45%', left: '75%' },
-      'Attaccante': { top: '20%', left: '50%' }
-    };
 
     function hideAllSections() {
       document.querySelectorAll('section').forEach(s => s.style.display = 'none');
@@ -50,12 +38,6 @@
       if (isAdmin) document.getElementById('admin-menu').style.display = 'block';
     }
 
-    function navigate(sectionId) {
-      if (sectionId.startsWith('admin-') && !isAdmin) return;
-      showSection(sectionId);
-    }
-    window.navigate = navigate;
-
     document.addEventListener('DOMContentLoaded', () => {
       const loginForm = document.getElementById('login-form');
       if (loginForm) {
@@ -63,23 +45,22 @@
           e.preventDefault();
           const email = document.getElementById('login-email').value;
           const password = document.getElementById('login-password').value;
-          signInWithEmailAndPassword(auth, email, password).catch(error => alert("Errore Login: " + error.message));
+          signInWithEmailAndPassword(auth, email, password).catch(err => alert('Errore login: ' + err.message));
         });
       }
+      loadRosa();
     });
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, user => {
       const logoutBtn = document.getElementById('logout-btn');
       if (user) {
         isAdmin = (user.uid === ADMIN_UID);
-        logoutBtn.style.display = 'inline';
         document.getElementById('login-section').style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
         if (isAdmin) {
           document.getElementById('admin-menu').style.display = 'block';
-          showSection('admin-inserimento-rosa-section');
-        } else {
-          showSection('rosa-section');
         }
+        showSection('rosa-section');
       } else {
         isAdmin = false;
         hideAllSections();
@@ -88,135 +69,71 @@
       }
     });
 
-    window.handleLogout = function() {
-      signOut(auth).then(() => {
-        alert("Logout effettuato.");
-        showSection('login-section');
-      });
-    }
+    window.handleLogout = function() { signOut(auth); }
 
-    window.addPlayer = function(e) {
-      e.preventDefault();
-      if (!isAdmin) return alert("Accesso negato.");
+    function loadRosa() {
+      const list = document.getElementById('rosa-list');
+      list.innerHTML = '<p style="color:gray">Caricamento dati rosa...</p>';
 
-      const nome = document.getElementById('player-nome').value;
-      const cognome = document.getElementById('player-cognome').value;
-      const numero = document.getElementById('player-numero').value;
-      const ruolo = document.getElementById('player-ruolo').value;
-      const tipo = document.getElementById('player-tipo').value;
-
-      if (nome && cognome && numero && ruolo && tipo) {
-        const newPlayerRef = push(ref(db, 'rosa'));
-        set(newPlayerRef, { nome, cognome, numero, ruolo, tipo }).then(() => {
-          alert("Giocatore inserito con successo!");
-          document.getElementById('player-form').reset();
+      try {
+        const rosaRef = ref(db, 'rosa');
+        onValue(rosaRef, snapshot => {
+          list.innerHTML = '';
+          if (!snapshot.exists()) {
+            list.innerHTML = '<p style="color:red">Nessun giocatore trovato nel database.</p>';
+            return;
+          }
+          const data = snapshot.val();
+          const players = Object.entries(data).map(([id, val]) => ({ id, ...val })).sort((a, b) => a.numero - b.numero);
+          if (!players.length) {
+            list.innerHTML = '<p style="color:red">Nessun giocatore disponibile da mostrare.</p>';
+            return;
+          }
+          players.forEach(p => {
+            const incomplete = !(p.nome && p.cognome && p.numero && p.ruolo && p.tipo);
+            const card = document.createElement('div');
+            card.className = 'player-card';
+            card.innerHTML = `
+              <h3>#${p.numero || '?'} ${p.nome || 'Sconosciuto'} ${p.cognome || ''}</h3>
+              <p><strong>Ruolo:</strong> ${p.ruolo || '—'}</p>
+              <p><strong>${p.tipo || '—'}</strong></p>
+              ${incomplete ? '<p style="color:red;font-size:12px">⚠️ Dati incompleti per questo giocatore</p>' : ''}
+            `;
+            list.appendChild(card);
+          });
+        }, err => {
+          list.innerHTML = '<p style="color:red">Errore nel caricamento dati: ' + err.message + '</p>';
         });
-      } else alert("Compila tutti i campi!");
-    }
-
-    window.addMatch = function(e) {
-      e.preventDefault();
-      if (!isAdmin) return alert("Accesso negato.");
-
-      const avversaria = document.getElementById('match-avversaria').value;
-      const data = document.getElementById('match-data').value;
-      const orario = document.getElementById('match-orario').value;
-      const campo = document.getElementById('match-campo').value;
-      const casa = document.getElementById('match-casa').value;
-
-      if (avversaria && data && orario && campo && casa) {
-        const newMatchRef = push(ref(db, 'calendario'));
-        set(newMatchRef, { avversaria, data, orario, campo, casa: casa === 'si', risultato: 'N/D' }).then(() => {
-          alert("Giornata inserita con successo!");
-          document.getElementById('match-form').reset();
-        });
-      } else alert("Compila tutti i campi!");
-    }
-
-    async function getPlayers() {
-      const snapshot = await get(ref(db, 'rosa'));
-      return snapshot.exists() ? snapshot.val() : {};
-    }
-
-    window.generateFormazioni = async function() {
-      showSection('admin-formazione-section');
-      const container = document.getElementById('campo-container');
-      container.innerHTML = '';
-      const players = await getPlayers();
-      const playerOptions = Object.keys(players).map(id => `<option value="${id}">${players[id].nome} ${players[id].cognome}</option>`).join('');
-
-      const baseFormation = ['Portiere','Difensore sinistro','Difensore centrale','Difensore destro','Centrocampista sinistro','Centrocampista destro','Attaccante'];
-
-      for (let i = 0; i <= 8; i++) {
-        const minuto = i * 5;
-        const campo = document.createElement('div');
-        campo.className = 'campo';
-        campo.innerHTML = `<h4>Formazione Minuto ${minuto}</h4>`;
-        baseFormation.forEach(r => {
-          const p = POSIZIONI[r];
-          const select = document.createElement('select');
-          select.innerHTML = `<option value="">${r}</option>${playerOptions}`;
-          select.dataset.ruolo = r;
-          select.addEventListener('change', saveFormationData);
-          const marker = document.createElement('div');
-          marker.className = 'player';
-          marker.style.top = p.top;
-          marker.style.left = p.left;
-          marker.appendChild(select);
-          campo.appendChild(marker);
-        });
-        container.appendChild(campo);
+      } catch (error) {
+        list.innerHTML = '<p style="color:red">Errore di connessione a Firebase.</p>';
       }
-    }
-
-    async function saveFormationData() {
-      if (!isAdmin) return;
-      const container = document.getElementById('campo-container');
-      const formationData = [];
-      container.querySelectorAll('select').forEach(sel => {
-        if (sel.value) formationData.push({ ruolo: sel.dataset.ruolo, playerId: sel.value });
-      });
-      await set(ref(db, 'formazioni'), formationData);
-      console.log('Formazione salvata', formationData);
     }
   </script>
 
   <style>
-    :root { --accent:#e10600; --gold:#ffd700; --dark:#222; }
-    body { font-family:Poppins, sans-serif; background:#fff; margin:0; }
-    header { background:var(--accent); color:white; text-align:center; padding:10px; }
-    nav { background:var(--gold); text-align:center; padding:8px; }
-    .nav-link { display:inline-block; background:white; margin:3px; padding:6px 12px; border-radius:20px; cursor:pointer; text-decoration:none; color:var(--dark); font-weight:bold; }
-    .nav-link:hover { background:var(--accent); color:white; }
-    #logout-btn { background:var(--accent); color:white; border:none; border-radius:20px; padding:6px 12px; }
-    #admin-menu { background:var(--dark); padding:10px; text-align:center; }
-    #admin-menu .nav-link { background:var(--gold); color:var(--dark); margin:3px; }
-    section { display:none; margin:20px auto; padding:20px; max-width:1000px; background:white; border-radius:8px; box-shadow:0 0 8px rgba(0,0,0,0.1); }
-    h2 { border-bottom:3px solid var(--gold); }
-    label { display:block; font-weight:bold; margin-top:10px; }
-    input, select { width:100%; padding:8px; margin-top:5px; border-radius:4px; border:1px solid #ccc; }
-    button { background:var(--accent); color:white; padding:8px 14px; border:none; border-radius:4px; margin-top:10px; cursor:pointer; }
-    .campo { position:relative; width:300px; height:400px; background:#006400; border-radius:10px; margin:10px; color:white; display:inline-block; vertical-align:top; }
-    .player { position:absolute; transform:translate(-50%,-50%); background:rgba(255,215,0,0.8); color:var(--dark); border-radius:10px; width:90px; height:50px; display:flex; align-items:center; justify-content:center; font-size:10px; text-align:center; }
-    #campo-container { display:flex; flex-wrap:wrap; justify-content:center; gap:20px; }
+    body { font-family:Poppins, sans-serif; margin:0; background:#fff; }
+    header { background:#e10600; color:white; text-align:center; padding:10px; }
+    nav { background:#ffd700; text-align:center; padding:8px; }
+    .nav-link { display:inline-block; background:white; margin:3px; padding:6px 12px; border-radius:20px; cursor:pointer; text-decoration:none; color:#222; font-weight:bold; }
+    .nav-link:hover { background:#e10600; color:white; }
+    #logout-btn { background:#e10600; color:white; border:none; border-radius:20px; padding:6px 12px; }
+    #admin-menu { background:#222; padding:10px; text-align:center; }
+    #admin-menu .nav-link { background:#ffd700; color:#222; margin:3px; }
+    section { display:none; margin:20px auto; padding:20px; max-width:900px; background:white; border-radius:8px; box-shadow:0 0 8px rgba(0,0,0,0.1); }
+    .player-card { background:#fef9e7; border:1px solid #ffd700; border-radius:10px; padding:10px 15px; width:200px; box-shadow:0 0 6px rgba(0,0,0,0.1); margin:8px; }
+    .player-card h3 { color:#e10600; margin-bottom:5px; }
+    .player-card p { margin:3px 0; font-size:14px; }
+    #rosa-list { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
   </style>
 </head>
 <body>
   <header><h1>AC Tuscolano ⚽</h1></header>
   <nav>
-    <a class="nav-link" onclick="navigate('rosa-section')">Rosa</a>
-    <a class="nav-link" onclick="navigate('calendario-section')">Calendario</a>
-    <a class="nav-link" onclick="navigate('statistiche-section')">Statistiche</a>
+    <a class="nav-link" onclick="showSection('rosa-section')">Rosa</a>
     <a class="nav-link" href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank">Torneo</a>
     <button id="logout-btn" onclick="handleLogout()">Logout</button>
   </nav>
-
-  <div id="admin-menu" style="display:none;">
-    <a class="nav-link" onclick="navigate('admin-inserimento-rosa-section')">Ins. Rosa</a>
-    <a class="nav-link" onclick="navigate('admin-inserimento-giornate-section')">Ins. Giornate</a>
-    <a class="nav-link" onclick="generateFormazioni()">Formazioni 9 Mappe</a>
-    <a class="nav-link" onclick="navigate('admin-statistiche-section')">Statistiche</a>
-  </div>
+  <div id="admin-menu" style="display:none;"></div>
 
   <section id="login-section">
     <h2>Accesso</h2>
@@ -229,66 +146,9 @@
     </form>
   </section>
 
-  <section id="rosa-section"><h2>Rosa</h2><ul id="rosa-list"></ul></section>
-  <section id="calendario-section"><h2>Calendario</h2><ul id="calendario-list"></ul></section>
-  <section id="statistiche-section"><h2>Statistiche</h2><ul id="statistiche-list"></ul></section>
-
-  <section id="admin-inserimento-rosa-section">
-    <h2>Inserimento Giocatori Rosa</h2>
-    <form id="player-form" onsubmit="addPlayer(event)">
-      <label>Nome</label><input id="player-nome" type="text" required>
-      <label>Cognome</label><input id="player-cognome" type="text" required>
-      <label>Numero Maglia</label><input id="player-numero" type="number" required>
-      <label>Ruolo</label>
-      <select id="player-ruolo" required>
-        <option value="Portiere">Portiere</option>
-        <option value="Terzino sinistro">Terzino sinistro</option>
-        <option value="Difensore centrale">Difensore centrale</option>
-        <option value="Terzino destro">Terzino destro</option>
-        <option value="Centrocampista centrale">Centrocampista centrale</option>
-        <option value="Centrocampista sinistro">Centrocampista sinistro</option>
-        <option value="Centrocampista destro">Centrocampista destro</option>
-        <option value="Attaccante centrale">Attaccante centrale</option>
-      </select>
-      <label>Titolare o Riserva</label>
-      <select id="player-tipo" required>
-        <option value="Titolare">Titolare</option>
-        <option value="Riserva">Riserva</option>
-      </select>
-      <button type="submit">Inserisci Giocatore</button>
-    </form>
-  </section>
-
-  <section id="admin-inserimento-giornate-section">
-    <h2>Inserimento Prossime Giornate</h2>
-    <form id="match-form" onsubmit="addMatch(event)">
-      <label>Nome Squadra Avversaria</label><input id="match-avversaria" type="text" required>
-      <label>Data</label><input id="match-data" type="date" required>
-      <label>Orario</label><input id="match-orario" type="time" required>
-      <label>Campo di Gioco</label><input id="match-campo" type="text" required>
-      <label>Casa o Fuori Casa</label><select id="match-casa" required><option value="si">Casa</option><option value="no">Fuori Casa</option></select>
-      <button type="submit">Inserisci Giornata</button>
-    </form>
-  </section>
-
-  <section id="admin-formazione-section">
-    <h2>9 Formazioni Automatiche (Modulo 3-3-1)</h2>
-    <div id="campo-container"></div>
-  </section>
-
-  <section id="admin-statistiche-section">
-    <h2>Statistiche</h2>
-    <h3>Giocatori</h3>
-    <label>Giocatore</label><select><option>Giocatore 1</option></select>
-    <label>Voto</label><input type="number" min="0" max="10">
-    <label>Assist</label><input type="number" min="0">
-    <label>Goal</label><input type="number" min="0">
-    <button>Salva</button>
-    <hr>
-    <h3>Risultati Squadra</h3>
-    <label>Partita</label><select><option>Partita 1</option></select>
-    <label>Risultato</label><input type="text" placeholder="es. 2-1">
-    <button>Salva Risultato</button>
+  <section id="rosa-section">
+    <h2>Rosa</h2>
+    <div id="rosa-list"></div>
   </section>
 </body>
 </html>
