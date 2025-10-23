@@ -120,7 +120,7 @@
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
       authDomain: "actuscolano.firebaseapp.com",
-      databaseURL: "https://actuscolano-default-rtdb.europe-west1.firebasedatabase.app",
+      databaseURL: "https://actuscolano-default-rtdb.firebaseio.com", // *** AGGIORNATO COME RICHIESTO ***
       projectId: "actuscolano",
       storageBucket: "actuscolano.firebasestorage.app",
       messagingSenderId: "62685359731",
@@ -167,10 +167,7 @@
       isAdmin = !!user && (user.uid===ADMIN_UID); // fallback semplice
       setAuthButton(user);
       toggleAdminUI();
-      // Sezioni pubbliche
-      loadRosa();
-      loadProssimeGiornate(false);
-      loadStatistiche();
+      // Le sezioni pubbliche vengono caricate in DOMContentLoaded per risolvere i problemi di "Permission Denied"
     });
 
     window.handleAuthToggle = ()=>{ const user = auth.currentUser; if(user){ signOut(auth).then(()=>hideLogin()); } else { showLogin(); } };
@@ -203,7 +200,8 @@
         }catch(err){ alert('Errore creazione: '+(err?.message||err)); }
       });
 
-      // Default
+      // Default: Carico le sezioni pubbliche immediatamente per la visualizzazione.
+      // Funzioneranno solo se la regola ".read": "true" è stata impostata.
       window.showPublicSection('rosa-section');
       loadRosa(); loadProssimeGiornate(false); loadStatistiche();
     });
@@ -273,6 +271,7 @@
 
     window.candidati = async(matchId)=>{
       const user = auth.currentUser;
+      // Scrittura per candidatura è protetta da "auth.uid != null"
       if(!user){ showLogin(); alert('Per candidarti devi effettuare il login.'); return; }
       await set(ref(db,`calendario/${matchId}/candidature/${user.uid}`), true);
       alert('Disponibilità inviata.');
@@ -374,6 +373,7 @@
     /* ===== Admin: inserimenti base ===== */
     window.addPlayer = async (e)=>{
       e?.preventDefault();
+      // Scrittura per giocatori è protetta da ADMIN_UID
       if(!isAdmin) return alert('Accesso negato.');
       const nome = v('giocatore-nome');
       const cognome = v('giocatore-cognome');
@@ -388,6 +388,7 @@
 
     window.addMatch = async (e)=>{
       e?.preventDefault();
+      // Scrittura per calendario è protetta da ADMIN_UID
       if(!isAdmin) return alert('Accesso negato.');
       const avversaria = v('match-avversaria');
       const data = v('match-data');
@@ -534,7 +535,7 @@
       ul.innerHTML = html;
     }
 
-    // ======= NUOVA SEZIONE: ADMIN · GESTIONE DATI (CRUD + candidature a nome) =======
+    // ======= SEZIONE: ADMIN · GESTIONE DATI (CRUD + candidature a nome) =======
     window.loadCrudGiocatori = async ()=>{
       const body = byId('crud-giocatori-body'); body.innerHTML = '';
       const snap = await get(ref(db,'rosa')); const data = snap.val()||{};
@@ -938,7 +939,7 @@
             <button class="btn" type="button" onclick="closeCandidatureEditor()">Chiudi</button>
           </div>
         </div>
-        </div>
+      </div>
     </section>
 
     <section id="admin-utenti-section" style="display:none">
