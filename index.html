@@ -174,7 +174,7 @@
           .catch(err=>alert("Errore login: "+err.message));
       });
 
-      // Creazione utente (admin) – usa auth secondario (fix)
+      // Creazione utente (admin) – usa auth secondario (simula il trigger)
       byId('create-user-form')?.addEventListener('submit',async e=>{
         e.preventDefault();
         if(!isAdmin) return alert("Solo admin.");
@@ -186,8 +186,10 @@
           const mod = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js');
           const cred = await mod.createUserWithEmailAndPassword(adminSecondaryAuth,email,pw);
           const uid = cred.user.uid;
-          // Salva anche nome e cognome per il display nelle candidature
+          
+          // *** SIMULAZIONE DEL TRIGGER: Salva i dati nella "collection" utenti ***
           await set(ref(db,'utenti/'+uid),{email, nome, cognome}); 
+          
           alert('Utenza creata: '+email);
           e.target.reset();
         }catch(err){ alert('Errore creazione: '+(err?.message||err)); }
@@ -367,8 +369,7 @@
     /* FINE FUNZIONE PUBBLICA */
 
     /**
-     * CORREZIONE: Funzione loadCandidature per visualizzare Nome/Cognome invece di UID.
-     * AGGIORNAMENTO: Aggiunta logica per mostrare un link di correzione per gli utenti sconosciuti.
+     * loadCandidature: Carica i nomi dalla "collection" utenti e mostra il link di correzione per gli sconosciuti.
      */
     async function loadCandidature(){
       if(!isAdmin) return;
@@ -392,20 +393,17 @@
             const user = utentiMap[uid];
             let displayName = '';
 
-            // 1. Priorità: Nome e Cognome
+            // 1. Priorità: Nome e Cognome dalla "collection" /utenti/{UID}
             if (user && user.nome && user.cognome) {
                 displayName = `${user.nome} ${user.cognome}`;
             }
 
-            // 2. Fallback 1: Email
-            else if (user && user.email) {
-                displayName = user.email;
-            }
-
-            // 3. Fallback 2: Placeholder con UID + Link di correzione
+            // 2. Fallback: Placeholder con l'identificatore disponibile + Link di correzione
             else {
+                // Usa l'email o l'UID per l'identificatore dell'utente sconosciuto
+                const userIdentifier = user?.email || `UID: ${uid}`;
                 const fixLink = `<a href="#" onclick="showManualUserFixForm(event, '${uid}')" style="font-size:10px;margin-left:5px;font-weight:400">[Correggi]</a>`;
-                displayName = `Utente Sconosciuto (UID: ${uid}) ${fixLink}`;
+                displayName = `Utente Sconosciuto (${userIdentifier}) ${fixLink}`;
             }
             
             return displayName;
@@ -441,7 +439,7 @@
       const content = byId('candidature-list');
       content.innerHTML = `
         <h3>Correggi Dati Utente Mancanti (UID: ${uid})</h3>
-        <p class="help">Inserisci il nome e cognome per associare il Giocatore a questo UID, in modo che appaia correttamente in tutte le candidature future. Puoi trovare l'UID anche nella sezione di inserimento utenze, se lo hai copiato in precedenza.</p>
+        <p class="help">Inserisci il nome e cognome per associare il Giocatore a questo UID, in modo che appaia correttamente in tutte le candidature future.</p>
         <form onsubmit="saveManualUserFix(event, '${uid}')">
           <label>Nome Giocatore</label><input id="fix-nome-${uid}" required />
           <label>Cognome Giocatore</label><input id="fix-cognome-${uid}" required />
