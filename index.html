@@ -178,8 +178,8 @@
       byId('create-user-form')?.addEventListener('submit',async e=>{
         e.preventDefault();
         if(!isAdmin) return alert("Solo admin.");
-        const nome = v('new-nome'); // <--- AGGIUNTO
-        const cognome = v('new-cognome'); // <--- AGGIUNTO
+        const nome = v('new-nome'); 
+        const cognome = v('new-cognome'); 
         const email = v('new-email').trim();
         const pw = v('new-password');
         try{
@@ -368,7 +368,7 @@
 
     /**
      * CORREZIONE: Funzione loadCandidature per visualizzare Nome/Cognome invece di UID.
-     * Ho riscritto la logica di fallback in modo più esplicito per evitare ambiguità.
+     * AGGIORNAMENTO: Aggiunta logica per mostrare un link di correzione per gli utenti sconosciuti.
      */
     async function loadCandidature(){
       if(!isAdmin) return;
@@ -390,20 +390,25 @@
           .filter(uid => cand[uid])
           .map(uid => {
             const user = utentiMap[uid];
-            
-            // 1. Priorità: Nome e Cognome (dovrebbe funzionare per gli utenti ricreati)
+            let displayName = '';
+
+            // 1. Priorità: Nome e Cognome
             if (user && user.nome && user.cognome) {
-                return `${user.nome} ${user.cognome}`;
+                displayName = `${user.nome} ${user.cognome}`;
             }
 
-            // 2. Fallback 1: Email (per vecchi utenti o incompleti)
-            if (user && user.email) {
-                return user.email;
+            // 2. Fallback 1: Email
+            else if (user && user.email) {
+                displayName = user.email;
             }
 
-            // 3. Fallback 2: Placeholder con UID
-            // Questo apparirà se l'utente non è stato trovato in 'utenti' o non ha dati identificativi.
-            return `Utente Sconosciuto (UID: ${uid})`; 
+            // 3. Fallback 2: Placeholder con UID + Link di correzione
+            else {
+                const fixLink = `<a href="#" onclick="showManualUserFixForm(event, '${uid}')" style="font-size:10px;margin-left:5px;font-weight:400">[Correggi]</a>`;
+                displayName = `Utente Sconosciuto (UID: ${uid}) ${fixLink}`;
+            }
+            
+            return displayName;
           });
         
         content += `
@@ -426,6 +431,48 @@
       }
       ul.innerHTML = content;
     }
+
+    /**
+     * NUOVE FUNZIONI DI CORREZIONE MANUALE PER UID SCONOSCIUTI
+     */
+    window.showManualUserFixForm = (e, uid) => {
+      e.preventDefault();
+      if (!isAdmin) return;
+      const content = byId('candidature-list');
+      content.innerHTML = `
+        <h3>Correggi Dati Utente Mancanti (UID: ${uid})</h3>
+        <p class="help">Inserisci il nome e cognome per associare il Giocatore a questo UID, in modo che appaia correttamente in tutte le candidature future. Puoi trovare l'UID anche nella sezione di inserimento utenze, se lo hai copiato in precedenza.</p>
+        <form onsubmit="saveManualUserFix(event, '${uid}')">
+          <label>Nome Giocatore</label><input id="fix-nome-${uid}" required />
+          <label>Cognome Giocatore</label><input id="fix-cognome-${uid}" required />
+          <label>Email (Opzionale, utile per completezza)</label><input id="fix-email-${uid}" type="email" />
+          <div class="actions">
+            <button class="btn btn--admin" type="submit">Salva Dati Utente</button>
+            <button class="btn" type="button" onclick="loadCandidature()">Annulla</button>
+          </div>
+        </form>
+      `;
+    };
+
+    window.saveManualUserFix = async (e, uid) => {
+        e.preventDefault();
+        if (!isAdmin) return;
+        const nome = byId(`fix-nome-${uid}`).value;
+        const cognome = byId(`fix-cognome-${uid}`).value;
+        const email = byId(`fix-email-${uid}`).value;
+        
+        const data = { nome, cognome };
+        if (email) data.email = email;
+
+        try {
+            // Aggiorna o crea il nodo /utenti/{uid}
+            await update(ref(db, 'utenti/' + uid), data);
+            alert(`Dati utente per UID ${uid} salvati con successo.`);
+            loadCandidature();
+        } catch (error) {
+            alert("Errore durante il salvataggio: " + error.message);
+        }
+    };
 
 
     /* ===== Admin: inserimenti & gestione ===== */
@@ -1160,7 +1207,7 @@
     
     <section id="admin-candidature-section" style="display:none">
       <h2>Admin · Gestione Candidature</h2>
-      <div class="help">Elenco delle disponibilità (candidature) inviate dagli utenti per le prossime partite.</div>
+      <div class="help">Elenco delle disponibilità (candidature) inviate dagli utenti per le prossime partite. Utilizza il link **[Correggi]** per associare nome e cognome agli Utenti Sconosciuti.</div>
       <ul id="candidature-list"></ul>
     </section>
 
@@ -1188,5 +1235,4 @@
   </main>
 </body>
 </html>
-
 
