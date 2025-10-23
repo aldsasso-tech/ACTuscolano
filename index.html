@@ -76,7 +76,7 @@
         document.getElementById('login-section').style.display = 'none';
         if (isAdmin) {
           document.getElementById('admin-menu').style.display = 'block';
-          showSection('admin-inserimento-giornate-section');
+          showSection('admin-inserimento-rosa-section');
         } else {
           showSection('rosa-section');
         }
@@ -93,6 +93,25 @@
         alert("Logout effettuato.");
         showSection('login-section');
       });
+    }
+
+    window.addPlayer = function(e) {
+      e.preventDefault();
+      if (!isAdmin) return alert("Accesso negato.");
+
+      const nome = document.getElementById('player-nome').value;
+      const cognome = document.getElementById('player-cognome').value;
+      const numero = document.getElementById('player-numero').value;
+      const ruolo = document.getElementById('player-ruolo').value;
+      const tipo = document.getElementById('player-tipo').value;
+
+      if (nome && cognome && numero && ruolo && tipo) {
+        const newPlayerRef = push(ref(db, 'rosa'));
+        set(newPlayerRef, { nome, cognome, numero, ruolo, tipo }).then(() => {
+          alert("Giocatore inserito con successo!");
+          document.getElementById('player-form').reset();
+        });
+      } else alert("Compila tutti i campi!");
     }
 
     window.addMatch = function(e) {
@@ -193,6 +212,7 @@
   </nav>
 
   <div id="admin-menu" style="display:none;">
+    <a class="nav-link" onclick="navigate('admin-inserimento-rosa-section')">Ins. Rosa</a>
     <a class="nav-link" onclick="navigate('admin-inserimento-giornate-section')">Ins. Giornate</a>
     <a class="nav-link" onclick="generateFormazioni()">Formazioni 9 Mappe</a>
     <a class="nav-link" onclick="navigate('admin-statistiche-section')">Statistiche</a>
@@ -212,6 +232,32 @@
   <section id="rosa-section"><h2>Rosa</h2><ul id="rosa-list"></ul></section>
   <section id="calendario-section"><h2>Calendario</h2><ul id="calendario-list"></ul></section>
   <section id="statistiche-section"><h2>Statistiche</h2><ul id="statistiche-list"></ul></section>
+
+  <section id="admin-inserimento-rosa-section">
+    <h2>Inserimento Giocatori Rosa</h2>
+    <form id="player-form" onsubmit="addPlayer(event)">
+      <label>Nome</label><input id="player-nome" type="text" required>
+      <label>Cognome</label><input id="player-cognome" type="text" required>
+      <label>Numero Maglia</label><input id="player-numero" type="number" required>
+      <label>Ruolo</label>
+      <select id="player-ruolo" required>
+        <option value="Portiere">Portiere</option>
+        <option value="Terzino sinistro">Terzino sinistro</option>
+        <option value="Difensore centrale">Difensore centrale</option>
+        <option value="Terzino destro">Terzino destro</option>
+        <option value="Centrocampista centrale">Centrocampista centrale</option>
+        <option value="Centrocampista sinistro">Centrocampista sinistro</option>
+        <option value="Centrocampista destro">Centrocampista destro</option>
+        <option value="Attaccante centrale">Attaccante centrale</option>
+      </select>
+      <label>Titolare o Riserva</label>
+      <select id="player-tipo" required>
+        <option value="Titolare">Titolare</option>
+        <option value="Riserva">Riserva</option>
+      </select>
+      <button type="submit">Inserisci Giocatore</button>
+    </form>
+  </section>
 
   <section id="admin-inserimento-giornate-section">
     <h2>Inserimento Prossime Giornate</h2>
@@ -246,6 +292,7 @@
   </section>
 </body>
 </html>
+
 
 
 
