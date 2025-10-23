@@ -304,11 +304,23 @@
       }
     }
 
+    /* Posizioni modulo 3-3-1 */
+    const POS_331 = {
+      'Portiere': { top:'90%', left:'50%' },
+      'Difensore centrale': { top:'70%', left:'50%' },
+      'Terzino sinistro': { top:'70%', left:'25%' },
+      'Terzino destro': { top:'70%', left:'75%' },
+      'Centrocampista centrale': { top:'45%', left:'50%' },
+      'Centrocampista sinistro': { top:'45%', left:'25%' },
+      'Centrocampista destro': { top:'45%', left:'75%' },
+      'Attaccante centrale': { top:'15%', left:'50%' }
+    };
+    
     /** FUNZIONE PUBBLICA: Visualizzazione Formazione **/
     window.showFormazionePubblica = async (matchId, avv) => {
       window.showPublicSection('formazione-pubblica-section');
       const content = byId('formazione-pubblica-content');
-      content.innerHTML = `<h3>vs ${escapeHtml(avv)}: Titolari e Sostituzioni</h3><p>Caricamento...</p>`;
+      content.innerHTML = `<h3>vs ${escapeHtml(avv)}: Formazione Iniziale e Sostituzioni</h3><p>Caricamento...</p>`;
 
       const [snapMatch, snapRosa] = await Promise.all([
         get(ref(db, `calendario/${matchId}`)),
@@ -330,7 +342,30 @@
       // 1. Titolari (Minuto 0)
       const titolari = formazioni['0']?.formazione;
       if (titolari) {
-        contentHtml.push(`<h4>Titolari (Minuto 0)</h4>`);
+        
+        // --- INSERIMENTO VISTA GRAFICA ---
+        contentHtml.push(`<h4>Formazione Titolare (Grafica - Minuto 0)</h4>`);
+        contentHtml.push(`<div class="field" style="margin-bottom: 20px;">`);
+        
+        // Genera i marker dei giocatori
+        Object.entries(titolari).forEach(([ruolo, pid]) => {
+            const p = rosa[pid];
+            const pos = POS_331[ruolo]; 
+            
+            if(p && pos) {
+                const cognome = p.cognome; 
+                contentHtml.push(`
+                    <div class="marker" style="top:${pos.top}; left:${pos.left};">
+                        <b>${escapeHtml(cognome)}</b><br>${ruolo}
+                    </div>
+                `);
+            }
+        });
+        contentHtml.push(`</div>`);
+        // --- FINE VISTA GRAFICA ---
+
+        // --- VISTA DESCRITTIVA DEI TITOLARI ---
+        contentHtml.push(`<h4>Dettaglio Titolari</h4>`);
         contentHtml.push(`<ul style="list-style-type:disc;padding-left:20px">`);
         
         const rolesOrder = ['Portiere', 'Difensore centrale', 'Terzino sinistro', 'Terzino destro', 'Centrocampista centrale', 'Centrocampista sinistro', 'Centrocampista destro', 'Attaccante centrale'];
@@ -340,6 +375,8 @@
             contentHtml.push(`<li><b>${ruolo}</b>: ${getPlayerInfo(pid)}</li>`);
         });
         contentHtml.push(`</ul>`);
+        // --- FINE VISTA DESCRITTIVA ---
+
       } else {
         contentHtml.push(`<p>Formazione titolare non trovata o non ancora pubblicata.</p>`);
       }
@@ -510,18 +547,6 @@
       byId('match-form').reset();
       loadProssimeGiornate(true);
       loadProssimeGiornate(false);
-    };
-
-    /* Posizioni modulo 3-3-1 */
-    const POS_331 = {
-      'Portiere': { top:'90%', left:'50%' },
-      'Difensore centrale': { top:'70%', left:'50%' },
-      'Terzino sinistro': { top:'70%', left:'25%' },
-      'Terzino destro': { top:'70%', left:'75%' },
-      'Centrocampista centrale': { top:'45%', left:'50%' },
-      'Centrocampista sinistro': { top:'45%', left:'25%' },
-      'Centrocampista destro': { top:'45%', left:'75%' },
-      'Attaccante centrale': { top:'15%', left:'50%' }
     };
 
     /* Admin: risultati */
