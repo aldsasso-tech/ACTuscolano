@@ -310,9 +310,11 @@
 
       const getPlayerInfo = (pid) => {
           const p = rosa[pid];
+          // L'ID è la chiave Firebase, che è una stringa.
           return p ? `${p.nome} ${p.cognome} (#${p.numero})` : `Giocatore Sconosciuto (ID: ${pid})`;
       };
 
+      // 1. Titolari (Minuto 0)
       const titolari = formazioni['0']?.formazione;
       if (titolari) {
         contentHtml.push(`<h4>Titolari (Minuto 0)</h4>`);
@@ -329,15 +331,19 @@
         contentHtml.push(`<p>Formazione titolare non trovata o non ancora pubblicata.</p>`);
       }
 
+      // 2. Sostituzioni (dal minuto 5 in poi)
       const sostituzioni = Object.entries(formazioni)
         .filter(([min,]) => min !== '0')
-        .map(([, data]) => data)
+        .map(([, data]) => data) // data ora include 'entra' e 'esce'
         .sort((a, b) => a.minuto - b.minuto);
       
       if (sostituzioni.length > 0) {
         contentHtml.push(`<h4>Sostituzioni Effettuate</h4>`);
         contentHtml.push(`<ul id="sostituzioni-list" style="list-style:none;padding:0;margin-top:10px">`);
         sostituzioni.forEach(s => {
+            // Se la formazione è stata salvata con il codice corretto, s.entra e s.esce saranno gli ID dei giocatori
+            
+            // Trova il ruolo di chi è uscito nella formazione precedente (semplificazione)
             const prevFormazione = formazioni[String(s.minuto - 5)]?.formazione || titolari;
             const ruoloUscente = prevFormazione ? Object.keys(prevFormazione).find(r => prevFormazione[r] === s.esce) : 'Ruolo Sconosciuto';
 
@@ -578,12 +584,21 @@
           subs.push({minuto:i*5, entra, esce});
         }
 
-        // 3) 9 formazioni
+        // 3) 9 formazioni (CORREZIONE APPLICATA QUI)
         const all = {'0':{minuto:0, formazione:{...tit}}};
         const cur = {...tit};
         subs.forEach(s=>{
           const ruoloUscente = Object.keys(cur).find(r=>cur[r]===s.esce);
-          if(ruoloUscente){ cur[ruoloUscente]=s.entra; all[String(s.minuto)]={minuto:s.minuto, formazione:{...cur}}; }
+          if(ruoloUscente){ 
+            cur[ruoloUscente]=s.entra; 
+            // Salviamo anche gli ID di chi entra e chi esce
+            all[String(s.minuto)] = {
+                minuto: s.minuto, 
+                formazione: {...cur},
+                entra: s.entra,
+                esce: s.esce
+            }; 
+          }
         });
 
         // 4) Salva sul match e pubblica la formazione
@@ -885,7 +900,7 @@
         'admin-statistiche-section',
         'admin-utenti-section',
         'admin-candidature-section',
-        'admin-modifica-dati-section' // NUOVO
+        'admin-modifica-dati-section'
       ];
       SECTIONS.forEach(secId => {
         const el = document.getElementById(secId);
@@ -983,7 +998,8 @@
         <a class="nav-link" onclick="showAdminSection('admin-formazione-section')">Formazione & sostituzioni</a>
         <a class="nav-link" onclick="showAdminSection('admin-candidature-section')">Gestione Candidature</a>
         <a class="nav-link" onclick="showAdminSection('admin-statistiche-section')">Statistiche</a>
-        <a class="nav-link" onclick="showAdminSection('admin-modifica-dati-section')">Modifica Dati</a> <a class="nav-link" onclick="showAdminSection('admin-utenti-section')">Inserimento utenti</a>
+        <a class="nav-link" onclick="showAdminSection('admin-modifica-dati-section')">Modifica Dati</a> 
+        <a class="nav-link" onclick="showAdminSection('admin-utenti-section')">Inserimento utenti</a>
       </div>
     </div>
   </nav>
