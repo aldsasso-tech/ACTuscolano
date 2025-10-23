@@ -94,13 +94,13 @@
 
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
-  authDomain: "actuscolano.firebaseapp.com",
-  databaseURL: "https://actuscolano-default-rtdb.firebaseio.com",
-  projectId: "actuscolano",
-  storageBucket: "actuscolano.firebasestorage.app",
-  messagingSenderId: "62685359731",
-  appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
-  measurementId: "G-TSVH8PH4RC"
+      authDomain: "actuscolano.firebaseapp.com",
+      databaseURL: "https://actuscolano-default-rtdb.firebaseio.com",
+      projectId: "actuscolano",
+      storageBucket: "actuscolano.firebasestorage.app",
+      messagingSenderId: "62685359731",
+      appId: "1:62685359731:web:26819bedd94fcb1ce8c406",
+      measurementId: "G-TSVH8PH4RC"
     };
 
     // Inizializzazioni
@@ -182,17 +182,25 @@
         const cognome = v('new-cognome'); 
         const email = v('new-email').trim();
         const pw = v('new-password');
+
+        if(!nome||!cognome||!email||!pw) return alert("Compila tutti i campi!");
+        
         try{
           const mod = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js');
+          
+          // 1. Creazione utente in Firebase Authentication
           const cred = await mod.createUserWithEmailAndPassword(adminSecondaryAuth,email,pw);
           const uid = cred.user.uid;
           
-          // *** SIMULAZIONE DEL TRIGGER: Salva i dati nella "collection" utenti ***
+          // 2. SIMULAZIONE DEL TRIGGER: Salva i dati nella "collection" utenti (RTDB)
           await set(ref(db,'utenti/'+uid),{email, nome, cognome}); 
           
-          alert('Utenza creata: '+email);
+          alert('Utenza creata con successo. UID: '+uid);
           e.target.reset();
-        }catch(err){ alert('Errore creazione: '+(err?.message||err)); }
+        }catch(err){ 
+          console.error("Errore creazione utente o scrittura DB:", err);
+          alert('Errore creazione: '+(err?.message||err)); 
+        }
       });
     });
 
@@ -338,18 +346,17 @@
 
       // 2. Sostituzioni (dal minuto 5 in poi)
       const sostituzioni = Object.entries(formazioni)
-        .filter(([min,]) => min !== '0')
-        .map(([, data]) => data) // data ora include 'entra' e 'esce'
+        .filter(([, data]) => data.minuto && data.minuto !== 0) // Filtra solo le sostituzioni
+        .map(([, data]) => data) 
         .sort((a, b) => a.minuto - b.minuto);
       
       if (sostituzioni.length > 0) {
         contentHtml.push(`<h4>Sostituzioni Effettuate</h4>`);
         contentHtml.push(`<ul id="sostituzioni-list" style="list-style:none;padding:0;margin-top:10px">`);
         sostituzioni.forEach(s => {
-            // Se la formazione è stata salvata con il codice corretto, s.entra e s.esce saranno gli ID dei giocatori
-            
-            // Trova il ruolo di chi è uscito nella formazione precedente (semplificazione)
-            const prevFormazione = formazioni[String(s.minuto - 5)]?.formazione || titolari;
+            // Trova il ruolo di chi è uscito nella formazione precedente (semplificazione, basata sul ruolo)
+            const prevMinutoKey = String(s.minuto - 5);
+            const prevFormazione = formazioni[prevMinutoKey]?.formazione || titolari;
             const ruoloUscente = prevFormazione ? Object.keys(prevFormazione).find(r => prevFormazione[r] === s.esce) : 'Ruolo Sconosciuto';
 
             contentHtml.push(`
@@ -582,7 +589,7 @@
           ruolo:g.ruolo,
           presenze:g.presenze||0,
           // Aggiunge la disponibilità alla label (CORREZIONE 2)
-          label: `${g.nome} ${g.cognome} (#${g.numero}) — ${g.presenze||0} pres. | Disponibilità: ${isAvailable ? 'Sì' : 'No'}`, 
+          label: `${g.nome} ${g.cognome} (#${g.numero}) — ${g.presenze||0} pres. | Disp.: ${isAvailable ? 'Sì' : 'No'}`, 
           isAvailable // La conserviamo, anche se non strettamente necessaria per opts
         };
       })
@@ -1228,9 +1235,8 @@
         <label>Password</label><input id="new-password" type="password" required />
         <div class="actions"><button class="btn btn--admin" type="submit">Crea utenza</button></div>
       </form>
-      <div class="help">L’admin resta connesso durante la creazione grazie all’autenticazione secondaria.</div>
+      <div class="help">L’admin resta connesso durante la creazione grazie all’autenticazione secondaria. La scrittura della Collection 'utenti' con i campi nome, cognome ed email avviene immediatamente dopo la creazione su Authentication.</div>
     </section>
   </main>
 </body>
 </html>
-
