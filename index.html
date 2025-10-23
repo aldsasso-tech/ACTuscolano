@@ -100,23 +100,27 @@
     #admin-menu{display:none;background:var(--red);padding:8px 16px}
     #admin-menu .tab{background:var(--yellow);color:#111;box-shadow:none;border-radius:12px}
 
+    /* Table-like list */
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+    .table thead th{font-size:.9rem;color:#000}
+
     /* Footer */
     footer{background:var(--ink-sub);color:#fff;padding:10px 16px;margin-top:22px;font-size:.8rem;text-align:center;border-top:4px solid var(--yellow)}
 
-    /* Accessibility */
     @media (prefers-reduced-motion: reduce){.tab,.btn{transition:none}}
   </style>
 
   <script type="module">
     /* Firebase v9 (modular) */
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getIdTokenResult } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
     import { getDatabase, ref, set, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
       authDomain: "actuscolano.firebaseapp.com",
-      databaseURL: "https://actuscolano-default-rtdb.firebaseio.com",
+      databaseURL: "https://actuscolano-default-rtdb.europe-west1.firebasedatabase.app",
       projectId: "actuscolano",
       storageBucket: "actuscolano.firebasestorage.app",
       messagingSenderId: "62685359731",
@@ -129,7 +133,7 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-    // *** Sostituisci con il tuo UID admin reale ***
+    // *** Se usi i custom claims, sostituisci questo controllo hardcoded ***
     const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2";
     let isAdmin = false;
 
@@ -140,12 +144,11 @@
     /* Helpers */
     const byId = (id)=>document.getElementById(id);
     const v = (id)=>byId(id)?.value || '';
-    const escapeHtml=(s='')=>s.replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[c]));
+    const escapeHtml=(s='')=>s.replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
     const PUBLIC_SECTIONS = ['rosa-section','calendario-section','statistiche-section','formazione-pubblica-section'];
     window.showPublicSection = (id = 'rosa-section') => {
       PUBLIC_SECTIONS.forEach(secId => { const el = byId(secId); if (el) el.style.display = (secId === id) ? 'block' : 'none'; });
-      // Attiva aria-current sui tab
       document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', t.dataset.target===id ? 'page' : 'false'); });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -156,10 +159,15 @@
     function setAuthButton(user){ const b=byId('auth-toggle-btn'); if(user){ b.textContent='Logout'; b.classList.add('btn--accent'); } else { b.textContent='Login'; b.classList.remove('btn--accent'); } }
 
     /* Auth */
-    onAuthStateChanged(auth,(user)=>{
-      isAdmin = !!user && (user.uid===ADMIN_UID);
+    onAuthStateChanged(auth, async (user)=>{
+      // Se usi custom claims:
+      // const token = user ? await getIdTokenResult(user, true) : null;
+      // isAdmin = !!token?.claims?.admin;
+
+      isAdmin = !!user && (user.uid===ADMIN_UID); // fallback semplice
       setAuthButton(user);
       toggleAdminUI();
+      // Sezioni pubbliche
       loadRosa();
       loadProssimeGiornate(false);
       loadStatistiche();
@@ -176,7 +184,7 @@
         signInWithEmailAndPassword(auth,email,pw).then(()=>{ hideLogin(); }).catch(err=>alert("Errore login: "+err.message));
       });
 
-      // Creazione utente (admin) – usa auth secondario (nome, cognome, email)
+      // Creazione utente (admin) – usa auth secondario
       byId('create-user-form')?.addEventListener('submit',async e=>{
         e.preventDefault();
         if(!isAdmin) return alert("Solo admin.");
@@ -227,7 +235,6 @@
       const snap = await get(ref(db,'calendario'));
       const val = snap.val() || {};
       let entries = Object.entries(val);
-      // Ordina per data decrescente (dd/mm/yyyy)
       const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
       entries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
 
@@ -256,7 +263,7 @@
               `:''}
               ${asAdmin ? `
                 <button class="btn btn--admin" onclick="showFormazioneForm('${matchId}','${escapeHtml(m.avversaria)}')">Formazione & Sost.</button>
-                <button class="btn btn--admin" onclick="showRisultatoForm('${matchId}','${escapeHtml(m.avversaria)}')">Inserisci Risultato</button>
+                <button class="btn btn--admin" onclick="showRisultatoForm('${matchId}','${escapeHtml(m.avversaria)}')">Risultato</button>
               `:''}
             </div>
           </div>`;
@@ -328,7 +335,6 @@
       const html = [];
       const rolesOrder = ['Portiere', 'Difensore centrale', 'Terzino sinistro', 'Terzino destro', 'Centrocampista centrale', 'Centrocampista sinistro', 'Centrocampista destro', 'Attaccante centrale'];
 
-      // 0': titolari (grafica + elenco)
       const titolari = formazioni['0']?.formazione;
       if (titolari) {
         html.push(`<h4>Formazione Titolare (3-3-1)</h4>`);
@@ -350,12 +356,11 @@
         html.push(`<p>Formazione titolare non trovata o non ancora pubblicata.</p>`);
       }
 
-      // Sostituzioni
       const sost = Object.entries(formazioni).filter(([,d])=> d.minuto && d.minuto!==0).map(([,d])=>d).sort((a,b)=>a.minuto-b.minuto);
       if (sost.length) {
         html.push(`<h4>Sostituzioni Effettuate</h4><ul class="grid cols-2">`);
         sost.forEach(s=>{
-          html.push(`<li class="card"><div style="font-weight:700">Minuto ${s.minuto}</div><div class="player-sub">(Entrato/Uscìto indicati nel dettaglio salvataggio admin)</div></li>`);
+          html.push(`<li class="card"><div style="font-weight:700">Minuto ${s.minuto}</div></li>`);
         });
         html.push(`</ul>`);
       }
@@ -363,12 +368,15 @@
       content.innerHTML = html.join('');
     };
 
-    /* ===== Admin: inserimenti & gestione ===== */
+    /* ===== Admin: inserimenti base ===== */
     window.addPlayer = async (e)=>{
-      e?.preventDefault(); if(!isAdmin) return alert('Accesso negato.');
-      const nome = v('giocatore-nome'); const cognome = v('giocatore-cognome');
+      e?.preventDefault();
+      if(!isAdmin) return alert('Accesso negato.');
+      const nome = v('giocatore-nome');
+      const cognome = v('giocatore-cognome');
       const numero = parseInt(v('giocatore-numero')||'0',10);
-      const ruolo = v('giocatore-ruolo'); const stato = v('giocatore-titolare');
+      const ruolo = v('giocatore-ruolo');
+      const stato = v('giocatore-titolare');
       if(!nome||!cognome||!numero||!ruolo) return alert('Compila tutti i campi');
       const row = {nome,cognome,numero,ruolo,stato,voto:0,presenze:0,goal:0,partite:0};
       await set(push(ref(db,'rosa')),row);
@@ -376,14 +384,20 @@
     };
 
     window.addMatch = async (e)=>{
-      e?.preventDefault(); if(!isAdmin) return alert('Accesso negato.');
-      const avversaria = v('match-avversaria'); const data = v('match-data');
-      const orario = v('match-orario'); const campo = v('match-campo');
+      e?.preventDefault();
+      if(!isAdmin) return alert('Accesso negato.');
+      const avversaria = v('match-avversaria');
+      const data = v('match-data');
+      const orario = v('match-orario');
+      const campo = v('match-campo');
       const casa = v('match-casa')==='si';
       if(!avversaria||!data||!orario||!campo) return alert('Compila tutti i campi');
       const rec = {avversaria,data,orario,campo,casa,risultato:'N/D',formazionePubblicata:false};
       await set(push(ref(db,'calendario')),rec);
-      alert('Giornata inserita'); byId('match-form').reset(); loadProssimeGiornate(true); loadProssimeGiornate(false);
+      alert('Giornata inserita');
+      byId('match-form').reset();
+      loadProssimeGiornate(true);
+      loadProssimeGiornate(false);
     };
 
     window.showRisultatoForm = (matchId,avv)=>{
@@ -398,18 +412,25 @@
             <button class="btn btn--admin" type="submit">Salva</button>
             <button class="btn" type="button" onclick="showAdminSection('admin-calendario-section')">Annulla</button>
           </div>
-        </form>`;
+        </form>
+      `;
     };
 
     window.saveMatchResult = async (e,matchId)=>{
-      e.preventDefault(); if(!isAdmin) return;
+      e.preventDefault();
+      if(!isAdmin) return;
       const risultato = v('risultato-input').trim() || 'N/D';
       await update(ref(db,'calendario/'+matchId),{risultato});
-      alert('Risultato salvato.'); window.showAdminSection('admin-calendario-section'); loadStatistiche(); loadProssimeGiornate(false);
+      alert('Risultato salvato.');
+      window.showAdminSection('admin-calendario-section');
+      loadStatistiche();
+      loadProssimeGiornate(false);
     };
 
+    /* ===== Admin: Formazione & sostituzioni (con presenze) ===== */
     window.showFormazioneForm = async (matchId,avv)=>{
-      if(!isAdmin) return; window.showAdminSection('admin-formazione-section');
+      if(!isAdmin) return;
+      window.showAdminSection('admin-formazione-section');
       const box = byId('formazione-content'); box.innerHTML='Caricamento...';
 
       const [snapRosa, snapCandidature, snapUtenti] = await Promise.all([
@@ -466,7 +487,7 @@
       }
       function collectTitolari(){ const ids = {}; Object.keys(POS_331).forEach(r=>{ ids[r] = byId('t-'+r).value || null; }); return ids; }
 
-      // Salvataggio formazione + incremento presenze
+      // Salvataggio + incremento presenze
       window.saveFormation = async (e,matchId,avv)=>{
         e.preventDefault();
         const tit = {}; for(const ruolo of Object.keys(POS_331)){ const val = byId('t-'+ruolo).value; if(!val) return alert('Completa i titolari'); tit[ruolo]=val; }
@@ -493,7 +514,7 @@
       const snap = await get(ref(db,'rosa')); const rosa = snap.val() || {}; const updates = {}; presenti.forEach(pid=>{ const g = rosa[pid]; if(g){ updates[`/rosa/${pid}/presenze`] = (g.presenze || 0) + 1; }}); if(Object.keys(updates).length){ await update(ref(db), updates); }
     }
 
-    // Admin: gestione candidature (migliorata)
+    // Admin: visualizzazione candidature compatta
     async function loadCandidature(){
       if(!isAdmin) return; const ul = byId('candidature-list'); if(!ul) return; ul.innerHTML = 'Caricamento candidature...';
       const [snapUtenti, snapCal] = await Promise.all([ get(ref(db,'utenti')), get(ref(db,'calendario')) ]);
@@ -510,13 +531,183 @@
       ul.innerHTML = html;
     }
 
+    // ======= NUOVA SEZIONE: ADMIN · GESTIONE DATI (CRUD + candidature a nome) =======
+    window.loadCrudGiocatori = async ()=>{
+      const body = byId('crud-giocatori-body'); body.innerHTML = '';
+      const snap = await get(ref(db,'rosa')); const data = snap.val()||{};
+      const rows = Object.entries(data).sort((a,b)=> (a[1].numero||0)-(b[1].numero||0));
+      if(!rows.length){ body.innerHTML = `<tr><td colspan="8"><div class="help">Nessun giocatore.</div></td></tr>`; return; }
+      for(const [id,g] of rows){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input data-gi="${id}" data-k="nome" value="${escapeHtml(g.nome||'')}" /></td>
+          <td><input data-gi="${id}" data-k="cognome" value="${escapeHtml(g.cognome||'')}" /></td>
+          <td><input data-gi="${id}" data-k="numero" type="number" min="1" max="99" value="${g.numero||''}" style="width:90px" /></td>
+          <td>
+            <select data-gi="${id}" data-k="ruolo">
+              ${['Portiere','Terzino sinistro','Terzino destro','Difensore centrale','Centrocampista centrale','Centrocampista sinistro','Centrocampista destro','Attaccante centrale']
+                .map(r=>`<option ${g.ruolo===r?'selected':''}>${r}</option>`).join('')}
+            </select>
+          </td>
+          <td>
+            <select data-gi="${id}" data-k="stato">
+              ${['Titolare','Riserva'].map(s=>`<option ${g.stato===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </td>
+          <td><input data-gi="${id}" data-k="presenze" type="number" value="${g.presenze||0}" style="width:90px" /></td>
+          <td><input data-gi="${id}" data-k="goal" type="number" value="${g.goal||0}" style="width:90px" /></td>
+          <td class="row" style="gap:6px">
+            <button class="btn btn--admin" onclick="crudSaveGiocatore('${id}')">Salva</button>
+            <button class="btn" onclick="crudDeleteGiocatore('${id}')">Elimina</button>
+          </td>`;
+        body.appendChild(tr);
+      }
+    };
+    window.crudSaveGiocatore = async (id)=>{
+      if(!isAdmin) return;
+      const sels = document.querySelectorAll(`[data-gi="${id}"]`);
+      const upd = {};
+      sels.forEach(i => { const k=i.getAttribute('data-k'); let val=i.value; if(['numero','presenze','goal','voto','partite'].includes(k)) val=+val||0; upd[k]=val; });
+      await update(ref(db,'rosa/'+id),upd);
+      alert('Salvato.');
+      loadRosa();
+    };
+    window.crudDeleteGiocatore = async (id)=>{
+      if(!isAdmin) return;
+      if(!confirm('Eliminare questo giocatore?')) return;
+      await remove(ref(db,'rosa/'+id));
+      alert('Eliminato.');
+      window.loadCrudGiocatori();
+      loadRosa();
+    };
+
+    window.loadCrudPartite = async ()=>{
+      const body = byId('crud-partite-body'); body.innerHTML='';
+      const snap = await get(ref(db,'calendario')); const data = snap.val()||{};
+      const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+      const rows = Object.entries(data).sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
+      if(!rows.length){ body.innerHTML = `<tr><td colspan="9"><div class="help">Nessuna partita.</div></td></tr>`; return; }
+      for(const [id,m] of rows){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input data-mi="${id}" data-k="avversaria" value="${escapeHtml(m.avversaria||'')}" /></td>
+          <td><input data-mi="${id}" data-k="data" value="${escapeHtml(m.data||'')}" placeholder="gg/mm/aaaa" style="width:130px"/></td>
+          <td><input data-mi="${id}" data-k="orario" value="${escapeHtml(m.orario||'')}" style="width:110px"/></td>
+          <td><input data-mi="${id}" data-k="campo" value="${escapeHtml(m.campo||'')}" /></td>
+          <td>
+            <select data-mi="${id}" data-k="casa">
+              <option value="true" ${m.casa?'selected':''}>Casa</option>
+              <option value="false" ${!m.casa?'selected':''}>Trasferta</option>
+            </select>
+          </td>
+          <td><input data-mi="${id}" data-k="risultato" value="${escapeHtml(m.risultato||'N/D')}" style="width:100px"/></td>
+          <td>
+            <select data-mi="${id}" data-k="formazionePubblicata">
+              <option value="true" ${m.formazionePubblicata?'selected':''}>Sì</option>
+              <option value="false" ${!m.formazionePubblicata?'selected':''}>No</option>
+            </select>
+          </td>
+          <td class="row" style="gap:6px">
+            <button class="btn btn--admin" onclick="crudSavePartita('${id}')">Salva</button>
+            <button class="btn" onclick="crudDeletePartita('${id}')">Elimina</button>
+          </td>
+          <td>
+            <button class="btn" onclick="openCandidatureEditor('${id}','${escapeHtml(m.avversaria||'')}')">Candidature…</button>
+          </td>`;
+        body.appendChild(tr);
+      }
+    };
+    window.crudSavePartita = async (id)=>{
+      if(!isAdmin) return;
+      const sels = document.querySelectorAll(`[data-mi="${id}"]`);
+      const upd = {};
+      sels.forEach(i => {
+        const k=i.getAttribute('data-k'); let val=i.value;
+        if(k==='casa' || k==='formazionePubblicata') val = (val==='true');
+        upd[k]=val;
+      });
+      await update(ref(db,'calendario/'+id),upd);
+      alert('Partita aggiornata.');
+      loadProssimeGiornate(true); loadProssimeGiornate(false);
+    };
+    window.crudDeletePartita = async (id)=>{
+      if(!isAdmin) return;
+      if(!confirm('Eliminare questa partita?')) return;
+      await remove(ref(db,'calendario/'+id));
+      alert('Partita eliminata.');
+      window.loadCrudPartite();
+      loadProssimeGiornate(true); loadProssimeGiornate(false);
+    };
+
+    // Editor candidature a nome
+    window.openCandidatureEditor = async (matchId, avv)=>{
+      byId('crud-candidature-panel').style.display='block';
+      byId('crud-candidature-title').textContent = `Candidature · vs ${avv}`;
+      byId('crud-candidature-panel').scrollIntoView({behavior:'smooth'});
+      const tbody = byId('crud-candidature-body'); tbody.innerHTML = 'Caricamento...';
+
+      const [snapUtenti, snapRosa, snapCand] = await Promise.all([
+        get(ref(db,'utenti')), get(ref(db,'rosa')), get(ref(db,`calendario/${matchId}/candidature`))
+      ]);
+      const utenti = snapUtenti.val()||{}; const rosa = snapRosa.val()||{}; const cand = snapCand.val()||{};
+
+      // mappa nome cognome -> uid (se registrato)
+      const nameToUid = {}; Object.entries(utenti).forEach(([uid,u])=>{ if(u.nome&&u.cognome) nameToUid[`${u.nome} ${u.cognome}`]=uid; });
+
+      const rows = Object.entries(rosa).map(([pid,g])=>{
+        const display = `${g.nome} ${g.cognome} (#${g.numero})`;
+        const uid = nameToUid[`${g.nome} ${g.cognome}`] || null;
+        const checked = uid ? !!cand[uid] : false;
+        return {pid, display, uid, checked};
+      }).sort((a,b)=> a.display.localeCompare(b.display,'it'));
+
+      tbody.innerHTML = '';
+      for(const r of rows){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(r.display)}</td>
+          <td>${r.uid ? r.uid : '<span class="help">Nessun utente collegato</span>'}</td>
+          <td><input type="checkbox" ${r.checked?'checked':''} data-cand="${r.uid||''}" ${r.uid?'':'disabled'} /></td>`;
+        tbody.appendChild(tr);
+      }
+
+      // Aggancia il pulsante Salva
+      const saveBtn = byId('crud-candidature-save');
+      saveBtn.onclick = async ()=>{
+        if(!isAdmin) return;
+        const inputs = tbody.querySelectorAll('input[type="checkbox"][data-cand]');
+        const updates = {};
+        inputs.forEach(chk=>{
+          const uid = chk.getAttribute('data-cand');
+          if(!uid) return;
+          updates[`/calendario/${matchId}/candidature/${uid}`] = chk.checked;
+        });
+        await update(ref(db), updates);
+        alert('Candidature aggiornate.');
+        loadProssimeGiornate(true); loadProssimeGiornate(false);
+      };
+    };
+    window.closeCandidatureEditor = ()=>{
+      byId('crud-candidature-panel').style.display='none';
+    };
+
     // MOSTRA sezioni admin (globale)
     window.showAdminSection = (id) => {
-      const SECTIONS = ['admin-inserimento-giocatori-section','admin-inserimento-giornate-section','admin-calendario-section','admin-formazione-section','admin-statistiche-section','admin-utenti-section','admin-candidature-section'];
+      const SECTIONS = [
+        'admin-inserimento-giocatori-section',
+        'admin-inserimento-giornate-section',
+        'admin-calendario-section',
+        'admin-formazione-section',
+        'admin-statistiche-section',
+        'admin-utenti-section',
+        'admin-candidature-section',
+        'admin-gestione-dati-section' /* <-- nuova sezione */
+      ];
       SECTIONS.forEach(secId => { const el = document.getElementById(secId); if (el) el.style.display = (secId === id) ? 'block' : 'none'; });
       if(id==='admin-calendario-section'){ loadProssimeGiornate(true); }
       if(id==='admin-inserimento-giornate-section'){ $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
       if(id==='admin-candidature-section'){ loadCandidature(); }
+      if(id==='admin-gestione-dati-section'){ window.loadCrudGiocatori(); window.loadCrudPartite(); }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -527,7 +718,7 @@
       const options = Object.entries(val).map(([id,g])=>`<option value="${id}">${g.nome} ${g.cognome} (#${g.numero})</option>`).join('');
       box.innerHTML = `
         <h3>Valutazione singolo giocatore (Incremento)</h3>
-        <div class="help">Usa questa sezione per aggiungere valori dopo una partita. Per correzioni totali utilizza le funzioni di modifica dati.</div>
+        <div class="help">Usa questa sezione per aggiungere valori dopo una partita. Per correzioni totali usa Gestione dati &rarr; Giocatori.</div>
         <form onsubmit="savePlayerStats(event)">
           <label>Giocatore</label>
           <select id="stat-player" required><option value="">Seleziona</option>${options}</select>
@@ -540,13 +731,15 @@
           <div class="actions"><button class="btn btn--admin" type="submit">Salva</button><button class="btn" type="button" onclick="showAdminSection('admin-calendario-section')">Torna alle partite</button></div>
         </form>`;
     };
-
     window.savePlayerStats = async (e)=>{
       e.preventDefault(); if(!isAdmin) return; const id = v('stat-player'); if(!id) return;
       const votoInc = +v('stat-voto')||0; const presInc = +v('stat-presenze')||0; const goalInc = +v('stat-goal')||0;
       const snap = await get(ref(db,'rosa/'+id)); const g = snap.val(); if(!g) return alert('Giocatore non trovato');
       const upd = { voto:(g.voto||0)+votoInc, presenze:(g.presenze||0)+presInc, goal:(g.goal||0)+goalInc };
-      await update(ref(db,'rosa/'+id),upd); alert('Statistiche aggiornate'); window.showValutazioneForm(); loadStatistiche();
+      await update(ref(db,'rosa/'+id),upd);
+      alert('Statistiche aggiornate');
+      window.showValutazioneForm();
+      loadStatistiche();
     };
   </script>
 </head>
@@ -581,6 +774,7 @@
         <button class="tab" onclick="showAdminSection('admin-calendario-section')">Gestione partite</button>
         <button class="tab" onclick="showAdminSection('admin-formazione-section')">Formazione & sostituzioni</button>
         <button class="tab" onclick="showAdminSection('admin-candidature-section')">Gestione Candidature</button>
+        <button class="tab" onclick="showAdminSection('admin-gestione-dati-section')">Gestione dati (Nuova)</button>
         <button class="tab" onclick="showAdminSection('admin-statistiche-section')">Statistiche</button>
         <button class="tab" onclick="showAdminSection('admin-utenti-section')">Inserimento utenti</button>
       </div>
@@ -630,7 +824,7 @@
       <div class="actions" style="margin-top:10px"><button class="btn" onclick="showPublicSection('calendario-section')">Torna al calendario</button></div>
     </section>
 
-    <!-- ADMIN -->
+    <!-- ADMIN base -->
     <section id="admin-inserimento-giocatori-section" style="display:none">
       <h2>Admin · Inserimento giocatori</h2>
       <form id="giocatore-form" onsubmit="addPlayer(event)">
@@ -694,6 +888,60 @@
       <h2>Admin · Gestione Candidature</h2>
       <div class="help">Elenco disponibilità inviate dagli utenti.</div>
       <ul id="candidature-list" class="grid cols-2"></ul>
+    </section>
+
+    <!-- ===== NUOVA SEZIONE: ADMIN · GESTIONE DATI ===== -->
+    <section id="admin-gestione-dati-section" style="display:none">
+      <h2>Admin · Gestione dati</h2>
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="row">
+          <button class="tab" aria-current="page" onclick="document.getElementById('crud-giocatori').style.display='block';document.getElementById('crud-partite').style.display='none';document.getElementById('crud-candidature').style.display='none';loadCrudGiocatori()">Giocatori</button>
+          <button class="tab" onclick="document.getElementById('crud-giocatori').style.display='none';document.getElementById('crud-partite').style.display='block';document.getElementById('crud-candidature').style.display='none';loadCrudPartite()">Partite</button>
+          <button class="tab" onclick="document.getElementById('crud-giocatori').style.display='none';document.getElementById('crud-partite').style.display='none';document.getElementById('crud-candidature').style.display='block';loadCrudPartite()">Candidature</button>
+        </div>
+      </div>
+
+      <!-- CRUD Giocatori -->
+      <div id="crud-giocatori">
+        <h3>Giocatori</h3>
+        <div class="help">Modifica i dati e premi <b>Salva</b>. Usa <b>Elimina</b> per rimuovere un giocatore.</div>
+        <table class="table">
+          <thead><tr>
+            <th>Nome</th><th>Cognome</th><th>#</th><th>Ruolo</th><th>Stato</th><th>Pres.</th><th>Goal</th><th>Azioni</th>
+          </tr></thead>
+          <tbody id="crud-giocatori-body"></tbody>
+        </table>
+      </div>
+
+      <!-- CRUD Partite -->
+      <div id="crud-partite" style="display:none">
+        <h3>Partite</h3>
+        <div class="help">Modifica i campi e premi <b>Salva</b> o <b>Elimina</b>. Apri <b>Candidature…</b> per impostare la disponibilità dei giocatori.</div>
+        <table class="table">
+          <thead><tr>
+            <th>Avversaria</th><th>Data</th><th>Orario</th><th>Campo</th><th>Casa</th><th>Ris.</th><th>Publ. Form.</th><th>Azioni</th><th>Extra</th>
+          </tr></thead>
+          <tbody id="crud-partite-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Editor candidature -->
+      <div id="crud-candidature" style="display:none">
+        <h3 id="crud-candidature-title">Candidature</h3>
+        <div id="crud-candidature-panel" class="card" style="display:none">
+          <div class="help">Spunta i giocatori disponibili (richiede che il giocatore abbia un utente collegato con lo stesso Nome e Cognome in <code>/utenti</code>).</div>
+          <table class="table">
+            <thead><tr><th>Giocatore</th><th>UID collegato</th><th>Disponibile</th></tr></thead>
+            <tbody id="crud-candidature-body"></tbody>
+          </table>
+          <div class="actions" style="margin-top:10px">
+            <button id="crud-candidature-save" class="btn btn--admin" type="button">Salva candidature</button>
+            <button class="btn" type="button" onclick="closeCandidatureEditor()">Chiudi</button>
+          </div>
+        </div>
+        <div class="help">Per aprire l'editor, vai nella scheda <b>Partite</b> e clicca <b>Candidature…</b> sulla partita desiderata.</div>
+      </div>
     </section>
 
     <section id="admin-utenti-section" style="display:none">
