@@ -186,7 +186,7 @@
           const mod = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js');
           const cred = await mod.createUserWithEmailAndPassword(adminSecondaryAuth,email,pw);
           const uid = cred.user.uid;
-          // Salva anche nome e cognome per il display nelle candidature (CORREZIONE 1)
+          // Salva anche nome e cognome per il display nelle candidature
           await set(ref(db,'utenti/'+uid),{email, nome, cognome}); 
           alert('Utenza creata: '+email);
           e.target.reset();
@@ -366,6 +366,10 @@
     };
     /* FINE FUNZIONE PUBBLICA */
 
+    /**
+     * CORREZIONE: Funzione loadCandidature per visualizzare Nome/Cognome invece di UID.
+     * Ho riscritto la logica di fallback in modo più esplicito per evitare ambiguità.
+     */
     async function loadCandidature(){
       if(!isAdmin) return;
       const ul = byId('candidature-list'); if(!ul) return; ul.innerHTML = 'Caricamento candidature...';
@@ -382,14 +386,24 @@
 
       for(const [matchId, m] of matchEntries){
         const cand = m.candidature || {};
-        const candidatiNames = Object.keys(cand) // <-- Modificato per mostrare nome/cognome
+        const candidatiNames = Object.keys(cand)
           .filter(uid => cand[uid])
           .map(uid => {
             const user = utentiMap[uid];
-            // Preferisce nome e cognome se disponibili, altrimenti l'email (CORREZIONE 1)
-            return (user?.nome && user?.cognome) 
-              ? `${user.nome} ${user.cognome}`
-              : user?.email || `Utente Sconosciuto (UID: ${uid})`;
+            
+            // 1. Priorità: Nome e Cognome (dovrebbe funzionare per gli utenti ricreati)
+            if (user && user.nome && user.cognome) {
+                return `${user.nome} ${user.cognome}`;
+            }
+
+            // 2. Fallback 1: Email (per vecchi utenti o incompleti)
+            if (user && user.email) {
+                return user.email;
+            }
+
+            // 3. Fallback 2: Placeholder con UID
+            // Questo apparirà se l'utente non è stato trovato in 'utenti' o non ha dati identificativi.
+            return `Utente Sconosciuto (UID: ${uid})`; 
           });
         
         content += `
@@ -1174,6 +1188,5 @@
   </main>
 </body>
 </html>
-
 
 
