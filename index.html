@@ -90,7 +90,7 @@
     /* Firebase v9 (modular) */
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
-    import { getDatabase, ref, set, push, get, update } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
+    import { getDatabase, ref, set, push, get, update, remove } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
@@ -131,7 +131,7 @@
       'rosa-section',
       'calendario-section',
       'statistiche-section',
-      'formazione-pubblica-section' // NUOVA SEZIONE
+      'formazione-pubblica-section'
     ];
 
     /**
@@ -221,7 +221,7 @@
         const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
         const cand = candSnap.val() || {};
         const candCount = Object.values(cand).filter(Boolean).length;
-        const isPublished = m.formazionePubblicata === true; // NUOVO FLAG
+        const isPublished = m.formazionePubblicata === true;
 
         const li = document.createElement('li'); li.className='card';
         li.innerHTML = `
@@ -235,7 +235,8 @@
             <div class="row">
               ${!asAdmin ? `
                 <button class="btn btn--accent" onclick="candidati('${matchId}')">Candidatura</button>
-                ${isPublished ? `<button class="btn" onclick="showFormazionePubblica('${matchId}','${escapeHtml(m.avversaria)}')">Vedi Formazione</button>` : ''} `:''}
+                ${isPublished ? `<button class="btn" onclick="showFormazionePubblica('${matchId}','${escapeHtml(m.avversaria)}')">Vedi Formazione</button>` : ''}
+              `:''}
               ${asAdmin ? `
                 <button class="btn btn--admin" onclick="showFormazioneForm('${matchId}','${escapeHtml(m.avversaria)}')">Formazione & Sost.</button>
                 <button class="btn btn--admin" onclick="showRisultatoForm('${matchId}','${escapeHtml(m.avversaria)}')">Inserisci Risultato</button>
@@ -290,7 +291,7 @@
       }
     }
 
-    /** NUOVA FUNZIONE PUBBLICA: Visualizzazione Formazione **/
+    /** FUNZIONE PUBBLICA: Visualizzazione Formazione **/
     window.showFormazionePubblica = async (matchId, avv) => {
       window.showPublicSection('formazione-pubblica-section');
       const content = byId('formazione-pubblica-content');
@@ -307,19 +308,16 @@
       
       const contentHtml = [];
 
-      // Mappa per risolvere ID a Nome/Cognome
       const getPlayerInfo = (pid) => {
           const p = rosa[pid];
           return p ? `${p.nome} ${p.cognome} (#${p.numero})` : `Giocatore Sconosciuto (ID: ${pid})`;
       };
 
-      // 1. Titolari (Minuto 0)
       const titolari = formazioni['0']?.formazione;
       if (titolari) {
         contentHtml.push(`<h4>Titolari (Minuto 0)</h4>`);
         contentHtml.push(`<ul style="list-style-type:disc;padding-left:20px">`);
         
-        // Ordino per ruolo per una visualizzazione più pulita
         const rolesOrder = ['Portiere', 'Difensore centrale', 'Terzino sinistro', 'Terzino destro', 'Centrocampista centrale', 'Centrocampista sinistro', 'Centrocampista destro', 'Attaccante centrale'];
         const titolariOrdinati = Object.entries(titolari).sort((a, b) => rolesOrder.indexOf(a[0]) - rolesOrder.indexOf(b[0]));
 
@@ -331,7 +329,6 @@
         contentHtml.push(`<p>Formazione titolare non trovata o non ancora pubblicata.</p>`);
       }
 
-      // 2. Sostituzioni (dal minuto 5 in poi)
       const sostituzioni = Object.entries(formazioni)
         .filter(([min,]) => min !== '0')
         .map(([, data]) => data)
@@ -341,7 +338,6 @@
         contentHtml.push(`<h4>Sostituzioni Effettuate</h4>`);
         contentHtml.push(`<ul id="sostituzioni-list" style="list-style:none;padding:0;margin-top:10px">`);
         sostituzioni.forEach(s => {
-            // Trova il ruolo di chi è uscito nella formazione precedente (semplificazione)
             const prevFormazione = formazioni[String(s.minuto - 5)]?.formazione || titolari;
             const ruoloUscente = prevFormazione ? Object.keys(prevFormazione).find(r => prevFormazione[r] === s.esce) : 'Ruolo Sconosciuto';
 
@@ -359,7 +355,7 @@
 
       content.innerHTML = contentHtml.join('');
     };
-    /* FINE NUOVA FUNZIONE PUBBLICA */
+    /* FINE FUNZIONE PUBBLICA */
 
     async function loadCandidature(){
       if(!isAdmin) return;
@@ -427,7 +423,7 @@
       const campo = v('match-campo');
       const casa = v('match-casa')==='si';
       if(!avversaria||!data||!orario||!campo) return alert('Compila tutti i campi');
-      const rec = {avversaria,data,orario,campo,casa,risultato:'N/D', formazionePubblicata: false}; // Aggiungo flag default
+      const rec = {avversaria,data,orario,campo,casa,risultato:'N/D', formazionePubblicata: false};
       await set(push(ref(db,'calendario')),rec);
       alert('Giornata inserita');
       byId('match-form').reset();
@@ -591,14 +587,13 @@
         });
 
         // 4) Salva sul match e pubblica la formazione
-        await update(ref(db,'calendario/'+matchId),{formazioni:all, formazionePubblicata: true}); // AGGIORNATO: Aggiunto flag di pubblicazione
+        await update(ref(db,'calendario/'+matchId),{formazioni:all, formazionePubblicata: true});
 
         // 5) Incrementa presenze per tutti i giocatori presenti in almeno una mappa
         await incrementPresenzeForFormazioni(all);
 
         alert('Formazione salvata e presenze aggiornate!');
         
-        // Ricarica il calendario pubblico per mostrare il pulsante "Vedi Formazione"
         loadProssimeGiornate(false); 
         
         visualizeAllFormations(avv,all);
@@ -652,6 +647,234 @@
       if(Object.keys(updates).length){ await update(ref(db), updates); }
     }
 
+
+    /* ===== Admin: NUOVA Sezione Modifica Dati ===== */
+
+    const modificaContent = byId('modifica-dati-content');
+
+    // Funzione 1: Carica lista Giocatori per modifica
+    window.loadModificaGiocatori = async () => {
+      if(!isAdmin) return;
+      modificaContent.innerHTML = 'Caricamento giocatori...';
+      const snap = await get(ref(db,'rosa'));
+      const val = snap.val() || {};
+      const rows = Object.entries(val).sort((a,b)=> (a[1].numero||0)-(b[1].numero||0));
+
+      let html = '<h3>Modifica / Elimina Giocatori</h3><ul id="modifica-giocatori-list">';
+      if(!rows.length){ html += '<div class="help">Nessun giocatore inserito.</div>'; }
+
+      rows.forEach(([id, g]) => {
+        // Passo i dati come stringa JSON escaped per evitare di doverli rileggere
+        const dataJson = escapeHtml(JSON.stringify(g));
+        
+        html += `
+          <li class="card">
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <div class="player-title">${g.nome} ${g.cognome} <span class="pill">#${g.numero}</span></div>
+                <div class="player-sub">Ruolo: ${g.ruolo} | Presenze: ${g.presenze||0} | Goal: ${g.goal||0} | Voto: ${g.voto||0}</div>
+              </div>
+              <div class="row">
+                <button class="btn btn--admin" onclick="handleEditPlayer('${id}', '${dataJson}')">Modifica</button>
+                <button class="btn btn--accent" style="background:#cc2222" onclick="handleDeletePlayer('${id}', '${escapeHtml(g.nome)} ${escapeHtml(g.cognome)}')">Elimina</button>
+              </div>
+            </div>
+          </li>`;
+      });
+      html += '</ul>';
+      modificaContent.innerHTML = html;
+    };
+
+    // Funzione 2: Modulo per modifica Giocatore
+    window.handleEditPlayer = (playerId, dataJson) => {
+        if (!isAdmin) return;
+        const g = JSON.parse(dataJson.replace(/&#39;/g, "'").replace(/&quot;/g, '"')); // De-escape the data
+        
+        const ruoloOptions = ['Portiere', 'Terzino sinistro', 'Terzino destro', 'Difensore centrale', 'Centrocampista centrale', 'Centrocampista sinistro', 'Centrocampista destro', 'Attaccante centrale'];
+        const statusOptions = ['Titolare', 'Riserva'];
+
+        const ruoloHtml = ruoloOptions.map(r => `<option value="${r}" ${g.ruolo === r ? 'selected' : ''}>${r}</option>`).join('');
+        const statusHtml = statusOptions.map(s => `<option value="${s}" ${g.stato === s ? 'selected' : ''}>${s}</option>`).join('');
+
+
+        modificaContent.innerHTML = `
+            <h3>Modifica Giocatore: ${g.nome} ${g.cognome}</h3>
+            <form onsubmit="savePlayerChanges(event, '${playerId}')">
+                <label>Nome</label><input id="edit-nome" value="${escapeHtml(g.nome)}" required />
+                <label>Cognome</label><input id="edit-cognome" value="${escapeHtml(g.cognome)}" required />
+                <label>Numero maglia</label><input id="edit-numero" type="number" min="1" max="99" value="${g.numero}" required />
+                <label>Ruolo</label><select id="edit-ruolo" required>${ruoloHtml}</select>
+                <label>Status</label><select id="edit-stato" required>${statusHtml}</select>
+                <hr style="margin:16px 0">
+                <h4>Statistiche Aggiornate (Totali)</h4>
+                <div class="help">Questi sono i valori *totali* nel database. Modificali solo se vuoi fare un'operazione correttiva.</div>
+                <label>Voto Totale</label><input id="edit-voto" type="number" step="1" value="${g.voto || 0}">
+                <label>Presenze Totali</label><input id="edit-presenze" type="number" step="1" value="${g.presenze || 0}">
+                <label>Goal Totali</label><input id="edit-goal" type="number" step="1" value="${g.goal || 0}">
+                <div class="actions">
+                    <button class="btn btn--admin" type="submit">Salva Modifiche</button>
+                    <button class="btn" type="button" onclick="loadModificaGiocatori()">Annulla</button>
+                </div>
+            </form>
+        `;
+    };
+
+    // Funzione 3: Salva Modifiche Giocatore
+    window.savePlayerChanges = async (e, playerId) => {
+        e.preventDefault();
+        if (!isAdmin) return;
+
+        const updatedData = {
+            nome: v('edit-nome'),
+            cognome: v('edit-cognome'),
+            numero: parseInt(v('edit-numero'), 10),
+            ruolo: v('edit-ruolo'),
+            stato: v('edit-stato'),
+            voto: parseInt(v('edit-voto'), 10),
+            presenze: parseInt(v('edit-presenze'), 10),
+            goal: parseInt(v('edit-goal'), 10),
+        };
+
+        try {
+            await update(ref(db, 'rosa/' + playerId), updatedData);
+            alert(`Giocatore ${updatedData.nome} ${updatedData.cognome} modificato con successo.`);
+            loadModificaGiocatori();
+            loadRosa();
+            loadStatistiche();
+        } catch (error) {
+            alert("Errore durante il salvataggio: " + error.message);
+        }
+    };
+
+    // Funzione 4: Elimina Giocatore
+    window.handleDeletePlayer = async (playerId, playerName) => {
+        if (!isAdmin) return;
+        if (!confirm(`Sei sicuro di voler ELIMINARE DEFINITIVAMENTE il giocatore ${playerName} e tutte le sue statistiche?`)) return;
+
+        try {
+            await remove(ref(db, 'rosa/' + playerId));
+            alert(`Giocatore ${playerName} eliminato.`);
+            loadModificaGiocatori();
+            loadRosa();
+            loadStatistiche();
+        } catch (error) {
+            alert("Errore durante l'eliminazione: " + error.message);
+        }
+    };
+
+    // Funzione 5: Carica lista Partite per modifica
+    window.loadModificaPartite = async () => {
+      if(!isAdmin) return;
+      modificaContent.innerHTML = 'Caricamento partite...';
+      const snap = await get(ref(db,'calendario'));
+      const val = snap.val() || {};
+      const rows = Object.entries(val).reverse(); // Ordino per le più recenti in alto
+
+      let html = '<h3>Modifica / Elimina Partite in Calendario</h3><ul id="modifica-partite-list">';
+      if(!rows.length){ html += '<div class="help">Nessuna partita a calendario.</div>'; }
+
+      rows.forEach(([id, m]) => {
+        const dataJson = escapeHtml(JSON.stringify(m));
+
+        html += `
+          <li class="card">
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <div class="player-title">vs ${m.avversaria}</div>
+                <div class="player-sub">${m.data} • ${m.orario} • ${m.campo}</div>
+                <div class="player-sub">Risultato: ${m.risultato||'N/D'} | Formazione pubblicata: ${m.formazionePubblicata ? 'Sì' : 'No'}</div>
+              </div>
+              <div class="row">
+                <button class="btn btn--admin" onclick="handleEditMatch('${id}', '${dataJson}')">Modifica</button>
+                <button class="btn btn--accent" style="background:#cc2222" onclick="handleDeleteMatch('${id}', '${escapeHtml(m.avversaria)}')">Elimina</button>
+              </div>
+            </div>
+          </li>`;
+      });
+      html += '</ul>';
+      modificaContent.innerHTML = html;
+      
+    };
+
+    // Funzione 6: Modulo per modifica Partita
+    window.handleEditMatch = (matchId, dataJson) => {
+        if (!isAdmin) return;
+        const m = JSON.parse(dataJson.replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
+        const isCasa = m.casa ? 'si' : 'no';
+
+        modificaContent.innerHTML = `
+            <h3>Modifica Partita: vs ${m.avversaria}</h3>
+            <form onsubmit="saveMatchChanges(event, '${matchId}')">
+                <label>Nome squadra avversaria</label><input id="edit-avversaria" value="${escapeHtml(m.avversaria)}" required />
+                <label>Data</label><input id="edit-data" value="${escapeHtml(m.data)}" required />
+                <label>Orario</label><input id="edit-orario" type="time" value="${escapeHtml(m.orario)}" required />
+                <label>Campo di gioco</label><input id="edit-campo" value="${escapeHtml(m.campo)}" required />
+                <label>Casa o fuori casa</label>
+                <select id="edit-casa" required>
+                    <option value="si" ${isCasa === 'si' ? 'selected' : ''}>Casa</option>
+                    <option value="no" ${isCasa === 'no' ? 'selected' : ''}>Trasferta</option>
+                </select>
+                <label>Risultato</label><input id="edit-risultato" value="${escapeHtml(m.risultato || 'N/D')}" />
+                <label>Formazione Pubblicata</label>
+                <select id="edit-formazionePubblicata" required>
+                    <option value="true" ${m.formazionePubblicata === true ? 'selected' : ''}>Sì</option>
+                    <option value="false" ${m.formazionePubblicata !== true ? 'selected' : ''}>No</option>
+                </select>
+                <div class="actions">
+                    <button class="btn btn--admin" type="submit">Salva Modifiche</button>
+                    <button class="btn" type="button" onclick="loadModificaPartite()">Annulla</button>
+                </div>
+            </form>
+        `;
+        // Re-inizializzo il datepicker per il campo data
+        $("#edit-data").datepicker({ dateFormat:"dd/mm/yy" });
+    };
+
+    // Funzione 7: Salva Modifiche Partita
+    window.saveMatchChanges = async (e, matchId) => {
+        e.preventDefault();
+        if (!isAdmin) return;
+
+        const updatedData = {
+            avversaria: v('edit-avversaria'),
+            data: v('edit-data'),
+            orario: v('edit-orario'),
+            campo: v('edit-campo'),
+            casa: v('edit-casa') === 'si',
+            risultato: v('edit-risultato') || 'N/D',
+            formazionePubblicata: v('edit-formazionePubblicata') === 'true',
+        };
+
+        try {
+            await update(ref(db, 'calendario/' + matchId), updatedData);
+            alert(`Partita vs ${updatedData.avversaria} modificata con successo.`);
+            loadModificaPartite();
+            loadProssimeGiornate(true);
+            loadProssimeGiornate(false);
+            loadStatistiche();
+        } catch (error) {
+            alert("Errore durante il salvataggio: " + error.message);
+        }
+    };
+
+    // Funzione 8: Elimina Partita
+    window.handleDeleteMatch = async (matchId, avversaria) => {
+        if (!isAdmin) return;
+        if (!confirm(`Sei sicuro di voler ELIMINARE DEFINITIVAMENTE la partita vs ${avversaria} e tutti i dati associati (candidature, formazioni)?`)) return;
+
+        try {
+            await remove(ref(db, 'calendario/' + matchId));
+            alert(`Partita vs ${avversaria} eliminata.`);
+            loadModificaPartite();
+            loadProssimeGiornate(true);
+            loadProssimeGiornate(false);
+            loadStatistiche();
+        } catch (error) {
+            alert("Errore durante l'eliminazione: " + error.message);
+        }
+    };
+
+
     // MOSTRA sezioni admin (funzione globale esistente)
     window.showAdminSection = (id) => {
       const SECTIONS = [
@@ -661,7 +884,8 @@
         'admin-formazione-section',
         'admin-statistiche-section',
         'admin-utenti-section',
-        'admin-candidature-section' 
+        'admin-candidature-section',
+        'admin-modifica-dati-section' // NUOVO
       ];
       SECTIONS.forEach(secId => {
         const el = document.getElementById(secId);
@@ -672,6 +896,7 @@
       if(id==='admin-calendario-section'){ loadProssimeGiornate(true); }
       if(id==='admin-inserimento-giornate-section'){ $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
       if(id==='admin-candidature-section'){ loadCandidature(); } 
+      if(id==='admin-modifica-dati-section'){ loadModificaGiocatori(); } // Carica i giocatori di default
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -683,7 +908,8 @@
       const snap = await get(ref(db,'rosa')); const val = snap.val()||{};
       const options = Object.entries(val).map(([id,g])=>`<option value="${id}">${g.nome} ${g.cognome} (#${g.numero})</option>`).join('');
       box.innerHTML = `
-        <h3>Valutazione singolo giocatore</h3>
+        <h3>Valutazione singolo giocatore (Incremento)</h3>
+        <div class="help">Usa questa sezione per **aggiungere** i voti, le presenze e i goal dopo una partita. Per correggere i totali, usa la sezione "Modifica Dati".</div>
         <form onsubmit="savePlayerStats(event)">
           <label>Giocatore</label>
           <select id="stat-player" required>
@@ -757,7 +983,7 @@
         <a class="nav-link" onclick="showAdminSection('admin-formazione-section')">Formazione & sostituzioni</a>
         <a class="nav-link" onclick="showAdminSection('admin-candidature-section')">Gestione Candidature</a>
         <a class="nav-link" onclick="showAdminSection('admin-statistiche-section')">Statistiche</a>
-        <a class="nav-link" onclick="showAdminSection('admin-utenti-section')">Inserimento utenti</a>
+        <a class="nav-link" onclick="showAdminSection('admin-modifica-dati-section')">Modifica Dati</a> <a class="nav-link" onclick="showAdminSection('admin-utenti-section')">Inserimento utenti</a>
       </div>
     </div>
   </nav>
@@ -855,10 +1081,11 @@
 
     <section id="admin-statistiche-section" style="display:none">
       <h2>Admin · Statistiche</h2>
-      <div id="admin-statistiche-form"></div>
+      <div id="admin-statistiche-form">
+        </div>
       <div class="actions" style="margin-top:10px">
         <button class="btn" onclick="showAdminSection('admin-calendario-section')">Gestisci risultati</button>
-        <button class="btn btn--admin" onclick="showValutazioneForm()">Valuta giocatori</button>
+        <button class="btn btn--admin" onclick="showValutazioneForm()">Valuta giocatori (Incremento)</button>
       </div>
     </section>
     
@@ -868,6 +1095,16 @@
       <ul id="candidature-list"></ul>
     </section>
 
+    <section id="admin-modifica-dati-section" style="display:none">
+      <h2>Admin · Modifica Dati</h2>
+      <div id="modifica-dati-menu" style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap">
+        <button class="btn btn--admin" onclick="loadModificaGiocatori()">Giocatori (Rosa & Statistiche)</button>
+        <button class="btn btn--admin" onclick="loadModificaPartite()">Partite (Calendario)</button>
+      </div>
+      <div id="modifica-dati-content">
+        <div class="help">Seleziona la sezione da modificare.</div>
+      </div>
+    </section>
     <section id="admin-utenti-section" style="display:none">
       <h2>Admin · Inserimento utenti</h2>
       <form id="create-user-form">
@@ -880,7 +1117,6 @@
   </main>
 </body>
 </html>
-
 
 
 
