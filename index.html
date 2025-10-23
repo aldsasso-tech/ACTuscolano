@@ -184,7 +184,8 @@
           const mod = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js');
           const cred = await mod.createUserWithEmailAndPassword(adminSecondaryAuth,email,pw);
           const uid = cred.user.uid;
-          await set(ref(db,'utenti/'+uid),{email});
+          // Salviamo l'email nel database per poterla recuperare con l'UID nella sezione candidature
+          await set(ref(db,'utenti/'+uid),{email}); 
           alert('Utenza creata: '+email);
           e.target.reset();
         }catch(err){ alert('Errore creazione: '+(err?.message||err)); }
@@ -250,6 +251,7 @@
         alert('Per candidarti devi effettuare il login.');
         return;
       }
+      // Salvataggio della candidatura con l'UID dell'utente
       await set(ref(db,`calendario/${matchId}/candidature/${user.uid}`), true);
       alert('Disponibilità inviata.');
       loadProssimeGiornate(false);
@@ -287,27 +289,29 @@
       }
     }
 
-    /* NUOVA FUNZIONE ADMIN: Candidature */
+    /* NUOVA FUNZIONE ADMIN: Candidature (CORRETTA) */
     async function loadCandidature(){
       if(!isAdmin) return;
       const ul = byId('candidature-list'); if(!ul) return; ul.innerHTML = 'Caricamento candidature...';
 
+      // 1. Recupera la lista di tutti gli utenti e crea una mappa UID -> Email
+      const snapUtenti = await get(ref(db,'utenti'));
+      const utentiMap = snapUtenti.val() || {}; // Mappa: UID -> {email: ...}
+
+      // 2. Recupera tutti i match con le candidature
       const snapCal = await get(ref(db,'calendario'));
       const matches = snapCal.val() || {};
       const matchEntries = Object.entries(matches);
       if(!matchEntries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
 
-      const snapUtenti = await get(ref(db,'utenti'));
-      const utenti = snapUtenti.val() || {}; // Mappa UID -> {email: ...}
-
       let content = '';
 
       for(const [matchId, m] of matchEntries){
         const cand = m.candidature || {};
-        // Filtra solo gli UID con valore 'true' per la candidatura
-        const candidatiUIDs = Object.keys(cand).filter(uid => cand[uid]);
-        // Mappa gli UID alle Email
-        const candidatiEmails = candidatiUIDs.map(uid => utenti[uid]?.email || `Utente Sconosciuto (UID: ${uid})`);
+        // Filtra solo gli UID con valore 'true' e recupera l'email dalla mappa
+        const candidatiEmails = Object.keys(cand)
+          .filter(uid => cand[uid])
+          .map(uid => utentiMap[uid]?.email || `Utente Sconosciuto (UID: ${uid})`); // Fallback
         
         content += `
           <li class="card">
@@ -586,7 +590,7 @@
         'admin-formazione-section',
         'admin-statistiche-section',
         'admin-utenti-section',
-        'admin-candidature-section' // NUOVA SEZIONE INCLUSA
+        'admin-candidature-section' 
       ];
       SECTIONS.forEach(secId => {
         const el = document.getElementById(secId);
@@ -596,7 +600,7 @@
       // Carico liste quando serve
       if(id==='admin-calendario-section'){ loadProssimeGiornate(true); }
       if(id==='admin-inserimento-giornate-section'){ $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
-      if(id==='admin-candidature-section'){ loadCandidature(); } // NUOVA FUNZIONE CHIAMATA
+      if(id==='admin-candidature-section'){ loadCandidature(); } 
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -680,7 +684,8 @@
         <a class="nav-link" onclick="showAdminSection('admin-inserimento-giornate-section')">Inserimento giornate</a>
         <a class="nav-link" onclick="showAdminSection('admin-calendario-section')">Gestione partite</a>
         <a class="nav-link" onclick="showAdminSection('admin-formazione-section')">Formazione & sostituzioni</a>
-        <a class="nav-link" onclick="showAdminSection('admin-candidature-section')">Gestione Candidature</a> <a class="nav-link" onclick="showAdminSection('admin-statistiche-section')">Statistiche</a>
+        <a class="nav-link" onclick="showAdminSection('admin-candidature-section')">Gestione Candidature</a>
+        <a class="nav-link" onclick="showAdminSection('admin-statistiche-section')">Statistiche</a>
         <a class="nav-link" onclick="showAdminSection('admin-utenti-section')">Inserimento utenti</a>
       </div>
     </div>
