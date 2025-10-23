@@ -83,6 +83,16 @@
     #admin-menu{display:none;background:var(--red);padding:8px 16px}
     #admin-menu .nav-link{background:var(--yellow);color:#111}
 
+    /* Footer */
+    footer{
+      background:var(--ink-sub);
+      color:var(--white);
+      padding:8px 16px;
+      margin-top:20px;
+      font-size:.75rem; /* small font size */
+      text-align:center;
+    }
+
     @media (max-width:640px){ .hero{padding:14px} }
   </style>
 
@@ -227,7 +237,29 @@
       const ul = byId(listId); if(!ul) return; ul.innerHTML='';
       const snap = await get(ref(db,'calendario'));
       const val = snap.val() || {};
-      const entries = Object.entries(val);
+      let entries = Object.entries(val);
+      
+      // --- INIZIO CORREZIONE: ORDINAMENTO PER DATA (DECEDENTE) ---
+      entries.sort((a, b) => {
+        const dateA = a[1].data; // dd/mm/yyyy
+        const dateB = b[1].data; // dd/mm/yyyy
+
+        // Funzione per convertire 'dd/mm/yyyy' in un oggetto Date per la comparazione
+        const createComparableDate = (dateString) => {
+            const [day, month, year] = dateString.split('/');
+            // JavaScript Date() accetta 'yyyy/mm/dd' o 'mm/dd/yyyy' meglio di 'dd/mm/yyyy'
+            // Uso mm/dd/yyyy per semplicità di conversione
+            return new Date(`${month}/${day}/${year}`);
+        };
+        
+        const comparableA = createComparableDate(dateA);
+        const comparableB = createComparableDate(dateB);
+
+        // Ordine decrescente (la data più alta/recente viene prima: B - A)
+        return comparableB.getTime() - comparableA.getTime();
+      });
+      // --- FINE CORREZIONE ---
+
       if(!entries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
 
       for(const [matchId,m] of entries){
@@ -344,7 +376,7 @@
       if (titolari) {
         
         // --- INSERIMENTO VISTA GRAFICA ---
-        contentHtml.push(`<h4>Formazione Titolare (Grafica - Minuto 0)</h4>`);
+        contentHtml.push(`<h4>Formazione Titolare (Grafica - Modulo 3-3-1)</h4>`);
         contentHtml.push(`<div class="field" style="margin-bottom: 20px;">`);
         
         // Genera i marker dei giocatori
@@ -392,9 +424,14 @@
         contentHtml.push(`<ul id="sostituzioni-list" style="list-style:none;padding:0;margin-top:10px">`);
         sostituzioni.forEach(s => {
             // Trova il ruolo di chi è uscito nella formazione precedente (semplificazione, basata sul ruolo)
-            const prevMinutoKey = String(s.minuto - 5);
-            const prevFormazione = formazioni[prevMinutoKey]?.formazione || titolari;
+            // Cerca la formazione nel minuto precedente per determinare il ruolo dell'uscente
+            const prevFormazioneEntry = Object.entries(formazioni)
+                .filter(([, data]) => data.minuto < s.minuto)
+                .sort((a, b) => b[1].minuto - a[1].minuto)[0];
+            
+            const prevFormazione = prevFormazioneEntry ? prevFormazioneEntry[1].formazione : titolari;
             const ruoloUscente = prevFormazione ? Object.keys(prevFormazione).find(r => prevFormazione[r] === s.esce) : 'Ruolo Sconosciuto';
+
 
             contentHtml.push(`
                 <li class="card">
@@ -424,7 +461,21 @@
       
       const snapCal = await get(ref(db,'calendario'));
       const matches = snapCal.val() || {};
-      const matchEntries = Object.entries(matches);
+      let matchEntries = Object.entries(matches);
+      
+      // Ordina le candidature per data (decrescente)
+      matchEntries.sort((a, b) => {
+        const dateA = a[1].data; 
+        const dateB = b[1].data; 
+        const createComparableDate = (dateString) => {
+            const [day, month, year] = dateString.split('/');
+            return new Date(`${month}/${day}/${year}`);
+        };
+        const comparableA = createComparableDate(dateA);
+        const comparableB = createComparableDate(dateB);
+        return comparableB.getTime() - comparableA.getTime();
+      });
+
       if(!matchEntries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
 
       let content = '';
@@ -913,7 +964,20 @@
       modificaContent.innerHTML = 'Caricamento partite...';
       const snap = await get(ref(db,'calendario'));
       const val = snap.val() || {};
-      const rows = Object.entries(val).reverse(); // Ordino per le più recenti in alto
+      let rows = Object.entries(val); 
+
+      // Ordina le partite per data (decrescente)
+      rows.sort((a, b) => {
+        const dateA = a[1].data; 
+        const dateB = b[1].data; 
+        const createComparableDate = (dateString) => {
+            const [day, month, year] = dateString.split('/');
+            return new Date(`${month}/${day}/${year}`);
+        };
+        const comparableA = createComparableDate(dateA);
+        const comparableB = createComparableDate(dateB);
+        return comparableB.getTime() - comparableA.getTime();
+      });
 
       let html = '<h3>Modifica / Elimina Partite in Calendario</h3><ul id="modifica-partite-list">';
       if(!rows.length){ html += '<div class="help">Nessuna partita a calendario.</div>'; }
@@ -1157,7 +1221,7 @@
 
     <section id="calendario-section" style="display:none">
       <h2>Prossime giornate</h2>
-      <div class="help">Premi “Candidatura” per dare disponibilità. Se la formazione è stata pubblicata, apparirà un pulsante per visualizzarla.</div>
+      <div class="help">Premi “Candidatura” per dare disponibilità. Se la formazione è stata pubblicata, apparirà un pulsante per visualizzarla. L'elenco è ordinato dalla partita più recente alla più vecchia.</div>
       <ul id="calendario-list"></ul>
     </section>
 
@@ -1217,6 +1281,7 @@
 
     <section id="admin-calendario-section" style="display:none">
       <h2>Admin · Gestione partite</h2>
+      <div class="help">L'elenco è ordinato dalla partita più recente alla più vecchia.</div>
       <ul id="admin-calendario-list"></ul>
     </section>
 
@@ -1263,5 +1328,9 @@
       <div class="help">L’admin resta connesso durante la creazione grazie all’autenticazione secondaria. La scrittura della Collection 'utenti' con i campi nome, cognome ed email avviene immediatamente dopo la creazione su Authentication.</div>
     </section>
   </main>
+  
+  <footer>
+    Direttore Tecnico Aldo Sasso - Direttore Sportivo Danilo Solini - Presidente Davide Broglia
+  </footer>
 </body>
 </html>
