@@ -287,6 +287,51 @@
       }
     }
 
+    /* NUOVA FUNZIONE ADMIN: Candidature */
+    async function loadCandidature(){
+      if(!isAdmin) return;
+      const ul = byId('candidature-list'); if(!ul) return; ul.innerHTML = 'Caricamento candidature...';
+
+      const snapCal = await get(ref(db,'calendario'));
+      const matches = snapCal.val() || {};
+      const matchEntries = Object.entries(matches);
+      if(!matchEntries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
+
+      const snapUtenti = await get(ref(db,'utenti'));
+      const utenti = snapUtenti.val() || {}; // Mappa UID -> {email: ...}
+
+      let content = '';
+
+      for(const [matchId, m] of matchEntries){
+        const cand = m.candidature || {};
+        // Filtra solo gli UID con valore 'true' per la candidatura
+        const candidatiUIDs = Object.keys(cand).filter(uid => cand[uid]);
+        // Mappa gli UID alle Email
+        const candidatiEmails = candidatiUIDs.map(uid => utenti[uid]?.email || `Utente Sconosciuto (UID: ${uid})`);
+        
+        content += `
+          <li class="card">
+            <div class="row" style="flex-wrap:wrap">
+              <div style="flex:1 1 250px">
+                <div style="font-weight:800">vs ${m.avversaria}</div>
+                <div class="player-sub">${m.data} • ${m.orario} • ${m.campo}</div>
+              </div>
+              <div style="flex:1 1 200px">
+                <div class="player-sub" style="font-weight:700">Disponibilità (${candidatiEmails.length}):</div>
+                ${candidatiEmails.length > 0 
+                  ? `<div style="font-size:.9rem">${candidatiEmails.join('<br>')}</div>`
+                  : 'Nessuna candidatura.'
+                }
+              </div>
+            </div>
+          </li>
+        `;
+      }
+      ul.innerHTML = content;
+    }
+    /* FINE NUOVA FUNZIONE */
+
+
     /* ===== Admin: inserimenti & gestione ===== */
     window.addPlayer = async (e)=>{
       e?.preventDefault();
@@ -540,7 +585,8 @@
         'admin-calendario-section',
         'admin-formazione-section',
         'admin-statistiche-section',
-        'admin-utenti-section'
+        'admin-utenti-section',
+        'admin-candidature-section' // NUOVA SEZIONE INCLUSA
       ];
       SECTIONS.forEach(secId => {
         const el = document.getElementById(secId);
@@ -550,6 +596,7 @@
       // Carico liste quando serve
       if(id==='admin-calendario-section'){ loadProssimeGiornate(true); }
       if(id==='admin-inserimento-giornate-section'){ $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
+      if(id==='admin-candidature-section'){ loadCandidature(); } // NUOVA FUNZIONE CHIAMATA
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -633,7 +680,7 @@
         <a class="nav-link" onclick="showAdminSection('admin-inserimento-giornate-section')">Inserimento giornate</a>
         <a class="nav-link" onclick="showAdminSection('admin-calendario-section')">Gestione partite</a>
         <a class="nav-link" onclick="showAdminSection('admin-formazione-section')">Formazione & sostituzioni</a>
-        <a class="nav-link" onclick="showAdminSection('admin-statistiche-section')">Statistiche</a>
+        <a class="nav-link" onclick="showAdminSection('admin-candidature-section')">Gestione Candidature</a> <a class="nav-link" onclick="showAdminSection('admin-statistiche-section')">Statistiche</a>
         <a class="nav-link" onclick="showAdminSection('admin-utenti-section')">Inserimento utenti</a>
       </div>
     </div>
@@ -731,7 +778,12 @@
         <button class="btn btn--admin" onclick="showValutazioneForm()">Valuta giocatori</button>
       </div>
     </section>
-
+    
+    <section id="admin-candidature-section" style="display:none">
+      <h2>Admin · Gestione Candidature</h2>
+      <div class="help">Elenco delle disponibilità (candidature) inviate dagli utenti per le prossime partite.</div>
+      <ul id="candidature-list"></ul>
+    </section>
     <section id="admin-utenti-section" style="display:none">
       <h2>Admin · Inserimento utenti</h2>
       <form id="create-user-form">
