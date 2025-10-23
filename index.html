@@ -178,13 +178,16 @@
       byId('create-user-form')?.addEventListener('submit',async e=>{
         e.preventDefault();
         if(!isAdmin) return alert("Solo admin.");
+        const nome = v('new-nome'); // <--- AGGIUNTO
+        const cognome = v('new-cognome'); // <--- AGGIUNTO
         const email = v('new-email').trim();
         const pw = v('new-password');
         try{
           const mod = await import('https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js');
           const cred = await mod.createUserWithEmailAndPassword(adminSecondaryAuth,email,pw);
           const uid = cred.user.uid;
-          await set(ref(db,'utenti/'+uid),{email}); 
+          // Salva anche nome e cognome per il display nelle candidature (CORREZIONE 1)
+          await set(ref(db,'utenti/'+uid),{email, nome, cognome}); 
           alert('Utenza creata: '+email);
           e.target.reset();
         }catch(err){ alert('Errore creazione: '+(err?.message||err)); }
@@ -369,7 +372,7 @@
 
       const snapUtenti = await get(ref(db,'utenti'));
       const utentiMap = snapUtenti.val() || {}; 
-
+      
       const snapCal = await get(ref(db,'calendario'));
       const matches = snapCal.val() || {};
       const matchEntries = Object.entries(matches);
@@ -379,9 +382,15 @@
 
       for(const [matchId, m] of matchEntries){
         const cand = m.candidature || {};
-        const candidatiEmails = Object.keys(cand)
+        const candidatiNames = Object.keys(cand) // <-- Modificato per mostrare nome/cognome
           .filter(uid => cand[uid])
-          .map(uid => utentiMap[uid]?.email || `Utente Sconosciuto (UID: ${uid})`);
+          .map(uid => {
+            const user = utentiMap[uid];
+            // Preferisce nome e cognome se disponibili, altrimenti l'email (CORREZIONE 1)
+            return (user?.nome && user?.cognome) 
+              ? `${user.nome} ${user.cognome}`
+              : user?.email || `Utente Sconosciuto (UID: ${uid})`;
+          });
         
         content += `
           <li class="card">
@@ -391,9 +400,9 @@
                 <div class="player-sub">${m.data} • ${m.orario} • ${m.campo}</div>
               </div>
               <div style="flex:1 1 200px">
-                <div class="player-sub" style="font-weight:700">Disponibilità (${candidatiEmails.length}):</div>
-                ${candidatiEmails.length > 0 
-                  ? `<div style="font-size:.9rem">${candidatiEmails.join('<br>')}</div>`
+                <div class="player-sub" style="font-weight:700">Disponibilità (${candidatiNames.length}):</div>
+                ${candidatiNames.length > 0 
+                  ? `<div style="font-size:.9rem">${candidatiNames.join('<br>')}</div>`
                   : 'Nessuna candidatura.'
                 }
               </div>
@@ -483,13 +492,41 @@
       window.showAdminSection('admin-formazione-section');
       const box = byId('formazione-content'); box.innerHTML='Caricamento...';
 
-      const snap = await get(ref(db,'rosa')); const val = snap.val()||{};
-      const players = Object.entries(val).map(([id,g])=>({
-        id,
-        ruolo:g.ruolo,
-        presenze:g.presenze||0,
-        label:`${g.nome} ${g.cognome} (${g.ruolo}) — ${g.presenze||0} pres.`
-      }))
+      // *** CORREZIONE 2: Fetch candidature e utenti per check disponibilità ***
+      const [snap, snapCandidature, snapUtenti] = await Promise.all([
+        get(ref(db,'rosa')), 
+        get(ref(db,`calendario/${matchId}/candidature`)),
+        get(ref(db,'utenti'))
+      ]);
+
+      const val = snap.val()||{};
+      const candidatureMap = snapCandidature.val() || {};
+      const utentiMap = snapUtenti.val() || {};
+      
+      // Mappa inversa NomeCognome -> UID (usata per il check di disponibilità)
+      const nameToUidMap = {};
+      Object.entries(utentiMap).forEach(([uid, u]) => {
+          if (u.nome && u.cognome) {
+              nameToUidMap[`${u.nome} ${u.cognome}`] = uid;
+          }
+      });
+      // *************************************************************************
+      
+      const players = Object.entries(val).map(([id,g])=>{
+        const playerName = `${g.nome} ${g.cognome}`;
+        const associatedUid = nameToUidMap[playerName]; // Trova l'UID associato tramite nome/cognome
+        // Controlla se l'UID associato ha inviato la candidatura per questa partita
+        const isAvailable = associatedUid && candidatureMap[associatedUid] === true;
+        
+        return {
+          id,
+          ruolo:g.ruolo,
+          presenze:g.presenze||0,
+          // Aggiunge la disponibilità alla label (CORREZIONE 2)
+          label: `${g.nome} ${g.cognome} (#${g.numero}) — ${g.presenze||0} pres. | Disponibilità: ${isAvailable ? 'Sì' : 'No'}`, 
+          isAvailable // La conserviamo, anche se non strettamente necessaria per opts
+        };
+      })
       .sort((a,b)=> (a.presenze - b.presenze) || a.ruolo.localeCompare(b.ruolo));
 
       const opts = (sel='')=>[
@@ -553,7 +590,9 @@
           const pos = POS_331[ruolo]; if(!p||!pos) return;
           const mk = document.createElement('div'); mk.className='marker';
           mk.style.top = pos.top; mk.style.left = pos.left;
-          mk.innerHTML = `<b>${escapeHtml(p.label.split(' (')[0])}</b><br>${ruolo}`;
+          // Per la preview, mostriamo solo il cognome per brevità
+          const cognome = p.label.split(' ')[1]; 
+          mk.innerHTML = `<b>${escapeHtml(cognome)}</b><br>${ruolo}`;
           field.appendChild(mk);
         });
       }
@@ -584,14 +623,14 @@
           subs.push({minuto:i*5, entra, esce});
         }
 
-        // 3) 9 formazioni (CORREZIONE APPLICATA QUI)
+        // 3) 9 formazioni
         const all = {'0':{minuto:0, formazione:{...tit}}};
         const cur = {...tit};
         subs.forEach(s=>{
           const ruoloUscente = Object.keys(cur).find(r=>cur[r]===s.esce);
           if(ruoloUscente){ 
             cur[ruoloUscente]=s.entra; 
-            // Salviamo anche gli ID di chi entra e chi esce
+            // Salviamo anche gli ID di chi entra e chi esce (già implementato nella correzione precedente)
             all[String(s.minuto)] = {
                 minuto: s.minuto, 
                 formazione: {...cur},
@@ -1124,6 +1163,8 @@
     <section id="admin-utenti-section" style="display:none">
       <h2>Admin · Inserimento utenti</h2>
       <form id="create-user-form">
+        <label>Nome Giocatore</label><input id="new-nome" required />
+        <label>Cognome Giocatore</label><input id="new-cognome" required />
         <label>Email</label><input id="new-email" type="email" required />
         <label>Password</label><input id="new-password" type="password" required />
         <div class="actions"><button class="btn btn--admin" type="submit">Crea utenza</button></div>
@@ -1133,7 +1174,6 @@
   </main>
 </body>
 </html>
-
 
 
 
