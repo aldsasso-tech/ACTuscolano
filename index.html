@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  
+  <script> 
 /* ===== SCHEDULAZIONE: refresh giornaliero alle 23:00 ===== */
 function msUntilNext(hour, minute = 0, second = 0) {
   const now = new Date();
@@ -66,17 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scheduleDailyClassificaRefresh();
   }
 });
-);
 
-document.addEventListener('DOMContentLoaded', () => {
-  const firstSection = document.querySelector('section');
-  if (firstSection) firstSection.classList.add('active');
-  if (typeof window.scheduleDailyClassificaRefresh === 'function') {
-    window.scheduleDailyClassificaRefresh();
-  }
-});
-
-</script>
+// Chiusura del blocco di codice custom
+  </script> 
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css"/>
 
@@ -1773,7 +1767,7 @@ const loadClassifica = async () => {
       </table>
 
       <div class="actions">
-        <button id="save-risultato-btn" class="btn btn--accent">Salva Risultato & Statistiche</button>
+        <button id="save-risultato-btn" class="btn btn--accent" type="button">Salva Risultato & Statistiche</button>
       </div>
     </section>
 
