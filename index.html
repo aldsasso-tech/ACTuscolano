@@ -707,8 +707,10 @@
       loadProssimeGiornate(false);
     };
 
-    /* ===== Admin: Formazione & sostituzioni (con presenze) ===== */
- /* ===== Admin: Formazione & sostituzioni (con presenze) ===== */
+ /* ===== Admin: Formazione & sostituzioni (con presenze) - LOGICA AGGIORNATA ===== */
+    const N_SLOTS = 8; // Posti in campo
+    const MATCH_DURATION = 50; // Durata totale partita in minuti
+
     window.showFormazioneForm = async (matchId,avv)=>{
       if(!isAdmin) return;
       window.showAdminSection('admin-formazione-section');
@@ -733,17 +735,67 @@
 
       const opts = (sel = '') => ['<option value="">Seleziona</option>', ...availablePlayers.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${escapeHtml(p.label)}</option>`)].join('');
       
-      const MAX_BENCH_OPTIONS = availablePlayers.length - 8;
+      const MAX_BENCH_OPTIONS = availablePlayers.length - N_SLOTS;
       if (MAX_BENCH_OPTIONS < 0) {
-          box.innerHTML = `<h3 style="color:var(--red)">Errore: solo ${availablePlayers.length} giocatori disponibili, ne servono almeno 8.</h3>`;
+          box.innerHTML = `<h3 style="color:var(--red)">Errore: solo ${availablePlayers.length} giocatori disponibili, ne servono almeno ${N_SLOTS}.</h3>`;
           return;
       }
 
+      // --- Funzioni Helper locali ---
+      function collectTitolariMap(){
+        const ids = {};
+        Object.keys(POS_331).forEach(r=>{
+          ids[r] = byId('t-'+r)?.value || null;
+        });
+        return ids;
+      }
+      function collectPanchina(){
+        const ids = [];
+        document.querySelectorAll('#panchina select').forEach(sel => {
+          if(sel.value) ids.push(sel.value);
+        });
+        // Rimuove eventuali duplicati tra titolari e panchina (selezioni errate)
+        const titolariIds = Object.values(collectTitolariMap());
+        return ids.filter(id => !titolariIds.includes(id));
+      }
+
+      // 2. Calcolo Logica Sostituzioni Dinamiche
+      const calculateSubstitutions = (panchinaIds) => {
+        const N_Tot = N_SLOTS + panchinaIds.length;
+        const N_Sostituzioni = N_SLOTS; // 8 uscite necessarie per far riposare tutti i titolari
+        const T_Player = (N_SLOTS * MATCH_DURATION) / N_Tot; // Tempo di gioco equo per ogni giocatore
+        const delta_t = MATCH_DURATION / N_Sostituzioni; // Intervallo tra le 8 sostituzioni
+
+        const subs = [];
+        for (let i = 1; i <= N_Sostituzioni; i++) {
+          let minuto;
+          if (i === N_Sostituzioni) {
+            // L'ultima sostituzione coincide con la fine del match, la saltiamo come swap
+            continue;
+          }
+          
+          minuto = Math.round(i * delta_t);
+          
+          // Se la sostituzione cade a metà partita (25 min), non arrotondiamo
+          if (minuto === 25) minuto = 25;
+          
+          subs.push({
+            minuto: minuto,
+            placeholder: `Sostituzione ${i}`,
+            entraId: `entra-${i}`,
+            esceId: `esce-${i}`
+          });
+        }
+        
+        return { subs, N_Tot, T_Player: T_Player.toFixed(2) };
+      };
+      
+      // --- Rendering HTML ---
       box.innerHTML = `
         <h3>Formazione e sostituzioni vs ${avv}</h3>
         <div class="help">Liste filtrate per <b>disponibilità</b> e ordinate per <b>presenze crescenti</b>.</div>
         <form id="formazione-save" onsubmit="saveFormation(event,'${matchId}','${avv}')">
-          <h4>Titolari (8)</h4>
+          <h4>Titolari (${N_SLOTS})</h4>
           <div id="titolari" class="grid cols-3">
             <div><label>Portiere</label><select data-role="titolari" id="t-Portiere" required>${opts()}</select></div>
             <div><label>Terzino sinistro</label><select data-role="titolari" id="t-Terzino sinistro" required>${opts()}</select></div>
@@ -768,6 +820,7 @@
           <hr style="margin:18px 0">
 
           <h4 id="subs-title">Calcolo Sostituzioni...</h4>
+          <p class="help" id="equal-playtime-info"></p>
           <div id="subs" class="grid cols-2"></div>
 
           <div class="actions">
@@ -776,23 +829,29 @@
           </div>
         </form>`;
 
-      // --- Funzioni Helper locali ---
-      function collectTitolariMap(){
-        const ids = {};
-        Object.keys(POS_331).forEach(r=>{
-          ids[r] = byId('t-'+r)?.value || null;
+      // --- Aggiornamento UI e Logica ---
+      
+      // Funzione per renderizzare la sezione sostituzioni
+      function renderSubstitutionsUI(){
+        const panchinaIds = collectPanchina();
+        const { subs, N_Tot, T_Player } = calculateSubstitutions(panchinaIds);
+        const subsContainer = byId('subs');
+        const subsTitle = byId('subs-title');
+        const playtimeInfo = byId('equal-playtime-info');
+        subsContainer.innerHTML = '';
+        
+        subsTitle.textContent = `Sostituzioni (${subs.length} totali)`;
+        playtimeInfo.innerHTML = `Con **${N_Tot}** giocatori (8 titolari + ${panchinaIds.length} riserve), il tempo di gioco equo per tutti è **${T_Player} minuti**.`;
+
+        const allPlayersOpts = opts(); // Usa le opzioni generali per chi entra/esce
+
+        subs.forEach(s => {
+          const row = document.createElement('div'); row.className='card';
+          row.innerHTML = `<div class="row" style="gap:10px;align-items:end"><div class="player-title">Sostituzione **${s.minuto}'**</div><div style="flex:1 1 180px"><label>Entra</label><select id="${s.entraId}" required>${allPlayersOpts}</select></div><div style="flex:1 1 180px"><label>Esce</label><select id="${s.esceId}" required>${allPlayersOpts}</select></div></div>`;
+          subsContainer.appendChild(row);
         });
-        return ids;
-      }
-      function collectPanchina(){
-        const ids = [];
-        document.querySelectorAll('#panchina select').forEach(sel => {
-          if(sel.value) ids.push(sel.value);
-        });
-        return ids;
       }
 
-      // Funzione per aggiornare l'anteprima del campo
       function updatePreview(){
         const map = collectTitolariMap();
         const field = byId('preview-field'); field.innerHTML='';
@@ -806,35 +865,90 @@
         });
       }
 
-      // 4. Funzione per calcolare e renderizzare le sostituzioni
-      function renderSubstitutionsUI(){
-        const N_Panchina = collectPanchina().length;
-        const subsContainer = byId('subs');
-        const subsTitle = byId('subs-title');
-        subsContainer.innerHTML = '';
+      // --- Inizializzazione e Event Listeners ---
+      updatePreview();
+      renderSubstitutionsUI(); 
 
-        if (N_Panchina === 0) {
-          subsTitle.textContent = 'Sostituzioni (0 necessarie)';
-          return;
+      // Event listeners per titolari e panchina per ricalcolare e renderizzare le sostituzioni
+      document.querySelectorAll('#titolari select, #panchina select').forEach(sel=>sel.addEventListener('change',()=>{
+        // Assicurati che i valori selezionati non siano duplicati prima di aggiornare
+        const selectedIds = [];
+        let hasDuplicates = false;
+        document.querySelectorAll('#titolari select, #panchina select').forEach(s => {
+            if(s.value) {
+                if(selectedIds.includes(s.value)) {
+                    hasDuplicates = true;
+                } else {
+                    selectedIds.push(s.value);
+                }
+            }
+        });
+        
+        if (hasDuplicates) {
+            alert("Attenzione: un giocatore è stato selezionato più volte (titolare e/o riserva). Correggi la selezione per calcolare le sostituzioni.");
+            return;
         }
 
-        // Il numero di sostituzioni necessarie è pari al numero di giocatori in panchina
-        const N_Sostituzioni = N_Panchina;
-        const totalMinutes = 50; // 2 tempi da 25 minuti
-        const interval = totalMinutes / N_Sostituzioni;
+        updatePreview();
+        renderSubstitutionsUI();
+      }));
 
-        subsTitle.textContent = `Sostituzioni (${N_Sostituzioni} necessarie)`;
+      // --- Logica di Salvataggio aggiornata ---
+      window.saveFormation = async (e,matchId,avv)=>{
+        e.preventDefault();
+        const tit = collectTitolariMap();
+        const panchina = collectPanchina();
+        const { subs: calculatedSubs } = calculateSubstitutions(panchina);
 
-        const allPlayersOpts = opts(); // Usa le opzioni generali per chi entra/esce
-
-        for(let i = 1; i <= N_Sostituzioni; i++){
-          const min = Math.round(i * interval);
-          const row = document.createElement('div'); row.className='card';
-          row.innerHTML = `<div class="row" style="gap:10px;align-items:end"><div class="player-title">Sostituzione ${min}'</div><div style="flex:1 1 180px"><label>Entra</label><select id="entra-${i}" required>${allPlayersOpts}</select></div><div style="flex:1 1 180px"><label>Esce</label><select id="esce-${i}" required>${allPlayersOpts}</select></div></div>`;
-          subsContainer.appendChild(row);
+        // Validazione Titolari (già gestita dall'attributo 'required')
+        for(const val of Object.values(tit)){ if(!val) return alert('Completa tutti gli 8 titolari.'); }
+        
+        // Verifica duplicati tra titolari e panchina
+        const titolariIds = Object.values(tit);
+        for(const pId of panchina){
+            if(titolariIds.includes(pId)) return alert('Errore: un giocatore è in panchina ma è stato selezionato anche come titolare. Correggi.');
         }
+
+        // Validazione Sostituzioni (usa i minuti calcolati dinamicamente)
+        const finalSubs = [];
+        for(let i=1;i<=calculatedSubs.length;i++){
+            const entra = v('entra-'+i);
+            const esce  = v('esce-'+i);
+            const minuto = calculatedSubs[i-1].minuto;
+            if(!entra||!esce) return alert(`Completa la sostituzione al minuto ${minuto}'.`);
+            finalSubs.push({minuto, entra, esce});
+        }
+
+        // Costruzione della mappa formazioni
+        const all = {'0':{minuto:0, formazione:{...tit}}};
+        const cur = {...tit};
+        finalSubs.forEach(s=>{
+            // Trova il ruolo del giocatore uscente
+            const ruoloUscente = Object.keys(cur).find(r=>cur[r]===s.esce);
+            if(ruoloUscente){
+                // Esegue lo swap nel lineup corrente
+                cur[ruoloUscente]=s.entra;
+                all[String(s.minuto)]={minuto:s.minuto, formazione:{...cur}, entra:s.entra, esce:s.esce};
+            }
+        });
+
+        // Salva formazioni e panchina
+        await update(ref(db,'calendario/'+matchId),{formazioni:all, formazionePubblicata:true, panchina:panchina});
+        await incrementPresenzeForFormazioni(all);
+
+        alert('Formazione salvata e presenze aggiornate!');
+        loadProssimeGiornate(false);
+        visualizeAllFormations(avv,all);
+      };
+
+      // Funzione per visualizzare tutte le formazioni (pre-esistente)
+      function visualizeAllFormations(avv,formazioni){
+        const out = document.createElement('div'); out.innerHTML = `<h3>${Object.keys(formazioni).length} formazioni vs ${avv}</h3><div class="help">Titolare (0’) + mappe dopo ogni sostituzione.</div>`;
+        const wrap = document.createElement('div'); wrap.className='grid cols-3'; out.appendChild(wrap);
+        get(ref(db,'rosa')).then(s=>{ const allPlayers = s.val()||{}; Object.keys(formazioni).forEach(min=>{ const pane = document.createElement('div'); pane.className='card'; pane.innerHTML = `<div style="font-weight:800;margin-bottom:6px">Minuto ${min}${min==='0'?' (Titolare)':''}</div><div class="field"></div>`; wrap.appendChild(pane); const field = pane.querySelector('.field'); const f = formazioni[min].formazione; Object.entries(f).forEach(([ruolo,pid])=>{ const pl = allPlayers[pid]; const pos = POS_331[ruolo]; if(!pl||!pos) return; const mk = document.createElement('div'); mk.className='marker'; mk.style.top=pos.top; mk.style.left=pos.left; mk.innerHTML = `<b>${escapeHtml(pl.cognome)}</b><br>${ruolo}`; field.appendChild(mk); }); }); });
+        const box = byId('formazione-content'); box.innerHTML=''; box.appendChild(out);
       }
-
+    };
       // --- Inizializzazione e Event Listeners ---
       updatePreview(); // Chiamata iniziale per l'anteprima
 
