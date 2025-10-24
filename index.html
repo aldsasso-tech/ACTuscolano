@@ -708,6 +708,7 @@
     };
 
     /* ===== Admin: Formazione & sostituzioni (con presenze) ===== */
+ /* ===== Admin: Formazione & sostituzioni (con presenze) ===== */
     window.showFormazioneForm = async (matchId,avv)=>{
       if(!isAdmin) return;
       window.showAdminSection('admin-formazione-section');
@@ -721,95 +722,179 @@
       const val = snapRosa.val()||{}; const candidatureMap = snapCandidature.val()||{}; const utentiMap = snapUtenti.val()||{};
       const nameToUid = {}; Object.entries(utentiMap).forEach(([uid,u])=>{ if(u.nome&&u.cognome) nameToUid[`${u.nome} ${u.cognome}`]=uid; });
 
-      const players = Object.entries(val).map(([id,g])=>{
-        const playerName = `${g.nome} ${g.cognome}`; const uid = nameToUid[playerName];
-        const isAvailable = uid && candidatureMap[uid]===true;
-        return { id, ruolo:g.ruolo, presenze:g.presenze||0, label:`${g.nome} ${g.cognome} (#${g.numero}) — ${g.presenze||0} pres. | Disp.: ${isAvailable?'Sì':'No'}` };
-      }).sort((a,b)=> (a.presenze - b.presenze) || a.ruolo.localeCompare(b.ruolo));
+      // 1. FILTRARE I GIOCATORI SOLO PER CHI HA DATO DISPONIBILITÀ
+      const availablePlayers = Object.entries(val).map(([id, g]) => {
+          const playerName = `${g.nome} ${g.cognome}`;
+          const uid = nameToUid[playerName];
+          const isAvailable = uid && candidatureMap[uid] === true;
+          return { id, uid, isAvailable, nome:g.nome, cognome:g.cognome, numero:g.numero, ruolo: g.ruolo, presenze: g.presenze || 0, label: `${g.nome} ${g.cognome} (#${g.numero}) — ${g.presenze||0} pres.` };
+      }).filter(p => p.isAvailable)
+      .sort((a, b) => (a.presenze - b.presenze) || a.ruolo.localeCompare(b.ruolo));
 
-      const opts = (sel='')=>['<option value="">Seleziona</option>', ...players.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${escapeHtml(p.label)}</option>`) ].join('');
+      const opts = (sel = '') => ['<option value="">Seleziona</option>', ...availablePlayers.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${escapeHtml(p.label)}</option>`)].join('');
+      
+      const MAX_BENCH_OPTIONS = availablePlayers.length - 8;
+      if (MAX_BENCH_OPTIONS < 0) {
+          box.innerHTML = `<h3 style="color:var(--red)">Errore: solo ${availablePlayers.length} giocatori disponibili, ne servono almeno 8.</h3>`;
+          return;
+      }
 
       box.innerHTML = `
         <h3>Formazione e sostituzioni vs ${avv}</h3>
-        <div class="help">Liste ordinate per <b>presenze crescenti</b> (priorità a chi ha giocato meno).</div>
+        <div class="help">Liste filtrate per <b>disponibilità</b> e ordinate per <b>presenze crescenti</b>.</div>
         <form id="formazione-save" onsubmit="saveFormation(event,'${matchId}','${avv}')">
+          <h4>Titolari (8)</h4>
           <div id="titolari" class="grid cols-3">
-            <div><label>Portiere</label><select id="t-Portiere" required>${opts()}</select></div>
-            <div><label>Terzino sinistro</label><select id="t-Terzino sinistro" required>${opts()}</select></div>
-            <div><label>Difensore centrale</label><select id="t-Difensore centrale" required>${opts()}</select></div>
-            <div><label>Terzino destro</label><select id="t-Terzino destro" required>${opts()}</select></div>
-            <div><label>Centrocampista sinistro</label><select id="t-Centrocampista sinistro" required>${opts()}</select></div>
-            <div><label>Centrocampista centrale</label><select id="t-Centrocampista centrale" required>${opts()}</select></div>
-            <div><label>Centrocampista destro</label><select id="t-Centrocampista destro" required>${opts()}</select></div>
-            <div><label>Attaccante centrale</label><select id="t-Attaccante centrale" required>${opts()}</select></div>
+            <div><label>Portiere</label><select data-role="titolari" id="t-Portiere" required>${opts()}</select></div>
+            <div><label>Terzino sinistro</label><select data-role="titolari" id="t-Terzino sinistro" required>${opts()}</select></div>
+            <div><label>Difensore centrale</label><select data-role="titolari" id="t-Difensore centrale" required>${opts()}</select></div>
+            <div><label>Terzino destro</label><select data-role="titolari" id="t-Terzino destro" required>${opts()}</select></div>
+            <div><label>Centrocampista sinistro</label><select data-role="titolari" id="t-Centrocampista sinistro" required>${opts()}</select></div>
+            <div><label>Centrocampista centrale</label><select data-role="titolari" id="t-Centrocampista centrale" required>${opts()}</select></div>
+            <div><label>Centrocampista destro</label><select data-role="titolari" id="t-Centrocampista destro" required>${opts()}</select></div>
+            <div><label>Attaccante centrale</label><select data-role="titolari" id="t-Attaccante centrale" required>${opts()}</select></div>
           </div>
           <div class="field" id="preview-field" style="margin-top:14px"></div>
+
           <hr style="margin:18px 0">
-          <h4>8 sostituzioni (5’,10’,15’,20’,25’,30’,35’,40’)</h4>
+
+          <h4>Panchina (max ${MAX_BENCH_OPTIONS})</h4>
+          <div id="panchina" class="grid cols-3">
+              ${Array.from({length: Math.max(0, MAX_BENCH_OPTIONS)}).map((_, i) => `
+                  <div><label>Riserva ${i + 1}</label><select data-role="panchina" id="p-riserva-${i+1}">${opts()}</select></div>
+              `).join('')}
+          </div>
+
+          <hr style="margin:18px 0">
+
+          <h4 id="subs-title">Calcolo Sostituzioni...</h4>
           <div id="subs" class="grid cols-2"></div>
-          <div class="actions"><button class="btn btn--admin" type="submit">Salva & genera 9 mappe</button><button class="btn" type="button" onclick="showAdminSection('admin-calendario-section')">Annulla</button></div>
+
+          <div class="actions">
+            <button class="btn btn--admin" type="submit">Salva & genera mappe</button>
+            <button class="btn" type="button" onclick="showAdminSection('admin-calendario-section')">Annulla</button>
+          </div>
         </form>`;
 
-      // blocchi sostituzioni
-      const subs = byId('subs');
-      for(let i=1;i<=8;i++){
-        const min=i*5; const row = document.createElement('div'); row.className='card';
-        row.innerHTML = `<div class="row" style="gap:10px;align-items:end"><div class="player-title">Sostituzione ${min}'</div><div style="flex:1 1 180px"><label>Entra</label><select id="entra-${i}" required>${opts()}</select></div><div style="flex:1 1 180px"><label>Esce</label><select id="esce-${i}" required>${opts()}</select></div></div>`;
-        subs.appendChild(row);
+      // --- Funzioni Helper locali ---
+      function collectTitolariMap(){
+        const ids = {};
+        Object.keys(POS_331).forEach(r=>{
+          ids[r] = byId('t-'+r)?.value || null;
+        });
+        return ids;
+      }
+      function collectPanchina(){
+        const ids = [];
+        document.querySelectorAll('#panchina select').forEach(sel => {
+          if(sel.value) ids.push(sel.value);
+        });
+        return ids;
       }
 
-      // anteprima
-      document.querySelectorAll('#titolari select').forEach(sel=>sel.addEventListener('change',updatePreview));
-      updatePreview();
+      // Funzione per aggiornare l'anteprima del campo
       function updatePreview(){
-        const map = collectTitolari(); const field = byId('preview-field'); field.innerHTML='';
-        Object.entries(map).forEach(([ruolo, pid])=>{ const p = players.find(x=>x.id===pid); const pos = POS_331[ruolo]; if(!p||!pos) return; const mk = document.createElement('div'); mk.className='marker'; mk.style.top = pos.top; mk.style.left = pos.left; const cognome = p.label.split(' ')[1]; mk.innerHTML = `<b>${escapeHtml(cognome)}</b><br>${ruolo}`; field.appendChild(mk); });
+        const map = collectTitolariMap();
+        const field = byId('preview-field'); field.innerHTML='';
+        Object.entries(map).forEach(([ruolo, pid])=>{
+          const p = availablePlayers.find(x=>x.id===pid);
+          const pos = POS_331[ruolo];
+          if(!p||!pos) return;
+          const mk = document.createElement('div'); mk.className='marker'; mk.style.top = pos.top; mk.style.left = pos.left;
+          const cognome = p.cognome;
+          mk.innerHTML = `<b>${escapeHtml(cognome)}</b><br>${ruolo}`; field.appendChild(mk);
+        });
       }
-      function collectTitolari(){ const ids = {}; Object.keys(POS_331).forEach(r=>{ ids[r] = byId('t-'+r).value || null; }); return ids; }
 
-      // Salvataggio + incremento presenze
+      // 4. Funzione per calcolare e renderizzare le sostituzioni
+      function renderSubstitutionsUI(){
+        const N_Panchina = collectPanchina().length;
+        const subsContainer = byId('subs');
+        const subsTitle = byId('subs-title');
+        subsContainer.innerHTML = '';
+
+        if (N_Panchina === 0) {
+          subsTitle.textContent = 'Sostituzioni (0 necessarie)';
+          return;
+        }
+
+        // Il numero di sostituzioni necessarie è pari al numero di giocatori in panchina
+        const N_Sostituzioni = N_Panchina;
+        const totalMinutes = 50; // 2 tempi da 25 minuti
+        const interval = totalMinutes / N_Sostituzioni;
+
+        subsTitle.textContent = `Sostituzioni (${N_Sostituzioni} necessarie)`;
+
+        const allPlayersOpts = opts(); // Usa le opzioni generali per chi entra/esce
+
+        for(let i = 1; i <= N_Sostituzioni; i++){
+          const min = Math.round(i * interval);
+          const row = document.createElement('div'); row.className='card';
+          row.innerHTML = `<div class="row" style="gap:10px;align-items:end"><div class="player-title">Sostituzione ${min}'</div><div style="flex:1 1 180px"><label>Entra</label><select id="entra-${i}" required>${allPlayersOpts}</select></div><div style="flex:1 1 180px"><label>Esce</label><select id="esce-${i}" required>${allPlayersOpts}</select></div></div>`;
+          subsContainer.appendChild(row);
+        }
+      }
+
+      // --- Inizializzazione e Event Listeners ---
+      updatePreview(); // Chiamata iniziale per l'anteprima
+
+      // Event listeners per titolari e panchina per ricalcolare e renderizzare le sostituzioni
+      document.querySelectorAll('#titolari select, #panchina select').forEach(sel=>sel.addEventListener('change',()=>{
+        updatePreview();
+        renderSubstitutionsUI();
+      }));
+      renderSubstitutionsUI(); // Chiamata iniziale per le sostituzioni
+
+      // --- Logica di Salvataggio aggiornata ---
       window.saveFormation = async (e,matchId,avv)=>{
         e.preventDefault();
-        const tit = {}; for(const ruolo of Object.keys(POS_331)){ const val = byId('t-'+ruolo).value; if(!val) return alert('Completa i titolari'); tit[ruolo]=val; }
-        const subs = []; for(let i=1;i<=8;i++){ const entra = byId('entra-'+i).value; const esce  = byId('esce-'+i).value; if(!entra||!esce) return alert('Completa le sostituzioni'); subs.push({minuto:i*5, entra, esce}); }
-        const all = {'0':{minuto:0, formazione:{...tit}}}; const cur = {...tit}; subs.forEach(s=>{ const ruoloUscente = Object.keys(cur).find(r=>cur[r]===s.esce); if(ruoloUscente){ cur[ruoloUscente]=s.entra; all[String(s.minuto)]={minuto:s.minuto, formazione:{...cur}, entra:s.entra, esce:s.esce}; }});
-        await update(ref(db,'calendario/'+matchId),{formazioni:all, formazionePubblicata:true});
+        const tit = collectTitolariMap();
+        const panchina = collectPanchina();
+        const N_Sostituzioni = panchina.length;
+
+        // Validazione Titolari
+        for(const val of Object.values(tit)){ if(!val) return alert('Completa tutti gli 8 titolari.'); }
+
+        // Validazione Sostituzioni
+        const subs = [];
+        for(let i=1;i<=N_Sostituzioni;i++){
+            const entra = v('entra-'+i);
+            const esce  = v('esce-'+i);
+            const minuto = Math.round(i * (50 / N_Sostituzioni));
+            if(!entra||!esce) return alert(`Completa la sostituzione al minuto ${minuto}'.`);
+            subs.push({minuto, entra, esce});
+        }
+
+        // Costruzione della mappa formazioni
+        const all = {'0':{minuto:0, formazione:{...tit}}};
+        const cur = {...tit};
+        subs.forEach(s=>{
+            // Trova il ruolo del giocatore uscente
+            const ruoloUscente = Object.keys(cur).find(r=>cur[r]===s.esce);
+            if(ruoloUscente){
+                // Esegue lo swap nel lineup corrente
+                cur[ruoloUscente]=s.entra;
+                all[String(s.minuto)]={minuto:s.minuto, formazione:{...cur}, entra:s.entra, esce:s.esce};
+            }
+        });
+
+        // Salva formazioni e panchina (panchina è facoltativa, ma aggiunta per completezza)
+        await update(ref(db,'calendario/'+matchId),{formazioni:all, formazionePubblicata:true, panchina:panchina});
         await incrementPresenzeForFormazioni(all);
+
         alert('Formazione salvata e presenze aggiornate!');
         loadProssimeGiornate(false);
         visualizeAllFormations(avv,all);
       };
 
+      // Funzione per visualizzare tutte le formazioni (pre-esistente)
       function visualizeAllFormations(avv,formazioni){
-        const out = document.createElement('div'); out.innerHTML = `<h3>9 formazioni vs ${avv}</h3><div class="help">Titolare (0’) + 8 mappe dopo ogni sostituzione.</div>`;
+        const out = document.createElement('div'); out.innerHTML = `<h3>${Object.keys(formazioni).length} formazioni vs ${avv}</h3><div class="help">Titolare (0’) + mappe dopo ogni sostituzione.</div>`;
         const wrap = document.createElement('div'); wrap.className='grid cols-3'; out.appendChild(wrap);
         get(ref(db,'rosa')).then(s=>{ const allPlayers = s.val()||{}; Object.keys(formazioni).forEach(min=>{ const pane = document.createElement('div'); pane.className='card'; pane.innerHTML = `<div style="font-weight:800;margin-bottom:6px">Minuto ${min}${min==='0'?' (Titolare)':''}</div><div class="field"></div>`; wrap.appendChild(pane); const field = pane.querySelector('.field'); const f = formazioni[min].formazione; Object.entries(f).forEach(([ruolo,pid])=>{ const pl = allPlayers[pid]; const pos = POS_331[ruolo]; if(!pl||!pos) return; const mk = document.createElement('div'); mk.className='marker'; mk.style.top=pos.top; mk.style.left=pos.left; mk.innerHTML = `<b>${escapeHtml(pl.cognome)}</b><br>${ruolo}`; field.appendChild(mk); }); }); });
         const box = byId('formazione-content'); box.innerHTML=''; box.appendChild(out);
       }
     };
-
-    // Helper: incremento presenze multiplo
-    async function incrementPresenzeForFormazioni(formazioni){
-      const presenti = new Set(); Object.values(formazioni).forEach(frame=>{ const f = frame.formazione || {}; Object.values(f).forEach(pid=>{ if(pid) presenti.add(pid); }); }); if(presenti.size===0) return;
-      const snap = await get(ref(db,'rosa')); const rosa = snap.val() || {}; const updates = {}; presenti.forEach(pid=>{ const g = rosa[pid]; if(g){ updates[`/rosa/${pid}/presenze`] = (g.presenze || 0) + 1; }}); if(Object.keys(updates).length){ await update(ref(db), updates); }
-    }
-
-    // Admin: visualizzazione candidature compatta
-    async function loadCandidature(){
-      if(!isAdmin) return; const ul = byId('candidature-list'); if(!ul) return; ul.innerHTML = 'Caricamento candidature...';
-      const [snapUtenti, snapCal] = await Promise.all([ get(ref(db,'utenti')), get(ref(db,'calendario')) ]);
-      const utenti = snapUtenti.val()||{}; const matches = snapCal.val()||{}; let matchEntries = Object.entries(matches);
-      const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
-      matchEntries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
-      if(!matchEntries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
-      let html='';
-      for(const [matchId, m] of matchEntries){
-        const cand = m.candidature || {};
-        const candidati = Object.keys(cand).filter(uid=>cand[uid]).map(uid=>{ const u = utenti[uid]; return u? `${u.nome||''} ${u.cognome||''}`.trim() || (u.email||uid) : uid; });
-        html += `<li class="card"><div class="row" style="justify-content:space-between"><div><div class="player-title">vs ${m.avversaria}</div><div class="player-sub">${m.data} • ${m.orario} • ${m.campo}</div></div><div><div class="player-sub" style="font-weight:700">Disponibilità (${candidati.length}):</div>${candidati.length? `<div style="font-size:.95rem">${candidati.join('<br>')}</div>`: 'Nessuna candidatura.'}</div></div></li>`;
-      }
-      ul.innerHTML = html;
-    }
 
     // ======= SEZIONE: ADMIN · GESTIONE DATI (CRUD + candidature a nome) =======
     window.loadCrudGiocatori = async ()=>{
