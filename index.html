@@ -243,14 +243,29 @@
     onAuthStateChanged(auth, async (user)=>{
       isAdmin = !!user && (user.uid===ADMIN_UID); 
       setAuthButton(user);
-      toggleAdminUI();
       hideLogin(); // Nasconde il form di login dopo lo stato di auth
+      toggleAdminUI(); // Aggiorna la UI
+      
+      // Assicura che una sezione sia visibile al cambio di stato
+      if(user && isAdmin) {
+         // Se admin loggato, mostra la sezione predefinita admin (es. inserimento giocatori)
+         if(byId('admin-inserimento-giocatori-section').style.display === 'none'){
+            window.showAdminSection('admin-inserimento-giocatori-section');
+         }
+      } else {
+         // Se loggout o utente normale, mostra la sezione pubblica predefinita
+         window.showPublicSection('rosa-section');
+      }
     });
     
     window.handleAuthToggle = ()=>{
       const user = auth.currentUser;
       if(user){
-        signOut(auth).then(()=>hideLogin());
+        signOut(auth).then(()=>{
+          hideLogin();
+          // Ricarica la sezione pubblica dopo il logout
+          window.showPublicSection('rosa-section');
+        });
       } else {
         showLogin();
       }
@@ -607,6 +622,7 @@
       const match = snapMatch.val();
       const rosa = snapRosa.val() || {};
       const formazioni = match?.formazioni || {};
+      const panchina = match?.panchina || []; // Recupera la panchina salvata
 
       const html = [];
       const rolesOrder = ['Portiere', 'Difensore centrale', 'Terzino sinistro', 'Terzino destro', 'Centrocampista centrale', 'Centrocampista sinistro', 'Centrocampista destro', 'Attaccante centrale'];
@@ -631,6 +647,19 @@
       } else {
         html.push(`<p>Formazione titolare non trovata o non ancora pubblicata.</p>`);
       }
+      
+      // Visualizzazione Panchina
+      if (panchina.length > 0) {
+        html.push(`<h4>Panchina</h4><ul class="grid cols-3" style="list-style:none;padding:0">`);
+        panchina.forEach(pid => {
+            const pl = rosa[pid];
+            if (pl) {
+                html.push(`<li class="card">${pl.nome} ${pl.cognome} (#${pl.numero})</li>`);
+            }
+        });
+        html.push(`</ul>`);
+      }
+
 
       const sost = Object.entries(formazioni).filter(([,d])=> d.minuto && d.minuto!==0).map(([,d])=>d).sort((a,b)=>a.minuto-b.minuto);
       if (sost.length) {
@@ -707,7 +736,7 @@
       loadProssimeGiornate(false);
     };
 
- /* ===== Admin: Formazione & sostituzioni (con presenze) - LOGICA AGGIORNATA ===== */
+    /* ===== Admin: Formazione & sostituzioni (con presenze) - LOGICA AGGIORNATA ===== */
     const N_SLOTS = 8; // Posti in campo
     const MATCH_DURATION = 50; // Durata totale partita in minuti
 
@@ -716,12 +745,19 @@
       window.showAdminSection('admin-formazione-section');
       const box = byId('formazione-content'); box.innerHTML='Caricamento...';
 
-      const [snapRosa, snapCandidature, snapUtenti] = await Promise.all([
+      const [snapRosa, snapCandidature, snapUtenti, snapMatch] = await Promise.all([
         get(ref(db,'rosa')),
         get(ref(db,`calendario/${matchId}/candidature`)),
-        get(ref(db,'utenti'))
+        get(ref(db,'utenti')),
+        get(ref(db,`calendario/${matchId}`))
       ]);
-      const val = snapRosa.val()||{}; const candidatureMap = snapCandidature.val()||{}; const utentiMap = snapUtenti.val()||{};
+      const val = snapRosa.val()||{}; 
+      const candidatureMap = snapCandidature.val()||{}; 
+      const utentiMap = snapUtenti.val()||{};
+      const matchData = snapMatch.val() || {};
+      const currentTitolari = matchData.formazioni?.['0']?.formazione || {};
+      const currentPanchina = matchData.panchina || [];
+      
       const nameToUid = {}; Object.entries(utentiMap).forEach(([uid,u])=>{ if(u.nome&&u.cognome) nameToUid[`${u.nome} ${u.cognome}`]=uid; });
 
       // 1. FILTRARE I GIOCATORI SOLO PER CHI HA DATO DISPONIBILITÀ
@@ -733,6 +769,7 @@
       }).filter(p => p.isAvailable)
       .sort((a, b) => (a.presenze - b.presenze) || a.ruolo.localeCompare(b.ruolo));
 
+      // Helper per generare le opzioni del select, selezionando l'ID corretto se fornito
       const opts = (sel = '') => ['<option value="">Seleziona</option>', ...availablePlayers.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${escapeHtml(p.label)}</option>`)].join('');
       
       const MAX_BENCH_OPTIONS = availablePlayers.length - N_SLOTS;
@@ -754,30 +791,35 @@
         document.querySelectorAll('#panchina select').forEach(sel => {
           if(sel.value) ids.push(sel.value);
         });
-        // Rimuove eventuali duplicati tra titolari e panchina (selezioni errate)
-        const titolariIds = Object.values(collectTitolariMap());
-        return ids.filter(id => !titolariIds.includes(id));
+        // Non rimuoviamo i duplicati qui, lasciamo che sia la validazione a farlo
+        return ids;
       }
 
       // 2. Calcolo Logica Sostituzioni Dinamiche
       const calculateSubstitutions = (panchinaIds) => {
         const N_Tot = N_SLOTS + panchinaIds.length;
-        const N_Sostituzioni = N_SLOTS; // 8 uscite necessarie per far riposare tutti i titolari
-        const T_Player = (N_SLOTS * MATCH_DURATION) / N_Tot; // Tempo di gioco equo per ogni giocatore
-        const delta_t = MATCH_DURATION / N_Sostituzioni; // Intervallo tra le 8 sostituzioni
+        // Il numero di sostituzioni (uscite) necessarie è pari al numero di posti in campo
+        const N_Sostituzioni = N_SLOTS; 
+        
+        // Tempo di gioco equo per ogni giocatore
+        const T_Player = (N_SLOTS * MATCH_DURATION) / N_Tot; 
+        // Intervallo tra le N_Sostituzioni
+        const delta_t = MATCH_DURATION / N_Sostituzioni; 
 
         const subs = [];
         for (let i = 1; i <= N_Sostituzioni; i++) {
-          let minuto;
-          if (i === N_Sostituzioni) {
-            // L'ultima sostituzione coincide con la fine del match, la saltiamo come swap
-            continue;
-          }
+          let minuto = Math.round(i * delta_t);
           
-          minuto = Math.round(i * delta_t);
+          // La sostituzione finale (minuto 50) è solo teorica se non ci sono riserve, 
+          // ma la includiamo nel calcolo per distribuire il tempo.
+          // In una rotazione completa, l'ultima rotazione coincide con la fine del match.
+          if (minuto > MATCH_DURATION) minuto = MATCH_DURATION;
           
           // Se la sostituzione cade a metà partita (25 min), non arrotondiamo
           if (minuto === 25) minuto = 25;
+
+          // Se N_Tot è 8, le sostituzioni sono inutili/teoriche: non le mostriamo
+          if (N_Tot === N_SLOTS) continue;
           
           subs.push({
             minuto: minuto,
@@ -797,14 +839,14 @@
         <form id="formazione-save" onsubmit="saveFormation(event,'${matchId}','${avv}')">
           <h4>Titolari (${N_SLOTS})</h4>
           <div id="titolari" class="grid cols-3">
-            <div><label>Portiere</label><select data-role="titolari" id="t-Portiere" required>${opts()}</select></div>
-            <div><label>Terzino sinistro</label><select data-role="titolari" id="t-Terzino sinistro" required>${opts()}</select></div>
-            <div><label>Difensore centrale</label><select data-role="titolari" id="t-Difensore centrale" required>${opts()}</select></div>
-            <div><label>Terzino destro</label><select data-role="titolari" id="t-Terzino destro" required>${opts()}</select></div>
-            <div><label>Centrocampista sinistro</label><select data-role="titolari" id="t-Centrocampista sinistro" required>${opts()}</select></div>
-            <div><label>Centrocampista centrale</label><select data-role="titolari" id="t-Centrocampista centrale" required>${opts()}</select></div>
-            <div><label>Centrocampista destro</label><select data-role="titolari" id="t-Centrocampista destro" required>${opts()}</select></div>
-            <div><label>Attaccante centrale</label><select data-role="titolari" id="t-Attaccante centrale" required>${opts()}</select></div>
+            <div><label>Portiere</label><select data-role="titolari" id="t-Portiere" required>${opts(currentTitolari['Portiere'])}</select></div>
+            <div><label>Terzino sinistro</label><select data-role="titolari" id="t-Terzino sinistro" required>${opts(currentTitolari['Terzino sinistro'])}</select></div>
+            <div><label>Difensore centrale</label><select data-role="titolari" id="t-Difensore centrale" required>${opts(currentTitolari['Difensore centrale'])}</select></div>
+            <div><label>Terzino destro</label><select data-role="titolari" id="t-Terzino destro" required>${opts(currentTitolari['Terzino destro'])}</select></div>
+            <div><label>Centrocampista sinistro</label><select data-role="titolari" id="t-Centrocampista sinistro" required>${opts(currentTitolari['Centrocampista sinistro'])}</select></div>
+            <div><label>Centrocampista centrale</label><select data-role="titolari" id="t-Centrocampista centrale" required>${opts(currentTitolari['Centrocampista centrale'])}</select></div>
+            <div><label>Centrocampista destro</label><select data-role="titolari" id="t-Centrocampista destro" required>${opts(currentTitolari['Centrocampista destro'])}</select></div>
+            <div><label>Attaccante centrale</label><select data-role="titolari" id="t-Attaccante centrale" required>${opts(currentTitolari['Attaccante centrale'])}</select></div>
           </div>
           <div class="field" id="preview-field" style="margin-top:14px"></div>
 
@@ -813,7 +855,7 @@
           <h4>Panchina (max ${MAX_BENCH_OPTIONS})</h4>
           <div id="panchina" class="grid cols-3">
               ${Array.from({length: Math.max(0, MAX_BENCH_OPTIONS)}).map((_, i) => `
-                  <div><label>Riserva ${i + 1}</label><select data-role="panchina" id="p-riserva-${i+1}">${opts()}</select></div>
+                  <div><label>Riserva ${i + 1}</label><select data-role="panchina" id="p-riserva-${i+1}">${opts(currentPanchina[i] || '')}</select></div>
               `).join('')}
           </div>
 
@@ -841,13 +883,35 @@
         subsContainer.innerHTML = '';
         
         subsTitle.textContent = `Sostituzioni (${subs.length} totali)`;
+        
+        if (subs.length === 0) {
+           playtimeInfo.innerHTML = `Nessuna sostituzione necessaria. Giocatori totali: **${N_Tot}**.`;
+           return;
+        }
+
         playtimeInfo.innerHTML = `Con **${N_Tot}** giocatori (8 titolari + ${panchinaIds.length} riserve), il tempo di gioco equo per tutti è **${T_Player} minuti**.`;
+
+        // Recupera le sostituzioni precedentemente salvate per pre-compilare i campi
+        const currentFormazioni = matchData.formazioni || {};
+        const currentSubs = Object.values(currentFormazioni).filter(f => f.minuto > 0).sort((a,b) => a.minuto - b.minuto);
+        let currentSubIndex = 0;
 
         const allPlayersOpts = opts(); // Usa le opzioni generali per chi entra/esce
 
-        subs.forEach(s => {
+        subs.forEach((s, i) => {
           const row = document.createElement('div'); row.className='card';
-          row.innerHTML = `<div class="row" style="gap:10px;align-items:end"><div class="player-title">Sostituzione **${s.minuto}'**</div><div style="flex:1 1 180px"><label>Entra</label><select id="${s.entraId}" required>${allPlayersOpts}</select></div><div style="flex:1 1 180px"><label>Esce</label><select id="${s.esceId}" required>${allPlayersOpts}</select></div></div>`;
+          
+          let entraSel = '';
+          let esceSel = '';
+          
+          // Pre-compila se la sostituzione al minuto s.minuto è stata salvata
+          if (currentSubIndex < currentSubs.length && currentSubs[currentSubIndex].minuto === s.minuto) {
+             entraSel = currentSubs[currentSubIndex].entra;
+             esceSel = currentSubs[currentSubIndex].esce;
+             currentSubIndex++; // Passa alla prossima sostituzione salvata
+          }
+          
+          row.innerHTML = `<div class="row" style="gap:10px;align-items:end"><div class="player-title">Sostituzione **${s.minuto}'**</div><div style="flex:1 1 180px"><label>Entra</label><select id="${s.entraId}" required>${opts(entraSel)}</select></div><div style="flex:1 1 180px"><label>Esce</label><select id="${s.esceId}" required>${opts(esceSel)}</select></div></div>`;
           subsContainer.appendChild(row);
         });
       }
@@ -871,22 +935,16 @@
 
       // Event listeners per titolari e panchina per ricalcolare e renderizzare le sostituzioni
       document.querySelectorAll('#titolari select, #panchina select').forEach(sel=>sel.addEventListener('change',()=>{
-        // Assicurati che i valori selezionati non siano duplicati prima di aggiornare
-        const selectedIds = [];
-        let hasDuplicates = false;
-        document.querySelectorAll('#titolari select, #panchina select').forEach(s => {
-            if(s.value) {
-                if(selectedIds.includes(s.value)) {
-                    hasDuplicates = true;
-                } else {
-                    selectedIds.push(s.value);
-                }
-            }
-        });
+        const titolariIds = Object.values(collectTitolariMap()).filter(Boolean);
+        const panchinaIds = collectPanchina().filter(Boolean);
+        const allSelected = [...titolariIds, ...panchinaIds];
         
-        if (hasDuplicates) {
-            alert("Attenzione: un giocatore è stato selezionato più volte (titolare e/o riserva). Correggi la selezione per calcolare le sostituzioni.");
-            return;
+        // Verifica duplicati (logica di validazione client-side)
+        const uniqueSet = new Set(allSelected);
+        if (allSelected.length !== uniqueSet.size) {
+            alert("Attenzione: un giocatore è stato selezionato più volte (titolare e/o riserva). Correggi la selezione prima di procedere.");
+            // Potresti resettare i campi qui o bloccare l'azione, ma lasciamo che l'utente corregga.
+            // Non blocchiamo l'update della preview/subs per permettere correzioni in tempo reale.
         }
 
         updatePreview();
@@ -899,24 +957,37 @@
         const tit = collectTitolariMap();
         const panchina = collectPanchina();
         const { subs: calculatedSubs } = calculateSubstitutions(panchina);
-
-        // Validazione Titolari (già gestita dall'attributo 'required')
+        
+        // Validazione Titolari
         for(const val of Object.values(tit)){ if(!val) return alert('Completa tutti gli 8 titolari.'); }
         
         // Verifica duplicati tra titolari e panchina
         const titolariIds = Object.values(tit);
         for(const pId of panchina){
-            if(titolariIds.includes(pId)) return alert('Errore: un giocatore è in panchina ma è stato selezionato anche come titolare. Correggi.');
+            if(titolariIds.includes(pId)) return alert('Errore: il giocatore in panchina è stato selezionato anche come titolare. Correggi.');
         }
+
+        // Verifica duplicati all'interno di Titolari+Panchina
+        const allSelected = [...titolariIds, ...panchina];
+        const uniqueSet = new Set(allSelected);
+        if (allSelected.length !== uniqueSet.size) return alert("Errore: un giocatore è stato selezionato più volte (titolare e/o riserva). Correggi.");
+
 
         // Validazione Sostituzioni (usa i minuti calcolati dinamicamente)
         const finalSubs = [];
         for(let i=1;i<=calculatedSubs.length;i++){
-            const entra = v('entra-'+i);
-            const esce  = v('esce-'+i);
-            const minuto = calculatedSubs[i-1].minuto;
-            if(!entra||!esce) return alert(`Completa la sostituzione al minuto ${minuto}'.`);
-            finalSubs.push({minuto, entra, esce});
+            const s = calculatedSubs[i-1];
+            const entra = v(s.entraId);
+            const esce  = v(s.esceId);
+            
+            if(!entra||!esce) return alert(`Completa la sostituzione al minuto ${s.minuto}'.`);
+            
+            // Verifica che i giocatori entranti/uscenti facciano parte del gruppo selezionato (titolari o panchina)
+            if(!allSelected.includes(entra) || !allSelected.includes(esce)) {
+                return alert(`Errore: i giocatori selezionati per la sostituzione al minuto ${s.minuto}' devono essere tra i titolari o in panchina.`);
+            }
+
+            finalSubs.push({minuto: s.minuto, entra, esce});
         }
 
         // Costruzione della mappa formazioni
@@ -949,66 +1020,29 @@
         const box = byId('formazione-content'); box.innerHTML=''; box.appendChild(out);
       }
     };
-      // --- Inizializzazione e Event Listeners ---
-      updatePreview(); // Chiamata iniziale per l'anteprima
 
-      // Event listeners per titolari e panchina per ricalcolare e renderizzare le sostituzioni
-      document.querySelectorAll('#titolari select, #panchina select').forEach(sel=>sel.addEventListener('change',()=>{
-        updatePreview();
-        renderSubstitutionsUI();
-      }));
-      renderSubstitutionsUI(); // Chiamata iniziale per le sostituzioni
+    // Helper: incremento presenze multiplo
+    async function incrementPresenzeForFormazioni(formazioni){
+      const presenti = new Set(); Object.values(formazioni).forEach(frame=>{ const f = frame.formazione || {}; Object.values(f).forEach(pid=>{ if(pid) presenti.add(pid); }); }); if(presenti.size===0) return;
+      const snap = await get(ref(db,'rosa')); const rosa = snap.val() || {}; const updates = {}; presenti.forEach(pid=>{ const g = rosa[pid]; if(g){ updates[`/rosa/${pid}/presenze`] = (g.presenze || 0) + 1; }}); if(Object.keys(updates).length){ await update(ref(db), updates); }
+    }
 
-      // --- Logica di Salvataggio aggiornata ---
-      window.saveFormation = async (e,matchId,avv)=>{
-        e.preventDefault();
-        const tit = collectTitolariMap();
-        const panchina = collectPanchina();
-        const N_Sostituzioni = panchina.length;
-
-        // Validazione Titolari
-        for(const val of Object.values(tit)){ if(!val) return alert('Completa tutti gli 8 titolari.'); }
-
-        // Validazione Sostituzioni
-        const subs = [];
-        for(let i=1;i<=N_Sostituzioni;i++){
-            const entra = v('entra-'+i);
-            const esce  = v('esce-'+i);
-            const minuto = Math.round(i * (50 / N_Sostituzioni));
-            if(!entra||!esce) return alert(`Completa la sostituzione al minuto ${minuto}'.`);
-            subs.push({minuto, entra, esce});
-        }
-
-        // Costruzione della mappa formazioni
-        const all = {'0':{minuto:0, formazione:{...tit}}};
-        const cur = {...tit};
-        subs.forEach(s=>{
-            // Trova il ruolo del giocatore uscente
-            const ruoloUscente = Object.keys(cur).find(r=>cur[r]===s.esce);
-            if(ruoloUscente){
-                // Esegue lo swap nel lineup corrente
-                cur[ruoloUscente]=s.entra;
-                all[String(s.minuto)]={minuto:s.minuto, formazione:{...cur}, entra:s.entra, esce:s.esce};
-            }
-        });
-
-        // Salva formazioni e panchina (panchina è facoltativa, ma aggiunta per completezza)
-        await update(ref(db,'calendario/'+matchId),{formazioni:all, formazionePubblicata:true, panchina:panchina});
-        await incrementPresenzeForFormazioni(all);
-
-        alert('Formazione salvata e presenze aggiornate!');
-        loadProssimeGiornate(false);
-        visualizeAllFormations(avv,all);
-      };
-
-      // Funzione per visualizzare tutte le formazioni (pre-esistente)
-      function visualizeAllFormations(avv,formazioni){
-        const out = document.createElement('div'); out.innerHTML = `<h3>${Object.keys(formazioni).length} formazioni vs ${avv}</h3><div class="help">Titolare (0’) + mappe dopo ogni sostituzione.</div>`;
-        const wrap = document.createElement('div'); wrap.className='grid cols-3'; out.appendChild(wrap);
-        get(ref(db,'rosa')).then(s=>{ const allPlayers = s.val()||{}; Object.keys(formazioni).forEach(min=>{ const pane = document.createElement('div'); pane.className='card'; pane.innerHTML = `<div style="font-weight:800;margin-bottom:6px">Minuto ${min}${min==='0'?' (Titolare)':''}</div><div class="field"></div>`; wrap.appendChild(pane); const field = pane.querySelector('.field'); const f = formazioni[min].formazione; Object.entries(f).forEach(([ruolo,pid])=>{ const pl = allPlayers[pid]; const pos = POS_331[ruolo]; if(!pl||!pos) return; const mk = document.createElement('div'); mk.className='marker'; mk.style.top=pos.top; mk.style.left=pos.left; mk.innerHTML = `<b>${escapeHtml(pl.cognome)}</b><br>${ruolo}`; field.appendChild(mk); }); }); });
-        const box = byId('formazione-content'); box.innerHTML=''; box.appendChild(out);
+    // Admin: visualizzazione candidature compatta
+    async function loadCandidature(){
+      if(!isAdmin) return; const ul = byId('candidature-list'); if(!ul) return; ul.innerHTML = 'Caricamento candidature...';
+      const [snapUtenti, snapCal] = await Promise.all([ get(ref(db,'utenti')), get(ref(db,'calendario')) ]);
+      const utenti = snapUtenti.val()||{}; const matches = snapCal.val()||{}; let matchEntries = Object.entries(matches);
+      const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+      matchEntries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
+      if(!matchEntries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
+      let html='';
+      for(const [matchId, m] of matchEntries){
+        const cand = m.candidature || {};
+        const candidati = Object.keys(cand).filter(uid=>cand[uid]).map(uid=>{ const u = utenti[uid]; return u? `${u.nome||''} ${u.cognome||''}`.trim() || (u.email||uid) : uid; });
+        html += `<li class="card"><div class="row" style="justify-content:space-between"><div><div class="player-title">vs ${m.avversaria}</div><div class="player-sub">${m.data} • ${m.orario} • ${m.campo}</div></div><div><div class="player-sub" style="font-weight:700">Disponibilità (${candidati.length}):</div>${candidati.length? `<div style="font-size:.95rem">${candidati.join('<br>')}</div>`: 'Nessuna candidatura.'}</div></div></li>`;
       }
-    };
+      ul.innerHTML = html;
+    }
 
     // ======= SEZIONE: ADMIN · GESTIONE DATI (CRUD + candidature a nome) =======
     window.loadCrudGiocatori = async ()=>{
@@ -1224,7 +1258,8 @@
       <button id="rosa-tab" class="tab" data-target="rosa-section" aria-current="page" onclick="showPublicSection('rosa-section')">Rosa</button>
       <button id="calendario-tab" class="tab" data-target="calendario-section" onclick="showPublicSection('calendario-section')">Calendario</button>
       <button id="statistiche-tab" class="tab" data-target="statistiche-section" onclick="showPublicSection('statistiche-section')">Prestazioni</button>
-      <button id="video-tab" class="tab" data-target="video-section" onclick="showPublicSection('video-section')">Video</button> <a class="tab" href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank" rel="noopener">Torneo ↗</a>
+      <button id="video-tab" class="tab" data-target="video-section" onclick="showPublicSection('video-section')">Video</button>
+      <a class="tab" href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank" rel="noopener">Torneo ↗</a>
       <button id="auth-toggle-btn" class="btn" onclick="handleAuthToggle()" aria-label="Apri il login">Login</button>
     </div>
 
@@ -1238,7 +1273,8 @@
         <button class="tab" data-admin-target="admin-candidature-section" onclick="showAdminSection('admin-candidature-section')">Gest. Candidature</button>
         <button class="tab" data-admin-target="admin-gestione-dati-section" onclick="showAdminSection('admin-gestione-dati-section')">Gest. dati</button>
         <button class="tab" data-admin-target="admin-statistiche-section" onclick="showAdminSection('admin-statistiche-section')">Statistiche</button>
-        <button class="tab" data-admin-target="admin-video-section" onclick="showAdminSection('admin-video-section')">Ins. Video</button> <button class="tab" data-admin-target="admin-utenti-section" onclick="showAdminSection('admin-utenti-section')">Ins. utenti</button>
+        <button class="tab" data-admin-target="admin-video-section" onclick="showAdminSection('admin-video-section')">Ins. Video</button>
+        <button class="tab" data-admin-target="admin-utenti-section" onclick="showAdminSection('admin-utenti-section')">Ins. utenti</button>
       </div>
     </div>
   </nav>
@@ -1438,7 +1474,7 @@
   </div>
 
   <footer>
-    @AC Tuscolano - Direttore Tecnico Aldo Sasso · Direttore Sportivo Danilo Solini · Presidente Davide Broglia
+    Direttore Tecnico Aldo Sasso · Direttore Sportivo Danilo Solini · Presidente Davide Broglia
   </footer>
 </body>
 </html>
