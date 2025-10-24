@@ -405,6 +405,8 @@ document.addEventListener('DOMContentLoaded', () => {
    /* ===== NUOVA FUNZIONE: Classifica Statica (Aggiornata con i dati forniti dall'utente) ===== */
     
 /* ===== FUNZIONE: Classifica AC Tuscolano con cache Firebase (solo admin aggiorna) ===== */
+
+/* ===== FUNZIONE: Classifica AC Tuscolano (layout colonne uniformi + cache Firebase; admin-only refresh) ===== */
 const loadClassifica = async () => {
   const classificaContent = document.getElementById('classifica-content');
   if (!classificaContent) return;
@@ -416,6 +418,109 @@ const loadClassifica = async () => {
     const todayKey = now.toISOString().split('T')[0];
     const snap = await get(ref(db, 'classifica_cache'));
     const cache = snap.val() || {};
+    const cachedHtml = cache.html;
+    const cachedDate = cache.date;
+
+    // Se abbiamo cache di oggi, usala subito
+    if (cachedHtml && cachedDate === todayKey) {
+      classificaContent.innerHTML = cachedHtml;
+      return;
+    }
+
+    // Se non è admin e non c'è cache di oggi, prova almeno a mostrare l'ultima cache
+    if (!isAdmin) {
+      if (cachedHtml) {
+        classificaContent.innerHTML = cachedHtml;
+        return;
+      } else {
+        classificaContent.innerHTML = `<div class="help" style="color:red">La classifica non è ancora disponibile. L'amministratore provvederà all'aggiornamento.</div>`;
+        return;
+      }
+    }
+
+    // Admin: scarica dal sito
+    const url = "https://www.romatornei.it/calcio-a-8-over-40-roma-sud/";
+    const proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(url) + "&cacheBust=" + Date.now();
+    const response = await fetch(proxy);
+    const data = await response.json();
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.contents, "text/html");
+    const remoteTable = doc.querySelector(".table-responsive table, table.table, table");
+
+    if (!remoteTable) {
+      classificaContent.innerHTML = `<div class="help">Impossibile trovare la classifica sul sito remoto.</div>`;
+      return;
+    }
+
+    // Normalizza: rimuovi stili inline e riduci loghi
+    remoteTable.querySelectorAll("img").forEach(img => {
+      img.style.maxWidth = "25px"; // ~20% rispetto ai loghi grandi
+      img.style.height = "auto";
+      img.style.verticalAlign = "middle";
+    });
+
+    // Estrarre header e righe
+    const headers = Array.from(remoteTable.querySelectorAll("thead th")).map(th => th.textContent.trim()) ||
+                    Array.from(remoteTable.querySelectorAll("tr:first-child th, tr:first-child td")).map(th => th.textContent.trim());
+
+    const rows = Array.from(remoteTable.querySelectorAll("tbody tr"));
+    const bodyRows = rows.length ? rows : Array.from(remoteTable.querySelectorAll("tr")).slice(1); // fallback se manca <tbody>
+
+    // Ricrea tabella con layout uniforme (table-layout: fixed)
+    const colCount = headers.length || (bodyRows[0]?.children.length || 8);
+    const widthPercent = (100 / colCount).toFixed(4) + "%";
+
+    const buildCell = (tag, html) => `<${tag} style="width:${widthPercent};padding:8px;text-align:center;border-bottom:1px solid #ddd;word-wrap:break-word">${html}</${tag}>`;
+
+    let theadHTML = "";
+    if (headers.length) {
+      theadHTML = `<thead><tr>${headers.map(h => 
+        `<th style="width:${widthPercent};padding:8px;text-align:center;border-bottom:2px solid #ccc;background:#8B0000;color:#fff;font-weight:600;font-size:14px">${h}</th>`
+      ).join("")}</tr></thead>`;
+    }
+
+    const tbodyHTML = bodyRows.map(tr => {
+      const cells = Array.from(tr.children);
+      const tds = cells.map(td => buildCell("td", td.innerHTML));
+      return `<tr>${tds.join("")}</tr>`;
+    }).join("");
+
+    const normalizedTable = `
+      <div class="help">Classifica aggiornata automaticamente da <a href="${url}" target="_blank" rel="noopener">romatornei.it</a></div>
+      <div style="overflow-x:auto">
+        <table class="table" style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px">
+          ${theadHTML}
+          <tbody>${tbodyHTML}</tbody>
+        </table>
+      </div>
+      <div class="help" style="margin-top:8px;">Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}</div>
+      <div id="classifica-next-run" class="help" style="margin-top:4px;"></div>
+    `;
+
+    classificaContent.innerHTML = normalizedTable;
+
+    // Salva in cache Firebase
+    await set(ref(db, 'classifica_cache'), {
+      html: normalizedTable,
+      date: todayKey,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error("Errore caricamento classifica:", error);
+    // Fallback: usa qualunque cache esistente
+    try{
+      const snap2 = await get(ref(db, 'classifica_cache'));
+      const cache2 = snap2.val() || {};
+      if (cache2.html) {
+        classificaContent.innerHTML = cache2.html;
+        return;
+      }
+    }catch(e){}
+    classificaContent.innerHTML = `<div class="help" style="color:red">Errore nel recupero della classifica.</div>`;
+  }
+};
+
     const cachedHtml = cache.html;
     const cachedDate = cache.date;
 
