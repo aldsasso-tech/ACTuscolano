@@ -34,46 +34,8 @@ window.scheduleDailyClassificaRefresh = () => {
   }, ms);
 };
 
-
-/* ===== EFFETTO FADE NAVIGAZIONE (solo .content-section, fix visibilità completa) ===== */
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const target = tab.getAttribute('data-target');
-    const current = document.querySelector('.content-section.active');
-    const next = document.getElementById(target);
-    if (!next || current === next) return;
-
-    if (current) {
-      current.style.opacity = '0';
-      current.style.pointerEvents = 'none';
-      setTimeout(() => {
-        current.classList.remove('active');
-        next.classList.add('active');
-        next.style.opacity = '0';
-        next.style.pointerEvents = 'all';
-        setTimeout(() => { next.style.opacity = '1'; }, 50);
-      }, 400);
-    } else {
-      // Caso iniziale: nessuna sezione attiva
-      document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-      next.classList.add('active');
-      next.style.opacity = '1';
-      next.style.pointerEvents = 'all';
-    }
-
-    // Aggiorna contenuto dinamico
-    if (target === 'classifica-section' && typeof loadClassifica === 'function') {
-      setTimeout(() => loadClassifica(), 600);
-    }
-  });
-});
-
 document.addEventListener('DOMContentLoaded', () => {
-  // Imposta la prima sezione pubblica come attiva all'avvio
-  const firstSection = document.querySelector('.content-section');
-  if (firstSection) firstSection.classList.add('active');
-  
-  // Avvia lo scheduler
+  // Avvia lo scheduler (dipende dalla funzione loadClassifica nel modulo)
   if (typeof window.scheduleDailyClassificaRefresh === 'function') {
     window.scheduleDailyClassificaRefresh();
   }
@@ -218,10 +180,12 @@ document.addEventListener('DOMContentLoaded', () => {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.5s ease;
+  display: none; /* Nascondi tutte le sezioni di default (il JS gestirà la prima visuale) */
 }
 .content-section.active {
   opacity: 1;
   pointer-events: all;
+  /* display: block è gestito dal JS prima di aggiungere .active */
 }
 
 
@@ -273,40 +237,37 @@ document.addEventListener('DOMContentLoaded', () => {
       'admin-candidature-section',
       'admin-gestione-dati-section',
       'admin-utenti-section',
-      'admin-video-section' // Aggiunto per il video
+      'admin-video-section'
     ];
     const ALL_SECTIONS = [...PUBLIC_SECTIONS, ...ADMIN_SECTIONS, 'login-section']; // Includo il login per nasconderlo
 
-    // Funzione per mostrare le sezioni pubbliche
+    // Funzione per mostrare le sezioni pubbliche (SIMPLIFICATA PER RISOLVERE IL BUG)
     window.showPublicSection = (id = 'rosa-section') => {
       ALL_SECTIONS.forEach(secId => { 
         const el = byId(secId); 
-        // Logica per gestire la visibilità con la transizione CSS
+        if (!el) return;
+
         const isTarget = (secId === id);
         
-        if (el) {
-          if (isTarget) {
-            el.style.display = 'block'; // Necessario per far partire la transizione
-            // Assicurati che l'opacità sia 0 prima di aggiungere 'active' se non lo è
-            if (!el.classList.contains('active')) {
-                el.style.opacity = '0';
-                setTimeout(() => {
-                    el.classList.add('active');
-                    el.style.opacity = '1';
-                }, 50);
-            }
+        if (isTarget) {
+          el.style.display = 'block';
+          // Aggiunge la classe 'active' per l'opacità, dopo che display:block è attivo
+          setTimeout(() => {
+            el.classList.add('active');
+            el.style.pointerEvents = 'all';
+          }, 10);
+        } else {
+          // Nasconde le altre sezioni gradualmente o immediatamente
+          if (el.classList.contains('active')) {
+            el.classList.remove('active');
+            el.style.pointerEvents = 'none';
+            // Dopo la transizione CSS di 500ms, imposta display:none
+            setTimeout(() => {
+              el.style.display = 'none';
+            }, 550); 
           } else {
-             // Nasconde le altre sezioni gradualmente o immediatamente
-            if (el.classList.contains('active')) {
-                el.style.opacity = '0';
-                el.style.pointerEvents = 'none';
-                setTimeout(() => {
-                    el.classList.remove('active');
-                    el.style.display = 'none';
-                }, 500); // 500ms per la transizione + 100ms di buffer
-            } else {
-                el.style.display = 'none';
-            }
+            el.style.display = 'none';
+            el.style.pointerEvents = 'none';
           }
         }
       });
@@ -315,35 +276,32 @@ document.addEventListener('DOMContentLoaded', () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
     
-    // Funzione per mostrare le sezioni admin
+    // Funzione per mostrare le sezioni admin (SIMMETRICA)
     window.showAdminSection = (id) => {
-        if(!isAdmin) return showLogin(); // Protezione base
+        if(!isAdmin) return showLogin();
         
         ALL_SECTIONS.forEach(secId => { 
             const el = byId(secId); 
+            if (!el) return;
+
             const isTarget = (secId === id);
 
-            if (el) {
-                if (isTarget) {
-                    el.style.display = 'block'; 
-                    if (!el.classList.contains('active')) {
-                        el.style.opacity = '0';
-                        setTimeout(() => {
-                            el.classList.add('active');
-                            el.style.opacity = '1';
-                        }, 50);
-                    }
-                } else {
-                    if (el.classList.contains('active')) {
-                        el.style.opacity = '0';
-                        el.style.pointerEvents = 'none';
-                        setTimeout(() => {
-                            el.classList.remove('active');
-                            el.style.display = 'none';
-                        }, 500); 
-                    } else {
+            if (isTarget) {
+                el.style.display = 'block'; 
+                setTimeout(() => {
+                    el.classList.add('active');
+                    el.style.pointerEvents = 'all';
+                }, 10);
+            } else {
+                if (el.classList.contains('active')) {
+                    el.classList.remove('active');
+                    el.style.pointerEvents = 'none';
+                    setTimeout(() => {
                         el.style.display = 'none';
-                    }
+                    }, 550); 
+                } else {
+                    el.style.display = 'none';
+                    el.style.pointerEvents = 'none';
                 }
             }
         });
@@ -358,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(id==='admin-inserimento-giornate-section'){ $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
         if(id==='admin-candidature-section'){ loadCandidature(); }
         if(id==='admin-gestione-dati-section'){ window.loadCrudGiocatori(); window.loadCrudPartite(); }
-        if (id === 'admin-video-section') loadPartitePerVideoAdmin(); // Carica per la sezione video
+        if (id === 'admin-video-section') loadPartitePerVideoAdmin(); 
         if (id === 'admin-statistiche-section') loadAdminStatistiche();
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -439,27 +397,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }catch(err){ alert('Errore creazione: '+(err?.message||err)); }
       });
 
-      // Default: Carico le sezioni pubbliche e mostro la rosa
-      // L'attivazione visuale è gestita nel primo script e nell'onAuthStateChanged
+      // Default: Carico i dati all'avvio (la sezione attiva è gestita dall'onAuthStateChanged)
       loadRosa(); 
       loadProssimeGiornate(false); 
       loadStatistiche();
-      loadClassifica(); // ** NUOVO: Carica la classifica all'avvio
+      loadClassifica(); 
       
       // Associazione evento per salvare il link video
       byId('save-video-btn')?.addEventListener('click', saveVideoLink);
 
-      // Associo gli eventi di navigazione pubblici per ricaricare i dati all'apertura
-      byId('rosa-tab')?.addEventListener('click', loadRosa);
-      byId('calendario-tab')?.addEventListener('click', () => loadProssimeGiornate(false));
-      byId('statistiche-tab')?.addEventListener('click', loadStatistiche);
-      byId('video-tab')?.addEventListener('click', loadVideoList);
-      byId('classifica-tab')?.addEventListener('click', loadClassifica); // ** NUOVO: Evento per la classifica
+      // ** NUOVO: Setup corretto della navigazione pubblica
+      const setupPublicNav = (id, loader) => {
+          byId(`${id}-tab`)?.addEventListener('click', () => {
+              window.showPublicSection(`${id}-section`);
+              if (typeof loader === 'function') {
+                  // Esegui il loader con un leggero ritardo per consentire la transizione CSS
+                  setTimeout(() => loader(), 50); 
+              }
+          });
+      };
+      
+      setupPublicNav('rosa', loadRosa);
+      setupPublicNav('calendario', () => loadProssimeGiornate(false));
+      setupPublicNav('statistiche', loadStatistiche);
+      setupPublicNav('classifica', loadClassifica);
+      setupPublicNav('video', loadVideoList);
     });
     
-   /* ===== NUOVA FUNZIONE: Classifica Statica (Aggiornata con i dati forniti dall'utente) ===== */
+   /* ===== FUNZIONE: Classifica AC Tuscolano con cache Firebase ===== */
     
-/* ===== FUNZIONE: Classifica AC Tuscolano con cache Firebase (solo admin aggiorna) ===== */
 const loadClassifica = async () => {
   const classificaContent = document.getElementById('classifica-content');
   if (!classificaContent) return;
@@ -502,7 +468,7 @@ const loadClassifica = async () => {
       return;
     }
 
-    // Stile AC Tuscolano
+    // Stile AC Tuscolano (Mantenuto per la tabella dinamica)
     table.querySelectorAll("img").forEach(img => {
       img.style.maxWidth = "25px";
       img.style.height = "auto";
@@ -553,8 +519,7 @@ const loadClassifica = async () => {
 };
 
 
-
-    /* ===== NUOVE FUNZIONI VIDEO (INTEGRATE) ===== */
+    /* ===== FUNZIONI VIDEO E LOGICA CRUD (Mantenute, erano corrette) ===== */
 
     const getYouTubeId = (url) => {
       if (!url) return null;
@@ -1618,7 +1583,7 @@ const loadClassifica = async () => {
 
   <header>
     <div class="hero">
-      <img src="https://example.com/logo.png" alt="AC Tuscolano Logo"/>
+      <img src="Logo.png" alt="AC Tuscolano Logo"/>
       <div class="brand">
         <h1 class="club">A.C. Tuscolano</h1>
         <p class="tag">La gestione squadra a portata di click.</p>
@@ -1652,7 +1617,7 @@ const loadClassifica = async () => {
 
   <main>
 
-    <section id="login-section" class="content-section" style="display:none; opacity:1; pointer-events:all;">
+    <section id="login-section" class="content-section">
       <h2>Accesso Amministratori e Giocatori</h2>
       <form id="login-form">
         <label for="login-email">Email</label><input id="login-email" type="email" required />
@@ -1844,16 +1809,16 @@ const loadClassifica = async () => {
     </section>
   </main>
   
-  <div id="video-modal">
+  <div id="video-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; padding: 20px;">
     <div style="background:var(--ink); padding:0; border-radius:var(--radius); width:90%; max-width:800px; position:relative;">
-      <button id="close-video-modal" class="btn btn--accent" type="button">&times;</button>
+      <button id="close-video-modal" class="btn btn--accent" type="button" style="position:absolute; top:-10px; right:-10px; z-index:110; font-size:1.2rem; line-height:1.2;">&times;</button>
       <div id="video-iframe-container">
         </div>
     </div>
   </div>
 
   <footer>
-    &copy; 2024 AC Tuscolano. Tutti i diritti riservati.
+    &copy; 2025 AC Tuscolano. Tutti i diritti riservati.
   </footer>
 
 </body>
