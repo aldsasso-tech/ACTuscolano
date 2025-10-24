@@ -27,19 +27,39 @@ window.scheduleDailyClassificaRefresh = () => {
   }, ms);
 };
 
-/* ===== EFFETTO FADE NAVIGAZIONE ===== */
+
+/* ===== EFFETTO FADE NAVIGAZIONE (fix visibilità) ===== */
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const target = tab.getAttribute('data-target');
-    document.querySelectorAll('section').forEach(sec => {
-      sec.classList.remove('active');
-    });
-    const section = document.getElementById(target);
-    if (section) {
-      section.classList.add('active');
+    const current = document.querySelector('section.active');
+    const next = document.getElementById(target);
+
+    if (!next || current === next) return;
+
+    if (current) {
+      current.style.opacity = '0';
+      setTimeout(() => {
+        current.classList.remove('active');
+        next.classList.add('active');
+        next.style.opacity = '0';
+        setTimeout(() => { next.style.opacity = '1'; }, 50);
+      }, 400);
+    } else {
+      next.classList.add('active');
+      next.style.opacity = '1';
     }
   });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+  const firstSection = document.querySelector('section');
+  if (firstSection) firstSection.classList.add('active');
+  if (typeof window.scheduleDailyClassificaRefresh === 'function') {
+    window.scheduleDailyClassificaRefresh();
+  }
+});
+);
 
 document.addEventListener('DOMContentLoaded', () => {
   const firstSection = document.querySelector('section');
@@ -186,16 +206,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     @media (prefers-reduced-motion: reduce){.tab,.btn{transition:none}}
   
-/* === Effetti di transizione sezione === */
+
+/* === Effetti di transizione sezione (fix visibilità) === */
 section {
+  display: none;
   opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.5s ease, visibility 0.5s ease;
+  transition: opacity 0.5s ease;
 }
 section.active {
+  display: block;
   opacity: 1;
-  visibility: visible;
 }
+
 
 </style>
 
