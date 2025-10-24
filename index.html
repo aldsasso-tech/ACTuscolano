@@ -405,11 +405,10 @@ document.addEventListener('DOMContentLoaded', () => {
    /* ===== NUOVA FUNZIONE: Classifica Statica (Aggiornata con i dati forniti dall'utente) ===== */
     
 /* ===== FUNZIONE: Classifica AC Tuscolano con cache Firebase (solo admin aggiorna) ===== */
-
-/* ===== FUNZIONE: Classifica AC Tuscolano (tabella uniforme, cache Firebase) ===== */
 const loadClassifica = async () => {
   const classificaContent = document.getElementById('classifica-content');
   if (!classificaContent) return;
+
   classificaContent.innerHTML = `<div class="help">Caricamento classifica in corso...</div>`;
 
   try {
@@ -417,115 +416,6 @@ const loadClassifica = async () => {
     const todayKey = now.toISOString().split('T')[0];
     const snap = await get(ref(db, 'classifica_cache'));
     const cache = snap.val() || {};
-    const cachedHtml = cache.html;
-    const cachedDate = cache.date;
-
-    // Usa la cache se aggiornata oggi
-    if (cachedHtml && cachedDate === todayKey) {
-      classificaContent.innerHTML = cachedHtml;
-      return;
-    }
-
-    // Se non è admin, mostra la cache o messaggio
-    if (!isAdmin) {
-      if (cachedHtml) {
-        classificaContent.innerHTML = cachedHtml;
-      } else {
-        classificaContent.innerHTML = `<div class="help" style="color:red">La classifica non è ancora disponibile. L'amministratore provvederà all'aggiornamento.</div>`;
-      }
-      return;
-    }
-
-    // Admin: scarica classifica aggiornata
-    const url = "https://www.romatornei.it/calcio-a-8-over-40-roma-sud/";
-    const proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(url) + "&cacheBust=" + Date.now();
-    const response = await fetch(proxy);
-    const data = await response.json();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(data.contents, "text/html");
-    const table = doc.querySelector(".table-responsive table") || doc.querySelector("table[class*='table']") || doc.querySelector("table");
-
-    if (!table) {
-      classificaContent.innerHTML = `<div class="help">Impossibile trovare la classifica sul sito remoto.</div>`;
-      return;
-    }
-
-    // Rimuovi stili precedenti
-    table.removeAttribute('style');
-    table.style.width = "100%";
-    table.style.borderCollapse = "collapse";
-    table.style.tableLayout = "fixed";
-    table.style.marginTop = "10px";
-
-    // Riduci i loghi
-    table.querySelectorAll("img").forEach(img => {
-      img.style.maxWidth = "25px";
-      img.style.height = "auto";
-      img.style.verticalAlign = "middle";
-    });
-
-    // Stile intestazioni
-    table.querySelectorAll("th").forEach(th => {
-      th.style.backgroundColor = "#8B0000";
-      th.style.color = "#fff";
-      th.style.padding = "8px";
-      th.style.textAlign = "center";
-      th.style.borderBottom = "2px solid #ccc";
-      th.style.fontWeight = "600";
-      th.style.fontSize = "14px";
-      th.style.wordWrap = "break-word";
-    });
-
-    // Celle uniformi
-    table.querySelectorAll("td").forEach(td => {
-      td.style.padding = "8px";
-      td.style.textAlign = "center";
-      td.style.borderBottom = "1px solid #ddd";
-      td.style.fontSize = "13px";
-      td.style.wordWrap = "break-word";
-    });
-
-    // Larghezze uniformi
-    const colCount = table.querySelectorAll("th").length || 8;
-    const widthPercent = (100 / colCount) + "%";
-    table.querySelectorAll("th, td").forEach(cell => {
-      cell.style.width = widthPercent;
-    });
-
-    // Righe alternate
-    table.querySelectorAll("tr:nth-child(even)").forEach(tr => {
-      tr.style.backgroundColor = "#f8f8f8";
-    });
-
-    const htmlContent = `
-      <div class="help">Classifica aggiornata automaticamente da <a href="${url}" target="_blank" rel="noopener">romatornei.it</a></div>
-      <div style="overflow-x:auto;">
-        ${table.outerHTML}
-      </div>
-      <div class="help" style="margin-top:8px;">Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}</div>
-      <div id="classifica-next-run" class="help" style="margin-top:4px;"></div>
-    `;
-
-    classificaContent.innerHTML = htmlContent;
-
-    // Salva cache
-    await set(ref(db, 'classifica_cache'), {
-      html: htmlContent,
-      date: todayKey,
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    console.error("Errore caricamento classifica:", error);
-    const snapFallback = await get(ref(db, 'classifica_cache'));
-    const cache = snapFallback.val();
-    if (cache && cache.html) {
-      classificaContent.innerHTML = cache.html;
-    } else {
-      classificaContent.innerHTML = `<div class="help" style="color:red">Errore nel recupero della classifica.</div>`;
-    }
-  }
-};
-
     const cachedHtml = cache.html;
     const cachedDate = cache.date;
 
