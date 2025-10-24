@@ -28,26 +28,34 @@ window.scheduleDailyClassificaRefresh = () => {
 };
 
 
-/* ===== EFFETTO FADE NAVIGAZIONE (fix visibilità) ===== */
+/* ===== EFFETTO FADE NAVIGAZIONE (opacity + pointer-events fix) ===== */
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const target = tab.getAttribute('data-target');
     const current = document.querySelector('section.active');
     const next = document.getElementById(target);
-
     if (!next || current === next) return;
 
+    // Fade out current section
     if (current) {
       current.style.opacity = '0';
+      current.style.pointerEvents = 'none';
       setTimeout(() => {
         current.classList.remove('active');
         next.classList.add('active');
         next.style.opacity = '0';
+        next.style.pointerEvents = 'all';
         setTimeout(() => { next.style.opacity = '1'; }, 50);
       }, 400);
     } else {
       next.classList.add('active');
       next.style.opacity = '1';
+      next.style.pointerEvents = 'all';
+    }
+
+    // Aggiorna contenuto dinamico se necessario
+    if (target === 'classifica-section' && typeof loadClassifica === 'function') {
+      setTimeout(() => loadClassifica(), 600);
     }
   });
 });
@@ -207,15 +215,15 @@ document.addEventListener('DOMContentLoaded', () => {
     @media (prefers-reduced-motion: reduce){.tab,.btn{transition:none}}
   
 
-/* === Effetti di transizione sezione (fix visibilità) === */
+/* === Effetti di transizione sezione (opacity + pointer-events fix) === */
 section {
-  display: none;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.5s ease;
 }
 section.active {
-  display: block;
   opacity: 1;
+  pointer-events: all;
 }
 
 
