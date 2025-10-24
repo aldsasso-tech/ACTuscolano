@@ -5,81 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js">
-/* ===== SCHEDULAZIONE: refresh giornaliero alle 23:00 ===== */
-function msUntilNext(hour, minute = 0, second = 0) {
-  const now = new Date();
-  const next = new Date(now);
-  next.setHours(hour, minute, second, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
-  return next - now;
-}
-window.scheduleDailyClassificaRefresh = () => {
-  const ms = msUntilNext(23, 0, 0);
-  const infoEl = document.getElementById('classifica-next-run');
-  if (infoEl) {
-    const when = new Date(Date.now() + ms).toLocaleString('it-IT');
-    infoEl.textContent = `Prossimo aggiornamento: ${when}`;
-  }
-  setTimeout(async function tick() {
-    await loadClassifica();
-    window.scheduleDailyClassificaRefresh();
-  }, ms);
-};
-
-
-/* ===== EFFETTO FADE NAVIGAZIONE (solo .content-section, fix visibilità completa) ===== */
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const target = tab.getAttribute('data-target');
-    const current = document.querySelector('.content-section.active');
-    const next = document.getElementById(target);
-    if (!next || current === next) return;
-
-    if (current) {
-      current.style.opacity = '0';
-      current.style.pointerEvents = 'none';
-      setTimeout(() => {
-        current.classList.remove('active');
-        next.classList.add('active');
-        next.style.opacity = '0';
-        next.style.pointerEvents = 'all';
-        setTimeout(() => { next.style.opacity = '1'; }, 50);
-      }, 400);
-    } else {
-      next.classList.add('active');
-      next.style.opacity = '1';
-      next.style.pointerEvents = 'all';
-    }
-
-    // Aggiorna contenuto dinamico
-    if (target === 'classifica-section' && typeof loadClassifica === 'function') {
-      setTimeout(() => loadClassifica(), 600);
-    }
-  });
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-  const firstSection = document.querySelector('.content-section') || document.querySelector('section');
-  if (firstSection) firstSection.classList.add('active');
-  if (typeof window.scheduleDailyClassificaRefresh === 'function') {
-    window.scheduleDailyClassificaRefresh();
-  }
-});
-);
-
-document.addEventListener('DOMContentLoaded', () => {
-  const firstSection = document.querySelector('section');
-  if (firstSection) firstSection.classList.add('active');
-  if (typeof window.scheduleDailyClassificaRefresh === 'function') {
-    window.scheduleDailyClassificaRefresh();
-  }
-});
-
-</script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css"/>
 
+  <script>
+    /* ===== SCHEDULAZIONE: refresh giornaliero alle 23:00 ===== */
+    function msUntilNext(hour, minute = 0, second = 0) {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(hour, minute, second, 0);
+      if (next <= now) next.setDate(next.getDate() + 1);
+      return next - now;
+    }
+    window.scheduleDailyClassificaRefresh = () => {
+      const ms = msUntilNext(23, 0, 0);
+      const infoEl = document.getElementById('classifica-next-run');
+      if (infoEl) {
+        const when = new Date(Date.now() + ms).toLocaleString('it-IT');
+        infoEl.textContent = `Prossimo aggiornamento: ${when}`;
+      }
+      setTimeout(async function tick() {
+        if(typeof loadClassifica === 'function') await loadClassifica();
+        window.scheduleDailyClassificaRefresh();
+      }, ms);
+    };
+
+    /* ===== INIZIALIZZAZIONE SCHEDULAZIONE ===== */
+    document.addEventListener('DOMContentLoaded', () => {
+      // Viene richiamata solo la funzione di scheduling, la navigazione è gestita nel type="module"
+      if (typeof window.scheduleDailyClassificaRefresh === 'function') {
+        window.scheduleDailyClassificaRefresh();
+      }
+    });
+  </script>
   <style>
     /* CSS originale */
     :root{
@@ -214,17 +173,18 @@ document.addEventListener('DOMContentLoaded', () => {
     @media (prefers-reduced-motion: reduce){.tab,.btn{transition:none}}
   
 
-/* === Effetti di transizione per le sezioni visibili (.content-section) === */
-.content-section {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.5s ease;
-}
-.content-section.active {
-  opacity: 1;
-  pointer-events: all;
-}
-
+    /* === Effetti di transizione per le sezioni visibili (.content-section) - CORRETTO === */
+    .content-section {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      display: none; /* Inizialmente nascosto */
+    }
+    .content-section.active {
+      opacity: 1;
+      pointer-events: all;
+      display: block; /* Visibile quando attivo */
+    }
 
 </style>
 
@@ -252,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2"; // Controlla il tuo UID corretto
     let isAdmin = false;
-    let selectedMatchKey = null; // Usato nella sezione admin-video-section
+    let selectedMatchKey = null;
 
     // Seconda app per creare utenti senza sloggarci
     const adminSecondaryApp = initializeApp(firebaseConfig, "adminSecondary");
@@ -274,46 +234,73 @@ document.addEventListener('DOMContentLoaded', () => {
       'admin-candidature-section',
       'admin-gestione-dati-section',
       'admin-utenti-section',
-      'admin-video-section' // Aggiunto per il video
+      'admin-video-section'
     ];
-    const ALL_SECTIONS = [...PUBLIC_SECTIONS, ...ADMIN_SECTIONS, 'login-section']; // Includo il login per nasconderlo
+    const ALL_SECTIONS = [...PUBLIC_SECTIONS, ...ADMIN_SECTIONS, 'login-section'];
 
+    // NUOVO: Funzione unificata per la gestione della visibilità con effetto fade
+    const showSection = (id, isAdminSection = false) => {
+        const targetId = id;
+        
+        ALL_SECTIONS.forEach(secId => { 
+            const el = byId(secId);
+            if (!el) return;
+            
+            if (secId === targetId) {
+                // Target section: needs to fade in
+                el.style.display = 'block';
+                el.style.opacity = '0'; // Assicura lo stato iniziale per la transizione
+                el.style.pointerEvents = 'all';
+                el.classList.add('active');
+                
+                // Forza il reflow (per CSS transition) e imposta l'opacità finale
+                setTimeout(() => { el.style.opacity = '1'; }, 50); 
+                
+            } else {
+                // Other sections: needs to fade out and hide
+                if (el.classList.contains('active')) {
+                    el.style.opacity = '0';
+                    el.style.pointerEvents = 'none';
+                    el.classList.remove('active');
+                    // Attendi la fine della transizione (0.5s) prima di nascondere completamente
+                    setTimeout(() => { el.style.display = 'none'; }, 500); 
+                } else {
+                    el.style.display = 'none'; // Assicura che sia nascosto
+                }
+            }
+        });
+
+        // Handle ARIA and Admin Menu state
+        document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', t.dataset.target===id ? 'page' : 'false'); });
+        document.querySelectorAll('#admin-menu .tab').forEach(t=>{ 
+            t.setAttribute('aria-current', isAdminSection ? (t.dataset.adminTarget===id ? 'page' : 'false') : 'false');
+        });
+
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Admin specific logic (richiama funzioni di caricamento)
+        if(isAdminSection){
+            if(id==='admin-calendario-section'){ loadProssimeGiornate(true); }
+            if(id==='admin-inserimento-giornate-section'){ $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
+            if(id==='admin-candidature-section'){ loadCandidature(); }
+            if(id==='admin-gestione-dati-section'){ window.loadCrudGiocatori(); window.loadCrudPartite(); }
+            if (id === 'admin-video-section') loadPartitePerVideoAdmin();
+        }
+    };
+    
     // Funzione per mostrare le sezioni pubbliche
     window.showPublicSection = (id = 'rosa-section') => {
-      ALL_SECTIONS.forEach(secId => { 
-        const el = byId(secId); 
-        if (el) el.style.display = (secId === id) ? 'block' : 'none'; 
-      });
-      document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', t.dataset.target===id ? 'page' : 'false'); });
-      document.querySelectorAll('#admin-menu .tab').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); // Rimuove current dall'admin
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showSection(id, false);
     };
     
     // Funzione per mostrare le sezioni admin
     window.showAdminSection = (id) => {
-        if(!isAdmin) return showLogin(); // Protezione base
-        
-        ALL_SECTIONS.forEach(secId => { 
-          const el = byId(secId); 
-          if (el) el.style.display = (secId === id) ? 'block' : 'none'; 
-        });
-        
-        document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); // Rimuove current dal pubblico
-        document.querySelectorAll(`#admin-menu .tab`).forEach(t=>{ 
-            t.setAttribute('aria-current', t.dataset.adminTarget===id ? 'page' : 'false');
-        });
-
-        // Ricarica i dati specifici per la sezione admin (dal tuo codice originale)
-        if(id==='admin-calendario-section'){ loadProssimeGiornate(true); }
-        if(id==='admin-inserimento-giornate-section'){ $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
-        if(id==='admin-candidature-section'){ loadCandidature(); }
-        if(id==='admin-gestione-dati-section'){ window.loadCrudGiocatori(); window.loadCrudPartite(); }
-        if (id === 'admin-video-section') loadPartitePerVideoAdmin(); // Carica per la sezione video
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if(!isAdmin) return showLogin();
+        showSection(id, true);
     };
 
-    function showLogin(){ byId('login-section').style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); }
+    function showLogin(){ showSection('login-section'); }
     function hideLogin(){ byId('login-section').style.display='none'; }
     function toggleAdminUI(){ 
         byId('admin-menu').style.display = isAdmin ? 'block' : 'none'; 
@@ -356,7 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
     
-    document.addEventListener('DOMContentLoaded',()=>{
+    document.addEventListener('DOMContentLoaded', async ()=>{
+      
       // Login
       byId('login-form')?.addEventListener('submit',e=>{
         e.preventDefault();
@@ -384,118 +372,134 @@ document.addEventListener('DOMContentLoaded', () => {
         }catch(err){ alert('Errore creazione: '+(err?.message||err)); }
       });
 
+      // Gestione del click per i pulsanti di navigazione (per eseguire showSection)
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          e.stopPropagation(); 
+          const target = tab.getAttribute('data-target');
+          const adminTarget = tab.getAttribute('data-admin-target');
+          
+          if (target) {
+            window.showPublicSection(target);
+          } else if (adminTarget) {
+            window.showAdminSection(adminTarget);
+          }
+        });
+      });
+
       // Default: Carico le sezioni pubbliche e mostro la rosa
-      window.showPublicSection('rosa-section');
+      window.showPublicSection('rosa-section'); // Ora usa la logica di fade corretta
       loadRosa(); 
       loadProssimeGiornate(false); 
       loadStatistiche();
-      loadClassifica(); // ** NUOVO: Carica la classifica all'avvio
+      loadClassifica();
       
       // Associazione evento per salvare il link video
       byId('save-video-btn')?.addEventListener('click', saveVideoLink);
 
-      // Associo gli eventi di navigazione pubblici per ricaricare i dati all'apertura
+      // Associo gli eventi di navigazione pubblici per ricaricare i dati all'apertura (dopo il cambio di sezione)
       byId('rosa-tab')?.addEventListener('click', loadRosa);
       byId('calendario-tab')?.addEventListener('click', () => loadProssimeGiornate(false));
       byId('statistiche-tab')?.addEventListener('click', loadStatistiche);
       byId('video-tab')?.addEventListener('click', loadVideoList);
-      byId('classifica-tab')?.addEventListener('click', loadClassifica); // ** NUOVO: Evento per la classifica
+      byId('classifica-tab')?.addEventListener('click', loadClassifica);
     });
     
-   /* ===== NUOVA FUNZIONE: Classifica Statica (Aggiornata con i dati forniti dall'utente) ===== */
-    
-/* ===== FUNZIONE: Classifica AC Tuscolano con cache Firebase (solo admin aggiorna) ===== */
-const loadClassifica = async () => {
-  const classificaContent = document.getElementById('classifica-content');
-  if (!classificaContent) return;
+   /* ===== FUNZIONE: Classifica AC Tuscolano con cache Firebase (solo admin aggiorna) ===== */
+    const loadClassifica = async () => {
+      const classificaContent = document.getElementById('classifica-content');
+      if (!classificaContent) return;
 
-  classificaContent.innerHTML = `<div class="help">Caricamento classifica in corso...</div>`;
+      classificaContent.innerHTML = `<div class="help">Caricamento classifica in corso...</div>`;
 
-  try {
-    const now = new Date();
-    const todayKey = now.toISOString().split('T')[0];
-    const snap = await get(ref(db, 'classifica_cache'));
-    const cache = snap.val() || {};
-    const cachedHtml = cache.html;
-    const cachedDate = cache.date;
+      try {
+        const now = new Date();
+        const todayKey = now.toISOString().split('T')[0];
+        const snap = await get(ref(db, 'classifica_cache'));
+        const cache = snap.val() || {};
+        const cachedHtml = cache.html;
+        const cachedDate = cache.date;
 
-    if (cachedHtml && cachedDate === todayKey) {
-      classificaContent.innerHTML = cachedHtml;
-      return;
-    }
+        if (cachedHtml && cachedDate === todayKey) {
+          classificaContent.innerHTML = cachedHtml;
+          return;
+        }
 
-    if (!isAdmin) {
-      if (cachedHtml) {
-        classificaContent.innerHTML = cachedHtml;
-      } else {
-        classificaContent.innerHTML = `<div class="help" style="color:red">La classifica non è ancora disponibile. L'amministratore provvederà all'aggiornamento.</div>`;
+        if (!isAdmin) {
+          if (cachedHtml) {
+            classificaContent.innerHTML = cachedHtml;
+          } else {
+            classificaContent.innerHTML = `<div class="help" style="color:red">La classifica non è ancora disponibile. L'amministratore provvederà all'aggiornamento.</div>`;
+          }
+          return;
+        }
+
+        const url = "https://www.romatornei.it/calcio-a-8-over-40-roma-sud/";
+        const proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(url) + "&cacheBust=" + Date.now();
+        const response = await fetch(proxy);
+        const data = await response.json();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(data.contents, "text/html");
+        const table = doc.querySelector(".table-responsive table") || doc.querySelector("table[class*='table']") || doc.querySelector("table");
+
+        if (!table) {
+          classificaContent.innerHTML = `<div class="help">Impossibile trovare la classifica sul sito remoto.</div>`;
+          return;
+        }
+
+        // Estrazione e normalizzazione delle righe della tabella
+        const thead = table.querySelector("thead");
+        const tbody = table.querySelector("tbody");
+
+        const theadHTML = thead ? `
+          <thead>
+            <tr>${Array.from(thead.querySelectorAll("th")).map(th => 
+              `<th style="background:#8B0000;color:#fff;padding:8px;text-align:center;border-bottom:2px solid #ccc;font-size:0.9rem">${th.innerHTML}</th>`
+            ).join('')}</tr>
+          </thead>
+        ` : '';
+
+        const tbodyHTML = tbody ? Array.from(tbody.querySelectorAll("tr")).map((tr, idx) => {
+          const rowHTML = Array.from(tr.querySelectorAll("td")).map(td => 
+            `<td style="padding:8px;text-align:center;border-bottom:1px solid #ddd;font-size:13px;word-wrap:break-word">${td.innerHTML}</td>`
+          ).join('');
+          const bg = idx % 2 === 1 ? ' style="background:#f8f8f8"' : '';
+          return `<tr${bg}>${rowHTML}</tr>`;
+        }).join('') : '';
+
+        const normalizedHTML = `
+          <div class="help">Classifica aggiornata automaticamente da <a href="${url}" target="_blank" rel="noopener">romatornei.it</a></div>
+          <div style="overflow-x:auto">
+            <table class="table" style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px">
+              ${theadHTML}
+              <tbody>${tbodyHTML}</tbody>
+            </table>
+          </div>
+          <div class="help" style="margin-top:8px;">Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}</div>
+          <div id="classifica-next-run" class="help" style="margin-top:4px;"></div>
+        `;
+
+        classificaContent.innerHTML = normalizedHTML;
+        
+        // Salva cache
+        await set(ref(db, 'classifica_cache'), {
+          html: normalizedHTML,
+          date: todayKey,
+          timestamp: Date.now()
+        });
+
+      } catch (error) {
+        console.error("Errore caricamento classifica:", error);
+        const snapFallback = await get(ref(db, 'classifica_cache'));
+        const cache = snapFallback.val();
+        if (cache && cache.html) {
+          classificaContent.innerHTML = cache.html;
+        } else {
+          classificaContent.innerHTML = `<div class="help" style="color:red">Errore nel recupero della classifica.</div>`;
+        }
       }
-      return;
-    }
-
-    const url = "https://www.romatornei.it/calcio-a-8-over-40-roma-sud/";
-    const proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(url) + "&cacheBust=" + Date.now();
-    const response = await fetch(proxy);
-    const data = await response.json();
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(data.contents, "text/html");
-    const table = doc.querySelector(".table-responsive table") || doc.querySelector("table[class*='table']") || doc.querySelector("table");
-
-    if (!table) {
-      classificaContent.innerHTML = `<div class="help">Impossibile trovare la classifica sul sito remoto.</div>`;
-      return;
-    }
-
-    // Stile AC Tuscolano
-    table.querySelectorAll("img").forEach(img => {
-      img.style.maxWidth = "25px";
-      img.style.height = "auto";
-      img.style.verticalAlign = "middle";
-    });
-
-    table.style.width = "100%";
-    table.style.borderCollapse = "collapse";
-    table.querySelectorAll("th").forEach(th => {
-      th.style.backgroundColor = "#8B0000";
-      th.style.color = "#fff";
-      th.style.padding = "8px";
-      th.style.textAlign = "center";
-      th.style.borderBottom = "2px solid #ccc";
-    });
-    table.querySelectorAll("td").forEach(td => {
-      td.style.padding = "8px";
-      td.style.textAlign = "center";
-      td.style.borderBottom = "1px solid #ddd";
-    });
-    table.querySelectorAll("tr:nth-child(even)").forEach(tr => {
-      tr.style.backgroundColor = "#f8f8f8";
-    });
-
-    const htmlContent = `
-      <div class="help">Classifica aggiornata automaticamente da <a href="${url}" target="_blank" rel="noopener">romatornei.it</a></div>
-      <div style="overflow-x:auto;">${table.outerHTML}</div>
-      <div class="help" style="margin-top:8px;">Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}</div>
-      <div id="classifica-next-run" class="help" style="margin-top:4px;"></div>
-    `;
-
-    classificaContent.innerHTML = htmlContent;
-    await set(ref(db, 'classifica_cache'), {
-      html: htmlContent,
-      date: todayKey,
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    console.error("Errore caricamento classifica:", error);
-    const snapFallback = await get(ref(db, 'classifica_cache'));
-    const cache = snapFallback.val();
-    if (cache && cache.html) {
-      classificaContent.innerHTML = cache.html;
-    } else {
-      classificaContent.innerHTML = `<div class="help" style="color:red">Errore nel recupero della classifica.</div>`;
-    }
-  }
-};
+    };
 
 
 
@@ -984,9 +988,6 @@ const loadClassifica = async () => {
         
         alert('Formazione e voti salvati con successo!');
         
-        // Dopo il salvataggio, si può anche pubblicare la formazione, se non già fatto
-        // L'opzione di pubblicazione la metteremo separata (vedi sotto)
-
       } catch(e) {
         alert('Errore salvataggio: ' + e.message);
         console.error(e);
@@ -1037,15 +1038,9 @@ const loadClassifica = async () => {
         const sortedPlayers = Object.entries(rosa).sort((a,b)=> (a[1].numero||0)-(b[1].numero||0));
         
         sortedPlayers.forEach(([id, g]) => {
-          // Controlla se il giocatore era in rosa per la partita (cioè se è in 'rosa' e non è stato rimosso dalla 'formazione' esplicitamente come null, ma in questo flusso salviamo tutti i presenti nella formazione anche con titolare=false e voto)
-          // La logica più semplice è: se è in rosa e non era nella formazione, è panchinaro (se l'admin lo ha lasciato fuori non dovrebbe essere aggiornato come presente)
-          // Usiamo il controllo se è in rosa E se è presente nella formazione (titolare=true o titolare=false ma con voto/ruolo)
+          // Controlla se il giocatore era in formazione (anche se panchinaro)
           const isInFormazione = formazione.hasOwnProperty(id); 
 
-          // Se non presente in formazione, ma vogliamo poter aggiornare lo stesso:
-          // Utilizziamo un campo nascosto in 'calendario/matchId' per marcare i presenti se necessario,
-          // ma per ora usiamo chi è in `formazione` come base. Se non c'è, non è presente.
-          
           if (!isInFormazione) return;
           
           // Presenze e goal salvati in `calendario/matchId/statistiche`
@@ -1143,7 +1138,6 @@ const loadClassifica = async () => {
         await update(ref(db), updates);
         
         // 4. Esegui l'aggiornamento della rosa
-        const rosaRootRef = ref(db, 'rosa');
         for(const [playerId, data] of Object.entries(statsUpdates)){
            await update(ref(db, `rosa/${playerId}`), data);
         }
@@ -1520,6 +1514,43 @@ const loadClassifica = async () => {
 
     
     /* Admin Inserimento Giornate */
+    byId('new-player-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        if (!isAdmin) return alert("Solo admin.");
+
+        const nome = v('new-player-nome').trim();
+        const cognome = v('new-player-cognome').trim();
+        const numero = parseInt(v('new-player-numero'), 10);
+        const ruolo = v('new-player-ruolo');
+        const stato = v('new-player-stato');
+
+        if (!nome || !cognome || isNaN(numero) || !ruolo || !stato) {
+            return alert("Compila tutti i campi.");
+        }
+
+        try {
+            const newPlayerRef = push(ref(db, 'rosa'));
+            await set(newPlayerRef, {
+                nome, 
+                cognome, 
+                numero, 
+                ruolo, 
+                stato,
+                presenze: 0,
+                goal: 0,
+                voto: 0
+            });
+            
+            alert('Giocatore inserito con successo!');
+            e.target.reset();
+            loadRosa(); // Aggiorna la sezione pubblica
+
+        } catch(error) {
+            alert('Errore inserimento giocatore: ' + error.message);
+            console.error(error);
+        }
+    });
+
     byId('new-match-form')?.addEventListener('submit', async e => {
       e.preventDefault();
       if (!isAdmin) return alert("Solo admin.");
@@ -1582,13 +1613,13 @@ const loadClassifica = async () => {
 
   <nav id="admin-menu" style="display:none">
     <div class="nav-wrap">
-      <button class="tab btn--admin" type="button" data-admin-target="admin-inserimento-giocatori-section" onclick="showAdminSection('admin-inserimento-giocatori-section')">Nuovo Giocatore</button>
-      <button class="tab btn--admin" type="button" data-admin-target="admin-inserimento-giornate-section" onclick="showAdminSection('admin-inserimento-giornate-section')">Nuova Partita</button>
-      <button class="tab btn--admin" type="button" data-admin-target="admin-calendario-section" onclick="showAdminSection('admin-calendario-section')">Calendario Admin</button>
-      <button class="tab btn--admin" type="button" data-admin-target="admin-candidature-section" onclick="showAdminSection('admin-candidature-section')">Candidature</button>
-      <button class="tab btn--admin" type="button" data-admin-target="admin-gestione-dati-section" onclick="showAdminSection('admin-gestione-dati-section')">CRUD Dati</button>
-      <button class="tab btn--admin" type="button" data-admin-target="admin-utenti-section" onclick="showAdminSection('admin-utenti-section')">Nuovo Utente</button>
-      <button class="tab btn--admin" type="button" data-admin-target="admin-video-section" onclick="showAdminSection('admin-video-section')">Gestione Video</button>
+      <button class="tab btn--admin" type="button" data-admin-target="admin-inserimento-giocatori-section">Nuovo Giocatore</button>
+      <button class="tab btn--admin" type="button" data-admin-target="admin-inserimento-giornate-section">Nuova Partita</button>
+      <button class="tab btn--admin" type="button" data-admin-target="admin-calendario-section">Calendario Admin</button>
+      <button class="tab btn--admin" type="button" data-admin-target="admin-candidature-section">Candidature</button>
+      <button class="tab btn--admin" type="button" data-admin-target="admin-gestione-dati-section">CRUD Dati</button>
+      <button class="tab btn--admin" type="button" data-admin-target="admin-utenti-section">Nuovo Utente</button>
+      <button class="tab btn--admin" type="button" data-admin-target="admin-video-section">Gestione Video</button>
     </div>
   </nav>
 
