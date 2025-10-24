@@ -179,7 +179,7 @@
     const escapeHtml=(s='')=>s.toString().replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
     // ** ARRAY SEZIONI AGGIORNATI E COMPLETI **
-    const PUBLIC_SECTIONS = ['rosa-section','calendario-section','statistiche-section','formazione-pubblica-section','video-section'];
+    const PUBLIC_SECTIONS = ['rosa-section','calendario-section','statistiche-section','formazione-pubblica-section','video-section', 'classifica-section'];
     const ADMIN_SECTIONS = [
       'admin-inserimento-giocatori-section',
       'admin-inserimento-giornate-section',
@@ -304,6 +304,8 @@
       loadRosa(); 
       loadProssimeGiornate(false); 
       loadStatistiche();
+      loadClassifica(); // ** NUOVO: Carica la classifica all'avvio
+      
       // Associazione evento per salvare il link video
       byId('save-video-btn')?.addEventListener('click', saveVideoLink);
 
@@ -312,7 +314,57 @@
       byId('calendario-tab')?.addEventListener('click', () => loadProssimeGiornate(false));
       byId('statistiche-tab')?.addEventListener('click', loadStatistiche);
       byId('video-tab')?.addEventListener('click', loadVideoList);
+      byId('classifica-tab')?.addEventListener('click', loadClassifica); // ** NUOVO: Evento per la classifica
     });
+    
+    /* ===== NUOVA FUNZIONE: Classifica Statica ===== */
+    const loadClassifica = () => {
+        const classificaContent = byId('classifica-content');
+        if (!classificaContent) return;
+        
+        // Contenuto statico estratto dal sito romatornei.it
+        classificaContent.innerHTML = `
+            <div class="help">Classifica Campionato Calcio a 8 Over 40 Roma Sud.</div>
+            <div style="overflow-x:auto;">
+                <table class="table" style="min-width: 600px;">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Squadra</th>
+                            <th>P.ti</th>
+                            <th>G</th>
+                            <th>V</th>
+                            <th>N</th>
+                            <th>P</th>
+                            <th>GF</th>
+                            <th>GS</th>
+                            <th>DR</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td>A.C. TUSCOLANO</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>ARCO ROMA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>ATLETICO COLLI ALBANI</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>ATLETICO LEONARDI</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>ATLETICO MADRID</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>BEVERLYNPS</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>DPL TOR PAGNOTTA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>LA RUSTICA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>MARVEL</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>NEGUS OSTIA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>NEW TEAM</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>ROMA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>SUPER TENNENTS F.C.</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>TORRE ANGELA C.G.</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="help" style="margin-top: 10px;">
+                Dati estratti il: ${new Date().toLocaleDateString('it-IT')}. Per la classifica aggiornata, <a href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank">consulta il sito del torneo</a>.
+            </div>
+        `;
+    };
+
 
     /* ===== NUOVE FUNZIONI VIDEO (INTEGRATE) ===== */
 
@@ -1257,7 +1309,7 @@
     <div class="nav-wrap">
       <button id="rosa-tab" class="tab" data-target="rosa-section" aria-current="page" onclick="showPublicSection('rosa-section')">Rosa</button>
       <button id="calendario-tab" class="tab" data-target="calendario-section" onclick="showPublicSection('calendario-section')">Calendario</button>
-      <button id="statistiche-tab" class="tab" data-target="statistiche-section" onclick="showPublicSection('statistiche-section')">Prestazioni</button>
+      <button id="classifica-tab" class="tab" data-target="classifica-section" onclick="showPublicSection('classifica-section')">Classifica</button> <button id="statistiche-tab" class="tab" data-target="statistiche-section" onclick="showPublicSection('statistiche-section')">Prestazioni</button>
       <button id="video-tab" class="tab" data-target="video-section" onclick="showPublicSection('video-section')">Video</button>
       <a class="tab" href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank" rel="noopener">Torneo ↗</a>
       <button id="auth-toggle-btn" class="btn" onclick="handleAuthToggle()" aria-label="Apri il login">Login</button>
@@ -1304,6 +1356,12 @@
       <h2>Prossime giornate</h2>
       <div class="help">Premi “Candidatura” per dare disponibilità. Se pubblicata, puoi vedere la formazione ufficiale. Ordinato dalla più recente.</div>
       <ul id="calendario-list" class="grid cols-3"></ul>
+    </section>
+    
+    <section id="classifica-section" style="display:none">
+      <h2>Classifica</h2>
+      <div id="classifica-content" style="overflow-x:auto;">
+        </div>
     </section>
 
     <section id="statistiche-section" style="display:none">
