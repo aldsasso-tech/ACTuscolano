@@ -5,7 +5,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js">
+/* ===== SCHEDULAZIONE: refresh giornaliero alle 23:00 ===== */
+function msUntilNext(hour, minute = 0, second = 0) {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(hour, minute, second, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  return next - now;
+}
+window.scheduleDailyClassificaRefresh = () => {
+  const ms = msUntilNext(23, 0, 0);
+  const infoEl = document.getElementById('classifica-next-run');
+  if (infoEl) {
+    const when = new Date(Date.now() + ms).toLocaleString('it-IT');
+    infoEl.textContent = `Prossimo aggiornamento: ${when}`;
+  }
+  setTimeout(async function tick() {
+    await loadClassifica();
+    window.scheduleDailyClassificaRefresh();
+  }, ms);
+};
+
+
+/* ===== EFFETTO FADE NAVIGAZIONE (solo .content-section, fix visibilità completa) ===== */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.getAttribute('data-target');
+    const current = document.querySelector('.content-section.active');
+    const next = document.getElementById(target);
+    if (!next || current === next) return;
+
+    if (current) {
+      current.style.opacity = '0';
+      current.style.pointerEvents = 'none';
+      setTimeout(() => {
+        current.classList.remove('active');
+        next.classList.add('active');
+        next.style.opacity = '0';
+        next.style.pointerEvents = 'all';
+        setTimeout(() => { next.style.opacity = '1'; }, 50);
+      }, 400);
+    } else {
+      next.classList.add('active');
+      next.style.opacity = '1';
+      next.style.pointerEvents = 'all';
+    }
+
+    // Aggiorna contenuto dinamico
+    if (target === 'classifica-section' && typeof loadClassifica === 'function') {
+      setTimeout(() => loadClassifica(), 600);
+    }
+  });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const firstSection = document.querySelector('.content-section') || document.querySelector('section');
+  if (firstSection) firstSection.classList.add('active');
+  if (typeof window.scheduleDailyClassificaRefresh === 'function') {
+    window.scheduleDailyClassificaRefresh();
+  }
+});
+);
+
+document.addEventListener('DOMContentLoaded', () => {
+  const firstSection = document.querySelector('section');
+  if (firstSection) firstSection.classList.add('active');
+  if (typeof window.scheduleDailyClassificaRefresh === 'function') {
+    window.scheduleDailyClassificaRefresh();
+  }
+});
+
+</script>
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css"/>
 
@@ -141,7 +212,21 @@
     footer{background:var(--ink-sub);color:#fff;padding:10px 16px;margin-top:22px;font-size:.8rem;text-align:center;border-top:4px solid var(--yellow)}
 
     @media (prefers-reduced-motion: reduce){.tab,.btn{transition:none}}
-  </style>
+  
+
+/* === Effetti di transizione per le sezioni visibili (.content-section) === */
+.content-section {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+.content-section.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+
+</style>
 
   <script type="module">
     /* Firebase v9 (modular) */
@@ -318,52 +403,100 @@
     });
     
    /* ===== NUOVA FUNZIONE: Classifica Statica (Aggiornata con i dati forniti dall'utente) ===== */
-    const loadClassifica = () => {
-        const classificaContent = byId('classifica-content');
-        if (!classificaContent) return;
-        
-        // Contenuto statico aggiornato con i dati corretti forniti
-        classificaContent.innerHTML = `
-            <div class="help">Classifica Campionato Calcio a 8 Over 40 Roma Sud, aggiornata dopo la prima giornata.</div>
-            <div style="overflow-x:auto;">
-                <table class="table" style="min-width: 600px;">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Squadra</th>
-                            <th>P.ti</th>
-                            <th>G</th>
-                            <th>V</th>
-                            <th>N</th>
-                            <th>P</th>
-                            <th>GF</th>
-                            <th>GS</th>
-                            <th>DR</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>1</td><td>A.C. TUSCOLANO</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>7</td><td>0</td><td>7</td></tr>
-                        <tr><td>2</td><td>DPL TOR PAGNOTTA</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>7</td><td>4</td><td>3</td></tr>
-                        <tr><td>3</td><td>MARVEL</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>5</td><td>3</td><td>2</td></tr>
-                        <tr><td>4</td><td>ATLETICO MADRID</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>5</td><td>4</td><td>1</td></tr>
-                        <tr><td>5</td><td>TORRE ANGELA C.G.</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>3</td><td>2</td><td>1</td></tr>
-                        <tr><td>6</td><td>ATLETICO LEONARDI</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>2</td><td>1</td><td>1</td></tr>
-                        <tr><td>7</td><td>ATLETICO COLLI ALBANI</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>3</td><td>3</td><td>0</td></tr>
-                        <tr><td>7</td><td>NEGUS OSTIA</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>3</td><td>3</td><td>0</td></tr>
-                        <tr><td>9</td><td>ARCO ROMA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>4</td><td>5</td><td>-1</td></tr>
-                        <tr><td>10</td><td>BEVERLYNPS</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>2</td><td>3</td><td>-1</td></tr>
-                        <tr><td>11</td><td>LA RUSTICA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>2</td><td>-1</td></tr>
-                        <tr><td>12</td><td>NEW TEAM</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>3</td><td>5</td><td>-2</td></tr>
-                        <tr><td>13</td><td>ROMA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>4</td><td>7</td><td>-3</td></tr>
-                        <tr><td>14</td><td>SUPER TENNENTS F.C.</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>7</td><td>-7</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="help" style="margin-top: 10px;">
-                Dati estratti il: **${new Date().toLocaleDateString('it-IT')}**</a>.
-            </div>
-        `;
-    };
+    
+/* ===== FUNZIONE: Classifica AC Tuscolano con cache Firebase (solo admin aggiorna) ===== */
+const loadClassifica = async () => {
+  const classificaContent = document.getElementById('classifica-content');
+  if (!classificaContent) return;
+
+  classificaContent.innerHTML = `<div class="help">Caricamento classifica in corso...</div>`;
+
+  try {
+    const now = new Date();
+    const todayKey = now.toISOString().split('T')[0];
+    const snap = await get(ref(db, 'classifica_cache'));
+    const cache = snap.val() || {};
+    const cachedHtml = cache.html;
+    const cachedDate = cache.date;
+
+    if (cachedHtml && cachedDate === todayKey) {
+      classificaContent.innerHTML = cachedHtml;
+      return;
+    }
+
+    if (!isAdmin) {
+      if (cachedHtml) {
+        classificaContent.innerHTML = cachedHtml;
+      } else {
+        classificaContent.innerHTML = `<div class="help" style="color:red">La classifica non è ancora disponibile. L'amministratore provvederà all'aggiornamento.</div>`;
+      }
+      return;
+    }
+
+    const url = "https://www.romatornei.it/calcio-a-8-over-40-roma-sud/";
+    const proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(url) + "&cacheBust=" + Date.now();
+    const response = await fetch(proxy);
+    const data = await response.json();
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.contents, "text/html");
+    const table = doc.querySelector(".table-responsive table") || doc.querySelector("table[class*='table']") || doc.querySelector("table");
+
+    if (!table) {
+      classificaContent.innerHTML = `<div class="help">Impossibile trovare la classifica sul sito remoto.</div>`;
+      return;
+    }
+
+    // Stile AC Tuscolano
+    table.querySelectorAll("img").forEach(img => {
+      img.style.maxWidth = "25px";
+      img.style.height = "auto";
+      img.style.verticalAlign = "middle";
+    });
+
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+    table.querySelectorAll("th").forEach(th => {
+      th.style.backgroundColor = "#8B0000";
+      th.style.color = "#fff";
+      th.style.padding = "8px";
+      th.style.textAlign = "center";
+      th.style.borderBottom = "2px solid #ccc";
+    });
+    table.querySelectorAll("td").forEach(td => {
+      td.style.padding = "8px";
+      td.style.textAlign = "center";
+      td.style.borderBottom = "1px solid #ddd";
+    });
+    table.querySelectorAll("tr:nth-child(even)").forEach(tr => {
+      tr.style.backgroundColor = "#f8f8f8";
+    });
+
+    const htmlContent = `
+      <div class="help">Classifica aggiornata automaticamente da <a href="${url}" target="_blank" rel="noopener">romatornei.it</a></div>
+      <div style="overflow-x:auto;">${table.outerHTML}</div>
+      <div class="help" style="margin-top:8px;">Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}</div>
+      <div id="classifica-next-run" class="help" style="margin-top:4px;"></div>
+    `;
+
+    classificaContent.innerHTML = htmlContent;
+    await set(ref(db, 'classifica_cache'), {
+      html: htmlContent,
+      date: todayKey,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error("Errore caricamento classifica:", error);
+    const snapFallback = await get(ref(db, 'classifica_cache'));
+    const cache = snapFallback.val();
+    if (cache && cache.html) {
+      classificaContent.innerHTML = cache.html;
+    } else {
+      classificaContent.innerHTML = `<div class="help" style="color:red">Errore nel recupero della classifica.</div>`;
+    }
+  }
+};
+
 
 
     /* ===== NUOVE FUNZIONI VIDEO (INTEGRATE) ===== */
