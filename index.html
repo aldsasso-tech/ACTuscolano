@@ -318,52 +318,84 @@
     });
     
    /* ===== NUOVA FUNZIONE: Classifica Statica (Aggiornata con i dati forniti dall'utente) ===== */
-    const loadClassifica = () => {
-        const classificaContent = byId('classifica-content');
-        if (!classificaContent) return;
-        
-        // Contenuto statico aggiornato con i dati corretti forniti
-        classificaContent.innerHTML = `
-            <div class="help">Classifica Campionato Calcio a 8 Over 40 Roma Sud, aggiornata dopo la prima giornata.</div>
-            <div style="overflow-x:auto;">
-                <table class="table" style="min-width: 600px;">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Squadra</th>
-                            <th>P.ti</th>
-                            <th>G</th>
-                            <th>V</th>
-                            <th>N</th>
-                            <th>P</th>
-                            <th>GF</th>
-                            <th>GS</th>
-                            <th>DR</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>1</td><td>A.C. TUSCOLANO</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>7</td><td>0</td><td>7</td></tr>
-                        <tr><td>2</td><td>DPL TOR PAGNOTTA</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>7</td><td>4</td><td>3</td></tr>
-                        <tr><td>3</td><td>MARVEL</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>5</td><td>3</td><td>2</td></tr>
-                        <tr><td>4</td><td>ATLETICO MADRID</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>5</td><td>4</td><td>1</td></tr>
-                        <tr><td>5</td><td>TORRE ANGELA C.G.</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>3</td><td>2</td><td>1</td></tr>
-                        <tr><td>6</td><td>ATLETICO LEONARDI</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>2</td><td>1</td><td>1</td></tr>
-                        <tr><td>7</td><td>ATLETICO COLLI ALBANI</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>3</td><td>3</td><td>0</td></tr>
-                        <tr><td>7</td><td>NEGUS OSTIA</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>3</td><td>3</td><td>0</td></tr>
-                        <tr><td>9</td><td>ARCO ROMA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>4</td><td>5</td><td>-1</td></tr>
-                        <tr><td>10</td><td>BEVERLYNPS</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>2</td><td>3</td><td>-1</td></tr>
-                        <tr><td>11</td><td>LA RUSTICA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>2</td><td>-1</td></tr>
-                        <tr><td>12</td><td>NEW TEAM</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>3</td><td>5</td><td>-2</td></tr>
-                        <tr><td>13</td><td>ROMA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>4</td><td>7</td><td>-3</td></tr>
-                        <tr><td>14</td><td>SUPER TENNENTS F.C.</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>7</td><td>-7</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="help" style="margin-top: 10px;">
-                Dati estratti il: **${new Date().toLocaleDateString('it-IT')}**</a>.
-            </div>
-        `;
-    };
+    
+/* ===== FUNZIONE: Classifica automatica da romatornei.it ===== */
+const loadClassifica = async () => {
+  const classificaContent = document.getElementById('classifica-content');
+  if (!classificaContent) return;
+  
+  classificaContent.innerHTML = `<div class="help">Caricamento classifica in corso...</div>`;
+
+  try {
+    // cache-buster per evitare risposte cached dal proxy
+    const url = "https://www.romatornei.it/calcio-a-8-over-40-roma-sud/";
+    const proxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(url) + "&cacheBust=" + Date.now();
+
+    const response = await fetch(proxy);
+    const data = await response.json();
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.contents, "text/html");
+
+    // Prova selettori comuni (adatta se cambiano sul sito)
+    const table =
+      doc.querySelector(".table-responsive table") ||
+      doc.querySelector("table[class*='table']") ||
+      doc.querySelector("table");
+
+    if (!table) {
+      classificaContent.innerHTML = `<div class="help">Impossibile trovare la classifica sul sito remoto.</div>`;
+      return;
+    }
+
+    classificaContent.innerHTML = `
+      <div class="help">Classifica aggiornata automaticamente da <a href="${url}" target="_blank" rel="noopener">romatornei.it</a></div>
+      <div style="overflow-x:auto;">${table.outerHTML}</div>
+      <div class="help" style="margin-top:8px;">Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}</div>
+      <div id="classifica-next-run" class="help" style="margin-top:4px;"></div>
+    `;
+
+    // Allinea lo stile al tuo tema
+    const importedTable = classificaContent.querySelector("table");
+    if (importedTable) {
+      importedTable.classList.add("table");
+      importedTable.querySelectorAll("th").forEach(th => th.style.color = "var(--red)");
+    }
+  } catch (error) {
+    console.error("Errore caricamento classifica:", error);
+    classificaContent.innerHTML = `<div class="help" style="color:red">Errore nel recupero della classifica.</div>`;
+  }
+};
+
+
+/* ===== SCHEDULAZIONE: refresh giornaliero alle 23:00 ===== */
+function msUntilNext(hour, minute = 0, second = 0) {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(hour, minute, second, 0);
+  if (next <= now) next.setDate(next.getDate() + 1); // se 23:00 è già passato, vai a domani
+  return next - now;
+}
+
+window.scheduleDailyClassificaRefresh = () => {
+  const infoEl = document.getElementById('classifica-next-run');
+
+  const schedule = () => {
+    const ms = msUntilNext(23, 0, 0); // 23:00
+    if (infoEl) {
+      const when = new Date(Date.now() + ms).toLocaleString('it-IT');
+      infoEl.textContent = `Prossimo aggiornamento: ${when}`;
+    }
+
+    setTimeout(async function tick() {
+      await loadClassifica();  // aggiorna ai successivi 23:00
+      schedule();              // riprogramma (ok anche con cambio ora legale)
+    }, ms);
+  };
+
+  schedule();
+};
+
 
 
     /* ===== NUOVE FUNZIONI VIDEO (INTEGRATE) ===== */
@@ -1536,3 +1568,4 @@
   </footer>
 </body>
 </html>
+
