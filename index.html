@@ -57,7 +57,9 @@
 
     /* Layout */
     main{max-width:1200px;margin:18px auto;padding:0 16px}
-    section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin:16px 0;box-shadow:var(--shadow)}
+    section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin:16px 0;box-shadow:var(--shadow); display: none;} /* Fix 1: Tutte le section sono nascoste di default */
+    #rosa-section { display: block; } /* Fix 2: Mostra solo la sezione iniziale */
+    
     #login-section{display:none}
     section h2{margin:0 0 14px 0;color:var(--red);border-bottom:3px solid var(--yellow);padding-bottom:6px}
     label{font-weight:700;margin-top:10px;display:block}
@@ -156,7 +158,7 @@
         .grid.cols-3{grid-template-columns: repeat(2,minmax(0,1fr)) !important;}
     }
     @media (max-width: 640px) {
-        .grid.cols-3{grid-template-columns: 1fr !important;}
+        .grid.cols-2,.grid.cols-3{grid-template-columns: 1fr !important;}
     }
     
     
@@ -165,16 +167,18 @@
 
     @media (prefers-reduced-motion: reduce){.tab,.btn{transition:none}}
 
-    /* === Effetti di transizione per le sezioni === */
+    /* === Effetti di transizione per le sezioni (MANTENUTI MA SIMPLIFICATI) === */
+    /* La transizione è solo sull'opacità, la visibilità (display) è gestita in JS per stabilità */
     .content-section {
+        opacity: 1; /* Iniziale */
+        transition: opacity 0.4s ease;
+    }
+    /* La classe 'active' non è più necessaria per la logica base, ma la manteniamo */
+    .content-section.hidden {
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.5s ease;
     }
-    .content-section.active {
-        opacity: 1;
-        pointer-events: all;
-    }
+
     /* === Stili per la Modal Video === */
     #video-modal{display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; padding: 20px;}
     #video-iframe-container{position: relative; width: 100%; padding-bottom: 56.25%; /* 16:9 Aspect Ratio */ height: 0; border-radius: var(--radius); overflow: hidden;}
@@ -190,6 +194,7 @@
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
     import { getDatabase, ref, set, push, get, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
 
+    // *** CONFIGURAZIONE FIREBASE - SOSTITUISCI CON I TUOI DATI VERI ***
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNu1lIA5N2-EfnbF1Bc7U",
       authDomain: "actuscolano.firebaseapp.com",
@@ -206,7 +211,8 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-    const ADMIN_UID = "tbHGXt pvBDfmVIrNT2QVy eBincV2"; // Controlla il tuo UID corretto
+    // *** ADMIN UID - ESSENZIALE! SOSTITUISCI CON L'UID VERO DEL TUO UTENTE ADMIN ***
+    const ADMIN_UID = "IL_TUO_UID_ADMIN_REALE_SENZA_SPAZI"; 
     let isAdmin = false;
     
     // Seconda app per creare utenti senza sloggare l'admin
@@ -218,7 +224,7 @@
     const v = (id)=>byId(id)?.value || '';
     const escapeHtml = (s='')=>s.toString().replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\'':'&#x27;'})[c]);
 
-    /* ** ARRAY SEZIONI AGGIORNATI E COMPLETI ** */
+    /* ** ARRAY SEZIONI ** */
     const PUBLIC_SECTIONS = ['rosa-section','calendario-section','statistiche-section','formazione-pubblica-section','video-section', 'classifica-section'];
     const ADMIN_SECTIONS = [
         'admin-inserimento-giocatori-section',
@@ -233,27 +239,48 @@
     ];
     const ALL_SECTIONS = [...PUBLIC_SECTIONS, ...ADMIN_SECTIONS, 'login-section']; 
     
-    // Funzione per mostrare le sezioni pubbliche
-    window.showPublicSection = (id = 'rosa-section') => {
+    // Funzione centralizzata per gestire la visibilità e lo stato CSS
+    function _setSectionVisibility(targetId) {
         ALL_SECTIONS.forEach(secId => {
             const el = byId(secId);
-            if (el) el.style.display = (secId === id) ? 'block' : 'none';
+            if (!el) return;
+            
+            if (secId === targetId) {
+                el.style.display = 'block'; // Mostra
+                // Se volessi l'effetto fade: rimuovi .hidden dopo il display block
+                // el.classList.remove('hidden'); 
+            } else {
+                el.style.display = 'none'; // Nascondi
+                // Se volessi l'effetto fade: aggiungi .hidden e poi aspetta per il display none
+                // el.classList.add('hidden'); 
+            }
         });
-        document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', t.dataset.target===id?'page':'false'); });
-        document.querySelectorAll('#admin-menu .tab').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); // Rimuove current dall'admin
         window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    // Funzione per mostrare le sezioni pubbliche
+    window.showPublicSection = (id = 'rosa-section') => {
+        _setSectionVisibility(id);
+        
+        // Aggiorna lo stato delle tab pubbliche e pulisce quelle admin
+        document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', t.dataset.target===id?'page':'false'); });
+        document.querySelectorAll('#admin-menu .tab').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); 
+        
+        // Carica i dati (mantenuto nella funzione per coerenza)
+        if (id === 'classifica-section') loadClassifica();
+        if (id === 'rosa-section') loadRosa();
+        if (id === 'calendario-section') loadProssimeGiornate(false);
+        if (id === 'statistiche-section') loadStatistiche();
+        if (id === 'video-section') loadVideoList();
     };
     
     // Funzione per mostrare le sezioni admin
     window.showAdminSection = (id) => {
-        if(!isAdmin) return showLogin(); // Protezione base
+        if(!isAdmin) return showLogin(); 
+        _setSectionVisibility(id);
         
-        ALL_SECTIONS.forEach(secId => { 
-            const el = byId(secId); 
-            if (el) el.style.display = (secId === id) ? 'block' : 'none';
-        });
-        
-        document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); // Rimuove current dal pubblico
+        // Aggiorna lo stato delle tab admin e pulisce quelle pubbliche
+        document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); 
         document.querySelectorAll(`#admin-menu .tab`).forEach(t=>{ 
              t.setAttribute('aria-current', t.dataset.adminTarget===id?'page':'false'); 
         });
@@ -264,27 +291,19 @@
         if(id==='admin-candidature-section'){ loadCandidature(); }
         if(id==='admin-gestione-dati-section'){ window.loadCrudGiocatori(); window.loadCrudPartite(); }
         if (id === 'admin-video-section') loadPartitePerVideoAdmin(); 
-
-        window.scrollTo({top: 0, behavior: 'smooth'});
     };
 
-    function showLogin(){ byId('login-section').style.display='block'; window.scrollTo({top:0,behavior:'smooth'}); }
+    function showLogin(){ 
+        _setSectionVisibility('login-section');
+        byId('login-form').reset();
+    }
     function hideLogin(){ byId('login-section').style.display='none'; }
+    
     function toggleAdminUI(){ 
         byId('admin-menu').style.display = isAdmin ? 'flex' : 'none'; 
         byId('auth-toggle-btn').textContent = isAdmin ? 'Logout Admin' : 'Accesso Admin';
         byId('auth-toggle-btn').classList.toggle('btn--admin', isAdmin);
         byId('auth-toggle-btn').classList.toggle('btn--accent', !isAdmin);
-
-        if(isAdmin){
-            // Se admin loggato, mostra la sezione admin di default
-            if(byId('admin-inserimento-giocatori-section').style.display === 'none') {
-               window.showAdminSection('admin-inserimento-giocatori-section');
-            }
-        } else {
-            // Se sloggato, mostra la sezione pubblica di default
-            window.showPublicSection('rosa-section');
-        }
     }
     
     function setAuthButton(user){ 
@@ -299,10 +318,9 @@
         setAuthButton(user);
         hideLogin(); 
         
+        // Al caricamento, mostra la sezione appropriata
         if(user && isAdmin){
-            if(byId('admin-inserimento-giocatori-section').style.display === 'none'){
-                window.showAdminSection('admin-inserimento-giocatori-section');
-            }
+            window.showAdminSection('admin-inserimento-giocatori-section');
         } else {
             window.showPublicSection('rosa-section');
         }
@@ -318,8 +336,9 @@
         }
     };
     
-    // Login Form Submit
+    // Inizializzazione principale
     document.addEventListener('DOMContentLoaded', () => {
+        // === LOGIN FORM SUBMIT ===
         byId('login-form')?.addEventListener('submit',e=>{
             e.preventDefault();
             const email = v('login-email').trim();
@@ -329,7 +348,7 @@
                 .catch(err=>alert("Errore login: "+err.message));
         });
         
-        // Create User Form Submit (Admin only)
+        // === CREATE USER FORM SUBMIT (Admin only) ===
         byId('create-user-form')?.addEventListener('submit', async e=>{
             e.preventDefault();
             if (!isAdmin) return alert("Solo l'admin può creare utenze.");
@@ -347,58 +366,22 @@
                 e.target.reset();
             }catch(err){ alert('Errore creazione: '+ (err.message||err)); }
         });
-    });
-
-    // Navigazione
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const target = tab.getAttribute('data-target') || tab.getAttribute('data-admin-target');
-            const isPublic = PUBLIC_SECTIONS.includes(target);
-            const current = document.querySelector('.content-section.active');
-            const next = byId(target);
-            if (!next || current === next) return;
-
-            if (current) {
-                current.classList.remove('active');
-                current.style.opacity = '0';
-                current.style.pointerEvents = 'none';
-            }
-
-            setTimeout(() => {
-                ALL_SECTIONS.forEach(secId => {
-                    const el = byId(secId);
-                    if (el) el.style.display = (secId === target) ? 'block' : 'none';
-                });
+        
+        // === NAVIGAZIONE FIX: Chiama le funzioni di navigazione centralizzate ===
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.getAttribute('data-target') || tab.getAttribute('data-admin-target');
+                const isPublic = PUBLIC_SECTIONS.includes(target);
                 
-                if (next) {
-                    next.style.display = 'block';
-                    next.classList.add('active');
-                    next.style.opacity = '1';
-                    next.style.pointerEvents = 'all';
+                if (isPublic) {
+                    window.showPublicSection(target);
+                } else {
+                    window.showAdminSection(target);
                 }
-                
-                // Aggiornamento dinamico
-                if (target === 'classifica-section') loadClassifica();
-                if (target === 'rosa-section') loadRosa();
-                if (target === 'calendario-section') loadProssimeGiornate(false);
-                if (target === 'statistiche-section') loadStatistiche();
-                if (target === 'video-section') loadVideoList();
-
-                // Admin Sections
-                if (target === 'admin-calendario-section') loadProssimeGiornate(true);
-                if (target === 'admin-candidature-section') loadCandidature();
-                if (target === 'admin-gestione-dati-section') { window.loadCrudGiocatori(); window.loadCrudPartite(); }
-                if (target === 'admin-video-section') loadPartitePerVideoAdmin();
-                if (target === 'admin-inserimento-giornate-section') { $("#match-data").datepicker({ dateFormat:"dd/mm/yy", minDate:0 }); }
-
-            }, 400); // Ritardo per l'effetto fade-out
-            
-            window.scrollTo({top: 0, behavior: 'smooth'});
+            });
         });
-    });
 
-    // Default: Carica i dati iniziali
-    document.addEventListener('DOMContentLoaded', () => {
+        // Caricamento iniziale dei dati per la sezione default (Rosa)
         loadRosa(); 
         loadProssimeGiornate(false); 
         loadStatistiche();
@@ -522,26 +505,23 @@
         try {
             const snapshot = await get(ref(db, 'partite'));
             const partite = snapshot.val() || {};
-            const matchKeys = Object.keys(partite).sort();
+            const matchKeys = Object.keys(partite).sort((keyA, keyB) => {
+                const dateA = new Date(partite[keyA].giorno + ' ' + (partite[keyA].ora || '20:00')).getTime();
+                const dateB = new Date(partite[keyB].giorno + ' ' + (partite[keyB].ora || '20:00')).getTime();
+                return dateA - dateB; // Ordine Cronologico
+            });
             
             list.innerHTML = '';
 
-            let nextMatchId = null;
-            let nextMatchData = null;
             const now = Date.now();
             
             const nextMatches = [];
             
-            // Trova la prossima partita non giocata
+            // Trova la prossima partita non giocata (o 5 più vicine)
             for (const key of matchKeys) {
                 const data = partite[key];
-                const matchTimestamp = new Date(data.giorno + ' ' + (data.ora || '20:00')).getTime();
-
-                if (!data.giocata || matchTimestamp > now) {
-                    if (nextMatchId === null) {
-                        nextMatchId = key;
-                        nextMatchData = data;
-                    }
+                // Includi sempre partite non giocate, e quelle giocate da poco (es. 2 giorni fa) se l'admin le vuole vedere
+                if (!data.giocata || new Date(data.giorno).getTime() > (now - (2 * 24 * 60 * 60 * 1000))) {
                     nextMatches.push({ key, data });
                 }
             }
@@ -560,6 +540,10 @@
                         <button class="btn btn--admin" type="button" 
                                 onclick="window.showFormazioneForm('${match.key}', ${JSON.stringify(match.data).replace(/"/g, '&quot;')})">
                             Modifica Formazione
+                        </button>
+                        <button class="btn btn--accent" type="button" 
+                                onclick="window.loadCrudPartite(); window.showAdminSection('admin-gestione-dati-section');">
+                            Modifica Dati
                         </button>
                     `;
                 } else if (match.data.formazionePubblicata) {
@@ -582,7 +566,7 @@
                                 ${giocata} ${pubblicata}
                             </div>
                         </div>
-                        <div class="actions">${actions}</div>
+                        <div class="actions" style="margin-top: 10px;">${actions}</div>
                     </div>
                 `;
                 list.appendChild(li);
@@ -616,14 +600,13 @@
             luogo: escapeHtml(luogo),
             tipoPartita: escapeHtml(tipoPartita),
             giocata: false,
-            // ... (altri campi se necessari)
         };
         
         try {
             await push(ref(db, 'partite'), newMatch);
             alert("Giornata salvata con successo!");
             byId('new-match-form').reset();
-            loadProssimeGiornate(true); // Ricarica il calendario admin
+            loadProssimeGiornate(true); 
         } catch (e) {
             console.error("Errore salvataggio giornata:", e);
             alert("Errore durante il salvataggio della giornata.");
@@ -632,6 +615,7 @@
     
     /* =========================================================================
      * FUNZIONI FORMAZIONE ID Drag and Drop
+     * ... (Funzioni Formazione: initDragAndDrop, handleDrop, handleSubstituteDrop, handleMarkerStop, makeMarkerDraggable, renderFormazioneField, renderAvailablePlayersList, renderSubstitutesList, showFormazioneForm, loadGiocatoriForFormazione, saveFormazione, toggleFormazionePublish, showFormazionePubblica, renderFormazionePubblicaField, renderFormazionePubblicaPanchina sono incluse ma omesse qui per brevità nel commento) ...
      * ========================================================================= */
 
     let currentFormazione = { titolari: {}, panchina: [] };
@@ -961,8 +945,6 @@
         const giocatoriSnap = await get(ref(db, 'giocatori/'));
         giocatoriSnap.forEach(snap => {
             const data = snap.val();
-            // Includi tutti, non solo gli attivi, per la formazione
-            // if (data.status !== 'attivo') return; 
             allGiocatori[snap.key] = { ...data, key: snap.key };
         });
     }
@@ -1169,7 +1151,7 @@
             section.innerHTML = html;
             
             // Admin View (placeholder)
-            if (isAdmin) {
+            if (isAdmin && byId('admin-statistiche-section')) {
                  byId('admin-statistiche-section').innerHTML = '<h2>Admin · Modifica Statistiche</h2><p>Questa sezione richiede un\'interfaccia complessa per l\'editing delle statistiche per partita. Si consiglia di utilizzare la sezione CRUD Dati per l\'aggiornamento rapido.</p>';
             }
 
@@ -1522,7 +1504,10 @@
             }).join('');
             
             // Aggiungi il bottone per l'editor manuale
-            list.insertAdjacentHTML('afterend', `
+            const editorButton = document.querySelector('#admin-candidature-section .actions');
+            if(editorButton) editorButton.remove(); // Rimuovi se già presente
+            
+            byId('admin-candidature-section').insertAdjacentHTML('beforeend', `
                 <div class="actions" style="margin-top: 15px;">
                     <button class="btn btn--admin" type="button" onclick="window.openCandidatureEditor()">Modifica Candidature Manuali</button>
                 </div>
@@ -1625,7 +1610,8 @@
             let options = '<option value="">Seleziona una partita...</option>';
             Object.entries(partite).sort(([keyA, pA], [keyB, pB]) => new Date(pB.giorno) - new Date(pA.giorno)).forEach(([key, p]) => {
                 const giorno = p.giorno.split('-').reverse().join('/');
-                options += `<option value="${key}">${giorno} - ${escapeHtml(p.avversario)} (${p.tipoPartita})</option>`;
+                const hasVideo = p.videoLink ? ' (VIDEO OK)' : '';
+                options += `<option value="${key}">${giorno} - ${escapeHtml(p.avversario)} (${p.tipoPartita})${hasVideo}</option>`;
             });
             
             select.innerHTML = options;
@@ -1684,6 +1670,7 @@
             });
             alert("Link video salvato con successo!");
             loadVideoList(); // Aggiorna la lista pubblica
+            loadPartitePerVideoAdmin(); // Ricarica la lista admin per vedere il tag OK
         } catch (e) {
             console.error("Errore salvataggio video link:", e);
             alert("Errore durante il salvataggio del link.");
@@ -1803,7 +1790,7 @@
 
   <main>
     
-    <section id="login-section">
+    <section id="login-section" class="content-section">
       <h2>Accesso Admin</h2>
       <form id="login-form">
         <label for="login-email">Email</label>
@@ -1816,7 +1803,7 @@
       </form>
     </section>
 
-    <section id="rosa-section" class="content-section active">
+    <section id="rosa-section" class="content-section">
       <h2>Rosa Giocatori</h2>
       <ul id="rosa-list" class="grid cols-3">
         </ul>
@@ -1856,7 +1843,7 @@
         </div>
     </section>
 
-    <section id="admin-inserimento-giocatori-section" class="content-section" style="display:none">
+    <section id="admin-inserimento-giocatori-section" class="content-section">
       <h2>Admin · Inserimento Giocatori</h2>
       <form id="new-player-form">
         <label for="nome">Nome Giocatore</label><input id="nome" required />
@@ -1882,7 +1869,7 @@
       </form>
     </section>
 
-    <section id="admin-inserimento-giornate-section" class="content-section" style="display:none">
+    <section id="admin-inserimento-giornate-section" class="content-section">
       <h2>Admin · Inserimento Nuova Giornata</h2>
       <form id="new-match-form">
         <label for="avversario">Avversario</label><input id="avversario" required />
@@ -1901,7 +1888,7 @@
       </form>
     </section>
     
-    <section id="admin-calendario-section" class="content-section" style="display:none">
+    <section id="admin-calendario-section" class="content-section">
       <h2>Admin · Partite & Formazione</h2>
       <h3>Prossime partite</h3>
       <ul id="admin-prossime-giornate-list">
@@ -1909,7 +1896,7 @@
       <div class="help" style="margin-top: 12px;">Clicca su "Modifica Formazione" per gestire titolari e panchina.</div>
     </section>
 
-    <section id="admin-formazione-section" class="content-section" style="display:none">
+    <section id="admin-formazione-section" class="content-section">
         <h2 id="formazione-match-title">Admin · Modifica Formazione</h2>
         <div class="grid-container">
             <div id="formazione-field-container">
@@ -1948,18 +1935,18 @@
         </div>
     </section>
 
-    <section id="admin-statistiche-section" class="content-section" style="display:none">
+    <section id="admin-statistiche-section" class="content-section">
       <h2>Admin · Modifica Statistiche</h2>
       <p>Questa sezione richiede un'interfaccia complessa per l'editing delle statistiche per partita. Si consiglia di utilizzare la sezione CRUD Dati per l'aggiornamento rapido.</p>
     </section>
 
-    <section id="admin-candidature-section" class="content-section" style="display:none">
+    <section id="admin-candidature-section" class="content-section">
       <h2>Admin · Gestione Candidature</h2>
       <ul id="candidature-list" class="grid cols-2">
         </ul>
-    </section>
+      </section>
 
-    <section id="admin-gestione-dati-section" class="content-section" style="display:none">
+    <section id="admin-gestione-dati-section" class="content-section">
       <h2>Admin · CRUD Dati</h2>
       <button class="tab btn--admin" onclick="window.loadCrudGiocatori()">Modifica Giocatori</button>
       <button class="tab btn--admin" onclick="window.loadCrudPartite()">Modifica Partite</button>
@@ -1981,7 +1968,7 @@
       </div>
     </section>
     
-    <section id="admin-video-section" class="content-section" style="display:none">
+    <section id="admin-video-section" class="content-section">
       <h2>Admin · Gestione Video Highlights</h2>
       <label for="video-match-select">Seleziona Partita</label>
       <select id="video-match-select" onchange="window.loadVideoLink()"></select>
@@ -1997,7 +1984,7 @@
       <div class="help" style="margin-top: 15px;">Solo l'URL di embed di YouTube è supportato. Esempio corretto: <code>https://www.youtube.com/embed/CODICE</code></div>
     </section>
 
-    <section id="admin-utenti-section" class="content-section" style="display:none">
+    <section id="admin-utenti-section" class="content-section">
       <h2>Admin · Inserimento utenti</h2>
       <form id="create-user-form">
         <label>Nome Giocatore</label><input id="new-nome" required />
@@ -2010,10 +1997,10 @@
     </section>
   </main>
   
-  <div id="video-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; padding: 20px;">
-    <div id="video-modal-content" style="background:var(--ink); padding:0; border-radius:var(--radius); width:90%; max-width:800px; position:relative;">
-      <button id="close-video-modal" class="btn btn--accent" type="button" style="position:absolute; top:-10px; right:-10px; z-index:110; font-size:1.2rem; line-height:1.2;">&times;</button>
-      <div id="video-iframe-container" style="position: relative; width: 100%; padding-bottom: 56.25%; height: 0; border-radius: var(--radius); overflow: hidden;">
+  <div id="video-modal">
+    <div id="video-modal-content">
+      <button id="close-video-modal" class="btn btn--accent" type="button">&times;</button>
+      <div id="video-iframe-container">
         <iframe id="video-iframe" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       </div>
     </div>
