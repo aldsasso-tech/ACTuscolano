@@ -317,14 +317,14 @@
       byId('classifica-tab')?.addEventListener('click', loadClassifica); // ** NUOVO: Evento per la classifica
     });
     
-    /* ===== NUOVA FUNZIONE: Classifica Statica ===== */
+   /* ===== NUOVA FUNZIONE: Classifica Statica (Aggiornata) ===== */
     const loadClassifica = () => {
         const classificaContent = byId('classifica-content');
         if (!classificaContent) return;
         
-        // Contenuto statico estratto dal sito romatornei.it
+        // Contenuto statico estratto dal sito romatornei.it (Classifica aggiornata)
         classificaContent.innerHTML = `
-            <div class="help">Classifica Campionato Calcio a 8 Over 40 Roma Sud.</div>
+            <div class="help">Classifica Campionato Calcio a 8 Over 40 Roma Sud, aggiornata dopo la prima giornata.</div>
             <div style="overflow-x:auto;">
                 <table class="table" style="min-width: 600px;">
                     <thead>
@@ -342,25 +342,25 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td>1</td><td>A.C. TUSCOLANO</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>ARCO ROMA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>ATLETICO COLLI ALBANI</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>ATLETICO LEONARDI</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>ATLETICO MADRID</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>BEVERLYNPS</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>DPL TOR PAGNOTTA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>LA RUSTICA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>MARVEL</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>NEGUS OSTIA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>NEW TEAM</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>ROMA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>SUPER TENNENTS F.C.</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                        <tr><td>1</td><td>TORRE ANGELA C.G.</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                        <tr><td>1</td><td>ATLETICO MADRID</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>5</td><td>0</td><td>5</td></tr>
+                        <tr><td>1</td><td>ATLETICO COLLI ALBANI</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>5</td><td>1</td><td>4</td></tr>
+                        <tr><td>1</td><td>NEW TEAM</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>4</td><td>1</td><td>3</td></tr>
+                        <tr><td>1</td><td>TORRE ANGELA C.G.</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>4</td><td>2</td><td>2</td></tr>
+                        <tr><td>1</td><td>ROMA</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>3</td><td>1</td><td>2</td></tr>
+                        <tr><td>1</td><td>A.C. TUSCOLANO</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>3</td><td>2</td><td>1</td></tr>
+                        <tr><td>1</td><td>LA RUSTICA</td><td>3</td><td>1</td><td>1</td><td>0</td><td>0</td><td>3</td><td>2</td><td>1</td></tr>
+                        <tr><td>1</td><td>DPL TOR PAGNOTTA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>3</td><td>-2</td></tr>
+                        <tr><td>1</td><td>SUPER TENNENTS F.C.</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>2</td><td>3</td><td>-1</td></tr>
+                        <tr><td>1</td><td>BEVERLYNPS</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>2</td><td>4</td><td>-2</td></tr>
+                        <tr><td>1</td><td>ATLETICO LEONARDI</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>2</td><td>4</td><td>-2</td></tr>
+                        <tr><td>1</td><td>MARVEL</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>4</td><td>-3</td></tr>
+                        <tr><td>1</td><td>ARCO ROMA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td><td>5</td><td>-5</td></tr>
+                        <tr><td>1</td><td>NEGUS OSTIA</td><td>0</td><td>1</td><td>0</td><td>0</td><td>1</td><td>1</td><td>5</td><td>-4</td></tr>
                     </tbody>
                 </table>
             </div>
             <div class="help" style="margin-top: 10px;">
-                Dati estratti il: ${new Date().toLocaleDateString('it-IT')}. Per la classifica aggiornata, <a href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank">consulta il sito del torneo</a>.
+                Dati estratti il: **${new Date().toLocaleDateString('it-IT')}**. Per la classifica più recente, <a href="https://www.romatornei.it/calcio-a-8-over-40-roma-sud/" target="_blank">consulta il sito del torneo</a>.
             </div>
         `;
     };
