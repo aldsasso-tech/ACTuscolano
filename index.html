@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css"/>
+
+  <script>
 /* ===== SCHEDULAZIONE: refresh giornaliero alle 23:00 ===== */
 function msUntilNext(hour, minute = 0, second = 0) {
   const now = new Date();
@@ -22,7 +26,10 @@ window.scheduleDailyClassificaRefresh = () => {
     infoEl.textContent = `Prossimo aggiornamento: ${when}`;
   }
   setTimeout(async function tick() {
-    await loadClassifica();
+    // La funzione loadClassifica viene definita nello script modulare (Firebase)
+    if (typeof loadClassifica === 'function') {
+      await loadClassifica();
+    }
     window.scheduleDailyClassificaRefresh();
   }, ms);
 };
@@ -47,6 +54,8 @@ document.querySelectorAll('.tab').forEach(tab => {
         setTimeout(() => { next.style.opacity = '1'; }, 50);
       }, 400);
     } else {
+      // Caso iniziale: nessuna sezione attiva
+      document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
       next.classList.add('active');
       next.style.opacity = '1';
       next.style.pointerEvents = 'all';
@@ -60,27 +69,17 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  const firstSection = document.querySelector('.content-section') || document.querySelector('section');
+  // Imposta la prima sezione pubblica come attiva all'avvio
+  const firstSection = document.querySelector('.content-section');
   if (firstSection) firstSection.classList.add('active');
+  
+  // Avvia lo scheduler
   if (typeof window.scheduleDailyClassificaRefresh === 'function') {
     window.scheduleDailyClassificaRefresh();
   }
 });
-);
-
-document.addEventListener('DOMContentLoaded', () => {
-  const firstSection = document.querySelector('section');
-  if (firstSection) firstSection.classList.add('active');
-  if (typeof window.scheduleDailyClassificaRefresh === 'function') {
-    window.scheduleDailyClassificaRefresh();
-  }
-});
-
 </script>
-  <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
-  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/base/jquery-ui.css"/>
-
-  <style>
+<style>
     /* CSS originale */
     :root{
       /* Brand */
@@ -282,7 +281,34 @@ document.addEventListener('DOMContentLoaded', () => {
     window.showPublicSection = (id = 'rosa-section') => {
       ALL_SECTIONS.forEach(secId => { 
         const el = byId(secId); 
-        if (el) el.style.display = (secId === id) ? 'block' : 'none'; 
+        // Logica per gestire la visibilità con la transizione CSS
+        const isTarget = (secId === id);
+        
+        if (el) {
+          if (isTarget) {
+            el.style.display = 'block'; // Necessario per far partire la transizione
+            // Assicurati che l'opacità sia 0 prima di aggiungere 'active' se non lo è
+            if (!el.classList.contains('active')) {
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    el.classList.add('active');
+                    el.style.opacity = '1';
+                }, 50);
+            }
+          } else {
+             // Nasconde le altre sezioni gradualmente o immediatamente
+            if (el.classList.contains('active')) {
+                el.style.opacity = '0';
+                el.style.pointerEvents = 'none';
+                setTimeout(() => {
+                    el.classList.remove('active');
+                    el.style.display = 'none';
+                }, 500); // 500ms per la transizione + 100ms di buffer
+            } else {
+                el.style.display = 'none';
+            }
+          }
+        }
       });
       document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', t.dataset.target===id ? 'page' : 'false'); });
       document.querySelectorAll('#admin-menu .tab').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); // Rimuove current dall'admin
@@ -294,8 +320,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!isAdmin) return showLogin(); // Protezione base
         
         ALL_SECTIONS.forEach(secId => { 
-          const el = byId(secId); 
-          if (el) el.style.display = (secId === id) ? 'block' : 'none'; 
+            const el = byId(secId); 
+            const isTarget = (secId === id);
+
+            if (el) {
+                if (isTarget) {
+                    el.style.display = 'block'; 
+                    if (!el.classList.contains('active')) {
+                        el.style.opacity = '0';
+                        setTimeout(() => {
+                            el.classList.add('active');
+                            el.style.opacity = '1';
+                        }, 50);
+                    }
+                } else {
+                    if (el.classList.contains('active')) {
+                        el.style.opacity = '0';
+                        el.style.pointerEvents = 'none';
+                        setTimeout(() => {
+                            el.classList.remove('active');
+                            el.style.display = 'none';
+                        }, 500); 
+                    } else {
+                        el.style.display = 'none';
+                    }
+                }
+            }
         });
         
         document.querySelectorAll('.tab[data-target]').forEach(t=>{ t.setAttribute('aria-current', 'false'); }); // Rimuove current dal pubblico
@@ -309,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(id==='admin-candidature-section'){ loadCandidature(); }
         if(id==='admin-gestione-dati-section'){ window.loadCrudGiocatori(); window.loadCrudPartite(); }
         if (id === 'admin-video-section') loadPartitePerVideoAdmin(); // Carica per la sezione video
+        if (id === 'admin-statistiche-section') loadAdminStatistiche();
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -332,14 +383,18 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleAdminUI(); // Aggiorna la UI
       
       // Assicura che una sezione sia visibile al cambio di stato
+      const currentActive = document.querySelector('.content-section.active');
+      
       if(user && isAdmin) {
          // Se admin loggato, mostra la sezione predefinita admin (es. inserimento giocatori)
-         if(byId('admin-inserimento-giocatori-section').style.display === 'none'){
+         if(!currentActive || PUBLIC_SECTIONS.includes(currentActive.id)){
             window.showAdminSection('admin-inserimento-giocatori-section');
          }
       } else {
          // Se loggout o utente normale, mostra la sezione pubblica predefinita
-         window.showPublicSection('rosa-section');
+         if(!currentActive || ADMIN_SECTIONS.includes(currentActive.id)){
+            window.showPublicSection('rosa-section');
+         }
       }
     });
     
@@ -356,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
     
-    document.addEventListener('DOMContentLoaded',()=>{
+    document.addEventListener('DOMContentLoaded', () => {
       // Login
       byId('login-form')?.addEventListener('submit',e=>{
         e.preventDefault();
@@ -385,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Default: Carico le sezioni pubbliche e mostro la rosa
-      window.showPublicSection('rosa-section');
+      // L'attivazione visuale è gestita nel primo script e nell'onAuthStateChanged
       loadRosa(); 
       loadProssimeGiornate(false); 
       loadStatistiche();
@@ -1450,7 +1505,7 @@ const loadClassifica = async () => {
         if (selectedPlayerId && selectedOption) {
             byId('stat-gol').value = selectedOption.dataset.gol;
             byId('stat-assist').value = selectedOption.dataset.assist;
-            byId('stat-presenze').value = selectedOption.dataset.presenze;
+            byId('stat-presenze').value = selectedOption.presenze;
             byId('stat-save-btn').disabled = false;
         } else {
             byId('stat-gol').value = 0;
@@ -1557,11 +1612,6 @@ const loadClassifica = async () => {
         ul.innerHTML = html;
     }
 
-    // Aggiungi le funzioni ai listener per la sezione admin
-    document.addEventListener('DOMContentLoaded', () => {
-        byId('admin-statistiche-tab')?.addEventListener('click', loadAdminStatistiche);
-    });
-
   </script>
 </head>
 <body>
@@ -1573,7 +1623,7 @@ const loadClassifica = async () => {
         <h1 class="club">A.C. Tuscolano</h1>
         <p class="tag">La gestione squadra a portata di click.</p>
       </div>
-      <button id="auth-toggle-btn" class="btn">Login</button>
+      <button id="auth-toggle-btn" class="btn" onclick="handleAuthToggle()">Login</button>
     </div>
   </header>
 
@@ -1602,7 +1652,7 @@ const loadClassifica = async () => {
 
   <main>
 
-    <section id="login-section">
+    <section id="login-section" class="content-section" style="display:none; opacity:1; pointer-events:all;">
       <h2>Accesso Amministratori e Giocatori</h2>
       <form id="login-form">
         <label for="login-email">Email</label><input id="login-email" type="email" required />
@@ -1652,7 +1702,7 @@ const loadClassifica = async () => {
       </div>
     </section>
 
-    <section id="admin-inserimento-giocatori-section" style="display:none">
+    <section id="admin-inserimento-giocatori-section" class="content-section">
       <h2>Admin · Inserimento Giocatori</h2>
       <form id="insert-giocatore-form">
         <label>Nome Giocatore</label><input id="giocatore-nome" required />
@@ -1671,7 +1721,7 @@ const loadClassifica = async () => {
       </form>
     </section>
 
-    <section id="admin-inserimento-giornate-section" style="display:none">
+    <section id="admin-inserimento-giornate-section" class="content-section">
       <h2>Admin · Inserimento Partite</h2>
       <form id="insert-giornata-form">
         <label>Avversaria</label><input id="match-avversaria" required />
@@ -1686,14 +1736,14 @@ const loadClassifica = async () => {
       </form>
     </section>
 
-    <section id="admin-calendario-section" style="display:none">
+    <section id="admin-calendario-section" class="content-section">
       <h2>Admin · Gestione Calendario & Formazioni</h2>
       <div class="help">Clicca sui pulsanti per gestire Formazione e Candidature. Il risultato si inserisce dalla sezione CRUD Dati.</div>
       <ul id="admin-calendario-list">
         </ul>
     </section>
 
-    <section id="admin-formazione-section" style="display:none">
+    <section id="admin-formazione-section" class="content-section">
       <h2 id="admin-formazione-title">Admin · Inserisci Formazione</h2>
       <div class="help">Seleziona il ruolo che il giocatore avrà per la partita. Seleziona 'Assente' per escluderlo. I candidati sono in evidenza.</div>
       <form id="admin-formazione-form">
@@ -1708,7 +1758,7 @@ const loadClassifica = async () => {
       </form>
     </section>
 
-    <section id="admin-statistiche-section" style="display:none">
+    <section id="admin-statistiche-section" class="content-section">
       <h2>Admin · Inserisci Statistiche Individuali</h2>
       <form id="insert-stat-form">
         <label>Giocatore</label>
@@ -1724,14 +1774,14 @@ const loadClassifica = async () => {
       </form>
     </section>
     
-    <section id="admin-candidature-section" style="display:none">
+    <section id="admin-candidature-section" class="content-section">
       <h2>Admin · Riepilogo Candidature Totali</h2>
       <ul id="candidature-list">
         </ul>
       <div class="help" style="margin-top:20px;">Per gestire le candidature di una singola partita, usa il pulsante "Gestisci Cand." nella sezione **Calendario Admin**.</div>
     </section>
 
-    <section id="admin-video-section" style="display:none">
+    <section id="admin-video-section" class="content-section">
         <h2>Admin · Inserimento Link Video</h2>
         <div class="help">Seleziona una partita conclusa e incolla il link YouTube degli highlights.</div>
         <label>Partita Conclusa</label>
@@ -1744,7 +1794,7 @@ const loadClassifica = async () => {
     </section>
 
 
-    <section id="admin-gestione-dati-section" style="display:none">
+    <section id="admin-gestione-dati-section" class="content-section">
       <h2>Admin · CRUD Dati</h2>
       <div class="help">Modifica i dati direttamente nelle celle della tabella per salvarli.</div>
 
@@ -1781,7 +1831,7 @@ const loadClassifica = async () => {
       </div>
     </section>
 
-    <section id="admin-utenti-section" style="display:none">
+    <section id="admin-utenti-section" class="content-section">
       <h2>Admin · Inserimento utenti</h2>
       <form id="create-user-form">
         <label>Nome Giocatore</label><input id="new-nome" required />
