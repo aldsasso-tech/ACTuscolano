@@ -5,7 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
 
-
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js">
+/* ===== SCHEDULAZIONE: refresh giornaliero alle 23:00 ===== */
+function msUntilNext(hour, minute = 0, second = 0) {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(hour, minute, second, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  return next - now;
+}
+window.scheduleDailyClassificaRefresh = () => {
+  const ms = msUntilNext(23, 0, 0);
+  const infoEl = document.getElementById('classifica-next-run');
+  if (infoEl) {
+    const when = new Date(Date.now() + ms).toLocaleString('it-IT');
+    infoEl.textContent = `Prossimo aggiornamento: ${when}`;
+  }
+  setTimeout(async function tick() {
+    await loadClassifica();
+    window.scheduleDailyClassificaRefresh();
+  }, ms);
+};
 
 
 /* ===== EFFETTO FADE NAVIGAZIONE (solo .content-section, fix visibilità completa) ===== */
