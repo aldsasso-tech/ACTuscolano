@@ -259,7 +259,8 @@
       'admin-candidature-section',
       'admin-gestione-dati-section',
       'admin-utenti-section',
-      'admin-video-section'
+      'admin-video-section',
+      'admin-classifica-section' // NUOVO
     ];
     const ALL_SECTIONS = [...PUBLIC_SECTIONS, ...ADMIN_SECTIONS, 'login-section']; // Includo il login per nasconderlo
 
@@ -1932,7 +1933,7 @@
         <button class="tab btn--admin" data-admin-target="admin-calendario-section" onclick="showAdminSection('admin-calendario-section')">Calendario Admin</button>
         <button class="tab btn--admin" data-admin-target="admin-statistiche-section" onclick="showAdminSection('admin-statistiche-section')">Risultato</button>
         <button class="tab btn--admin" data-admin-target="admin-video-section" onclick="showAdminSection('admin-video-section')">Video</button>
-        <button class="tab btn--admin" data-admin-target="admin-gestione-dati-section" onclick="showAdminSection('admin-gestione-dati-section')">Gestione Dati</button>
+        <button class="tab btn--admin" data-admin-target="admin-classifica-section" onclick="showAdminSection('admin-classifica-section')">Agg. Classifica</button> <button class="tab btn--admin" data-admin-target="admin-gestione-dati-section" onclick="showAdminSection('admin-gestione-dati-section')">Gestione Dati</button>
         <button class="tab btn--admin" data-admin-target="admin-utenti-section" onclick="showAdminSection('admin-utenti-section')">Utenti</button>
     </div>
 </div>
@@ -1961,7 +1962,6 @@
 
   <section id="classifica-section" style="display:none">
     <h2>Classifica</h2>
-    <button class="btn btn--admin" onclick="updateClassificaFromSito()" style="margin-bottom:10px;">Aggiorna Classifica (Admin)</button>
     <div id="classifica-content" style="overflow-x:auto;">
       </div>
   </section>
@@ -2043,6 +2043,14 @@
     <h2>Admin · Calendario</h2>
     <div class="help">Visualizza/Modifica formazioni e Valuta prestazioni. Ordinato dalla più recente.</div>
     <ul id="admin-calendario-list" class="grid cols-3"></ul>
+  </section>
+  
+  <section id="admin-classifica-section" style="display:none">
+    <h2>Admin · Aggiorna Classifica</h2>
+    <div class="help">Clicca sul pulsante qui sotto per scaricare la classifica più recente dal sito ufficiale e salvarla su Firebase.</div>
+    <div class="actions">
+        <button class="btn btn--accent" onclick="window.updateClassificaFromSito()">Aggiorna Classifica Ora</button>
+    </div>
   </section>
 
   <section id="admin-formazione-section" style="display:none">
