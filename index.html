@@ -2135,7 +2135,46 @@ tit = newFormat;
     
     // Funzioni Admin placeholder (CREATE/UPDATE/DELETE)
     window.addPlayer=()=>alert("La funzione di aggiunta giocatore è da implementare.");
-    window.addMatch=()=>alert("La funzione di aggiunta partita è da implementare.");
+   // ================== ADMIN: SAVE NEW MATCH (NUOVA PARTITA) ==================
+window.saveNewMatch = async function(){
+
+  const data = v('new-match-data');     // formato dd/mm/yyyy
+  const orario = v('new-match-orario'); // esempio 20:30
+  const avv = v('new-match-avversaria');
+  const campo = v('new-match-campo');
+  const casa = byId('new-match-casa').checked; // boolean
+
+  if(!data || !orario || !avv || !campo){
+    alert("Compila tutti i campi obbligatori!");
+    return;
+  }
+
+  const calRef = ref(db, 'calendario');
+  const newNode = push(calRef);
+
+  await set(newNode, {
+    data,
+    orario,
+    avversaria: avv,
+    campo,
+    casa,
+    candidature: {},           // vuoto in nuova partita
+    formazioni: {},            // vuoto in nuova partita
+    formazionePubblicata:false,
+    risultato:"",
+    linkVideo:""
+  });
+
+  alert("Partita inserita correttamente!");
+  
+  // reset form
+  byId('new-match-data').value="";
+  byId('new-match-orario').value="";
+  byId('new-match-avversaria').value="";
+  byId('new-match-campo').value="";
+  byId('new-match-casa').checked=true;
+};
+
     window.crudUpdateGiocatore=()=>alert("Funzione CRUD Update Giocatore da implementare.");
     window.crudDeleteGiocatore=()=>alert("Funzione CRUD Delete Giocatore da implementare.");
     window.crudUpdatePartita=()=>alert("Funzione CRUD Update Partita da implementare.");
@@ -2749,7 +2788,7 @@ window.loadCandidatureForMatch = async function(matchId){
         <option value="false">Trasferta</option>
       </select>
       <div class="actions">
-        <button type="submit" class="btn btn--accent">Aggiungi Partita</button>
+        <button type="button" class="btn btn--accent" onclick="saveNewMatch()">Inserisci Partita</button>
       </div>
     </form>
   </section>
