@@ -2276,10 +2276,57 @@ if(window.loadRosaAdmin) window.loadRosaAdmin?.();
 if(window.loadRosaAdmin) window.loadRosaAdmin?.();
 };
 
-    window.crudUpdatePartita=()=>alert("Funzione CRUD Update Partita da implementare.");
-    window.crudDeletePartita=()=>alert("Funzione CRUD Delete Partita da implementare."); 
+    // ===================== CRUD UPDATE PARTITA =====================
+window.crudUpdatePartita = async function(matchId){
+
+  const snap = await get(ref(db, 'calendario/'+matchId));
+  const m = snap.val();
+  if(!m){ alert("Partita non trovata"); return; }
+
+  const data = prompt("Data (gg/mm/aaaa):", m.data || "");
+  if(data===null) return;
+
+  const orario = prompt("Orario (hh:mm):", m.orario || "");
+  if(orario===null) return;
+
+  const avv = prompt("Avversaria:", m.avversaria || "");
+  if(avv===null) return;
+
+  const campo = prompt("Campo:", m.campo || "");
+  if(campo===null) return;
+
+  const casa = confirm("Partita in CASA? (OK = Casa | Cancel = Trasferta)");
+
+  await update(ref(db, 'calendario/'+matchId), {
+    data,
+    orario,
+    avversaria: avv,
+    campo,
+    casa
+  });
+
+  alert("Partita aggiornata!");
+
+  if(window.loadCrudPartite) window.loadCrudPartite();
+};
+
+
+// ===================== CRUD DELETE PARTITA =====================
+window.crudDeletePartita = async function(matchId){
+  if(!confirm("Sei sicuro di eliminare DEFINITIVAMENTE questa partita?")) return;
+
+  await remove(ref(db,'calendario/'+matchId));
+
+  alert("Partita eliminata!");
+
+  if(window.loadCrudPartite) window.loadCrudPartite();
+};
+
     window.loadCandidature=()=>document.getElementById('candidature-list').innerHTML = "<h3>Gestione Candidature</h3><div class=\"help\">Seleziona una partita dal menu Formaz./Voti/Cand. per vedere i dettagli, oppure implementa qui un selettore globale.</div>";
-    window.closeCandidatureEditor=()=>alert("La funzione di chiusura editor candidature è da completare.");
+    window.closeCandidatureEditor = ()=>{
+  byId('crud-candidature-panel').style.display='none';
+  byId('crud-candidature-select').value="";
+}
 
 
     /**
@@ -2458,7 +2505,25 @@ window.loadCandidatureForMatch = async function(matchId){
     tbody.innerHTML = htmlRows || '<tr><td colspan="3">Nessun giocatore in rosa.</td></tr>';
 
     const saveBtn = byId('crud-candidature-save');
-    if (saveBtn) saveBtn.onclick = () => alert(`Funzione per salvare le candidature per la partita ${matchId} da implementare.`);
+    if (saveBtn) saveBtn.onclick = async ()=>{
+
+  const checks = document.querySelectorAll('#crud-candidature-body input[type="checkbox"]');
+  let updates = {};
+
+  checks.forEach(ch=>{
+    const uid = ch.dataset.uid;
+    if(!uid) return;
+    updates[uid] = ch.checked;   // true or false
+  });
+
+  await update(ref(db, `calendario/${matchId}/candidature`), updates);
+
+  alert("Candidature aggiornate correttamente!");
+
+  // ricarico tabella per sicurezza visuale
+  window.loadCandidatureForMatch(matchId);
+};
+
 
   } catch(e) {
     console.error("Errore caricamento Candidature CRUD:", e);
