@@ -2135,14 +2135,16 @@ tit = newFormat;
     
     // Funzioni Admin placeholder (CREATE/UPDATE/DELETE)
     window.addPlayer=()=>alert("La funzione di aggiunta giocatore è da implementare.");
+
+    
    // ================== ADMIN: SAVE NEW MATCH (NUOVA PARTITA) ==================
 window.saveNewMatch = async function(){
 
-  const data = v('new-match-data');     // formato dd/mm/yyyy
-  const orario = v('new-match-orario'); // esempio 20:30
-  const avv = v('new-match-avversaria');
-  const campo = v('new-match-campo');
-  const casa = byId('new-match-casa').checked; // boolean
+  const data = byId('match-data').value.trim();
+  const orario = byId('match-orario').value.trim();
+  const avv = byId('match-avversaria').value.trim();
+  const campo = byId('match-campo').value.trim();
+  const casa = (byId('match-casa-trasferta').value === "true"); // true/false
 
   if(!data || !orario || !avv || !campo){
     alert("Compila tutti i campi obbligatori!");
@@ -2158,22 +2160,23 @@ window.saveNewMatch = async function(){
     avversaria: avv,
     campo,
     casa,
-    candidature: {},           // vuoto in nuova partita
-    formazioni: {},            // vuoto in nuova partita
+    candidature: {},
+    formazioni: {},
     formazionePubblicata:false,
     risultato:"",
     linkVideo:""
   });
 
   alert("Partita inserita correttamente!");
-  
-  // reset form
-  byId('new-match-data').value="";
-  byId('new-match-orario').value="";
-  byId('new-match-avversaria').value="";
-  byId('new-match-campo').value="";
-  byId('new-match-casa').checked=true;
+
+  // reset
+  byId('match-data').value="";
+  byId('match-orario').value="";
+  byId('match-avversaria').value="";
+  byId('match-campo').value="";
+  byId('match-casa-trasferta').value="true";
 };
+
 
     window.crudUpdateGiocatore=()=>alert("Funzione CRUD Update Giocatore da implementare.");
     window.crudDeleteGiocatore=()=>alert("Funzione CRUD Delete Giocatore da implementare.");
@@ -2775,7 +2778,7 @@ window.loadCandidatureForMatch = async function(matchId){
 
   <section id="admin-inserimento-giornate-section" class="content-section">
     <h2>Admin · Inserimento giornate</h2>
-    <form id="match-form" onsubmit="window.addMatch(event)">
+    <form id="match-form">
       <div class="grid cols-2">
         <div><label>Data (gg/mm/aaaa)</label><input id="match-data" required /></div>
         <div><label>Ora (hh:mm)</label><input id="match-orario" type="time" placeholder="18:00" /></div>
