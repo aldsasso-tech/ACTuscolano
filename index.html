@@ -2134,7 +2134,52 @@ tit = newFormat;
     /* ========================================================================= */
     
     // Funzioni Admin placeholder (CREATE/UPDATE/DELETE)
-    window.addPlayer=()=>alert("La funzione di aggiunta giocatore è da implementare.");
+    // ================== ADMIN: ADD PLAYER DEFINITIVO ==================
+window.addPlayer = async function(e){
+  e.preventDefault();
+
+  const nome = byId('giocatore-nome').value.trim();
+  const cognome = byId('giocatore-cognome').value.trim();
+  const numero = Number(byId('giocatore-numero').value.trim());
+  const ruolo = byId('giocatore-ruolo').value.trim();
+  const stato = byId('giocatore-stato').value.trim();
+
+  if(!nome || !cognome || !numero || !ruolo || !stato){
+    alert("Compila tutti i campi");
+    return;
+  }
+
+  const rosaRef = ref(db, 'rosa');
+  const newNode = push(rosaRef);
+
+  await set(newNode, {
+    nome,
+    cognome,
+    numero,
+    ruolo,
+    stato,
+    assist: 0,
+    goal: 0,
+    partite: 0,
+    voto: 0,
+    uid: "" // non associato account auth finché non associamo utente
+  });
+
+  alert("Giocatore inserito correttamente!");
+
+  // reset input form
+  byId('giocatore-nome').value = "";
+  byId('giocatore-cognome').value = "";
+  byId('giocatore-numero').value = "";
+  byId('giocatore-ruolo').value = "";
+  byId('giocatore-stato').value = "Titolare";
+
+  // ricarica rosa pubblica se già visualizzata
+  if(document.getElementById('rosa-section').classList.contains('active')){
+    if(window.loadRosa) window.loadRosa();
+  }
+}
+
 
     
    // ================== ADMIN: SAVE NEW MATCH (NUOVA PARTITA) ==================
@@ -2178,8 +2223,59 @@ window.saveNewMatch = async function(){
 };
 
 
-    window.crudUpdateGiocatore=()=>alert("Funzione CRUD Update Giocatore da implementare.");
-    window.crudDeleteGiocatore=()=>alert("Funzione CRUD Delete Giocatore da implementare.");
+    window.crudUpdateGiocatore = async function(pid){
+
+  const pSnap = await get(ref(db, 'rosa/'+pid));
+  const p = pSnap.val();
+
+  if(!p){
+    alert("Giocatore non trovato.");
+    return;
+  }
+
+  const nuovoNome = prompt("Nome:", p.nome);
+  if(nuovoNome===null) return;
+
+  const nuovoCognome = prompt("Cognome:", p.cognome);
+  if(nuovoCognome===null) return;
+
+  const nuovoNumero = prompt("Numero maglia:", p.numero);
+  if(nuovoNumero===null) return;
+
+  const nuovoRuolo = prompt("Ruolo:", p.ruolo);
+  if(nuovoRuolo===null) return;
+
+  const nuovoStato = prompt("Stato (Titolare/Riserva):", p.stato);
+  if(nuovoStato===null) return;
+
+  await update(ref(db, 'rosa/'+pid),{
+    nome: nuovoNome.trim(),
+    cognome: nuovoCognome.trim(),
+    numero: Number(nuovoNumero),
+    ruolo: nuovoRuolo,
+    stato: nuovoStato
+  });
+
+  alert("Giocatore aggiornato!");
+
+  // ricarica tabella CRUD
+  if(window.loadCrudGiocatori) window.loadCrudGiocatori();
+      if(window.loadRosa) window.loadRosa();
+if(window.loadRosaAdmin) window.loadRosaAdmin?.();
+};
+
+   window.crudDeleteGiocatore = async function(pid){
+  if(!confirm("Sei sicuro di eliminare questo giocatore?")) return;
+  
+  await remove(ref(db, 'rosa/'+pid));
+
+  alert("Giocatore eliminato!");
+  
+  if(window.loadCrudGiocatori) window.loadCrudGiocatori();
+     if(window.loadRosa) window.loadRosa();
+if(window.loadRosaAdmin) window.loadRosaAdmin?.();
+};
+
     window.crudUpdatePartita=()=>alert("Funzione CRUD Update Partita da implementare.");
     window.crudDeletePartita=()=>alert("Funzione CRUD Delete Partita da implementare."); 
     window.loadCandidature=()=>document.getElementById('candidature-list').innerHTML = "<h3>Gestione Candidature</h3><div class=\"help\">Seleziona una partita dal menu Formaz./Voti/Cand. per vedere i dettagli, oppure implementa qui un selettore globale.</div>";
@@ -2225,8 +2321,8 @@ window.saveNewMatch = async function(){
               <td><input type="text" value="${escapeHtml(g.stato)}" data-field="stato" data-id="${id}"/></td>
               <td>${presenzeCount}</td>
               <td>
-                <button class="btn btn--accent" onclick="crudUpdateGiocatore('${id}')" style="padding:4px 8px; font-size:.8rem;">Salva</button>
-                <button class="btn" onclick="crudDeleteGiocatore('${id}')" style="padding:4px 8px; font-size:.8rem; background:var(--ink-sub); color:#fff;">Elimina</button>
+              <button class="btn" onclick="crudUpdateGiocatore('${pid}')">Modifica</button>
+              <button class="btn btn--danger" onclick="crudDeleteGiocatore('${pid}')">Elimina</button>
               </td>
             </tr>
           `;
