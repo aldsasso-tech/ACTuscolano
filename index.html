@@ -1133,17 +1133,18 @@ ul.innerHTML = "";
       prestazioniBtn = `<button class="btn" disabled style="opacity:0.6;">Prestazioni</button>`;
     }
 
-    // ---- BTN Candidatura
-    let candButton='';
-    if(risultatoValido){
-      candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura terminata</button>`;
-    } else if(isPast){
-      candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura scaduta</button>`;
-    } else {
-      const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
-      candButton = `<button class="btn btn--accent" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
-    }
-
+ // ---- BTN Candidatura
+let candButton='';
+if(risultatoValido){
+  candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura terminata</button>`;
+} else if(isPast){
+  candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura scaduta</button>`;
+} else {
+  const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
+  // *** QUESTA È LA RIGA DA MODIFICARE ***
+  // Aggiunto data-match-cand-btn="${matchId}"
+  candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
+}
     ul.innerHTML += `
       <div class="card">
         <div class="player-title">${escapeHtml(m.avversaria||'')}</div>
