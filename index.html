@@ -2614,40 +2614,49 @@ byId('btn-salva-permessi').onclick = async function(){
      /**
      * funzione toggle candidatura
      */
-window.toggleCandidatura = async function(matchId) {
+window.toggleCandidatura = async function(matchId){
   if(!auth.currentUser){
-    return showLogin();
+    alert("Devi effettuare il login per candidarti");
+    showLogin();
+    return;
   }
 
-  const user = auth.currentUser;
-  const snapMatch = await get(ref(db, `calendario/${matchId}`));
-  const match = snapMatch.val() || {};
+  // FIX HTML: Seleziona il pulsante usando l'attributo data
+  const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
+  if (btn) btn.disabled = true; // Disabilita per evitare doppi click
 
-  // --- BLOCCO 48h solo non admin ---
-  if(window.currentUserRole !== 'admin' && window.currentUserRole !== 'superadmin'){
-    if(match.data){
-      const [dd,mm,yy] = match.data.split('/');
-      const matchDate = new Date(`${yy}-${mm}-${dd}T00:00:00`);
-      const diffHours = (matchDate - new Date()) / 36e5;
-      if(diffHours < 48){
-        alert("Candidature bloccate. Mancano meno di 48 ore alla partita.");
-        return;
-      }
+  try {
+    const uid = auth.currentUser.uid;
+    const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
+
+    const snap = await get(candRef);
+    const isCandidato = snap.exists() && snap.val() === true;
+    const nuovoValore = !isCandidato;
+
+    await set(candRef, nuovoValore); // SCRITTURA NEL DATABASE
+
+    // FIX AGGIORNAMENTO: AGGIORNAMENTO IMMEDIATO DEL DOM
+    if (btn) {
+        btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
+        btn.classList.toggle('btn--accent', nuovoValore); 
     }
+
+    // *** PUNTO CRUCIALE: RIMOSSA la riga await loadProssimeGiornate(false); ***
+    // Questa riga non deve esserci, altrimenti sovrascrive il FIX.
+
+    // Se è admin, aggiorna solo la vista admin
+    if(window.isAdmin){
+      await loadProssimeGiornate(true);
+    }
+  } catch (error) {
+    console.error("Errore candidatura:", error);
+    alert("Si è verificato un errore durante l'operazione.");
+    // In caso di errore, ricarica solo come fallback
+    await loadProssimeGiornate(false); 
+  } finally {
+    if (btn) btn.disabled = false; // Riabilita il pulsante
   }
-
-  const candRef = ref(db, `calendario/${matchId}/candidature/${user.uid}`);
-  const snap = await get(candRef);
-  const curr = snap.exists() ? snap.val() : false;
-  const nuovoValore = !curr;
-
-  await set(candRef, nuovoValore);
-
-  // refresh UI
-  if(window.loadCalendario) window.loadCalendario(); 
-}
-    
-  
+};
 
 window.loadCandidatureForMatch = async function(matchId){
   const tbody = byId('crud-candidature-body');
