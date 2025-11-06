@@ -1088,7 +1088,7 @@ ul.innerHTML = "";
       prestazioniBtn = `<button class="btn" disabled style="opacity:0.6;">Prestazioni</button>`;
     }
 
- // ---- BTN Candidatura
+// ---- BTN Candidatura
 let candButton='';
 if(risultatoValido){
   candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura terminata</button>`;
@@ -1096,8 +1096,7 @@ if(risultatoValido){
   candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura scaduta</button>`;
 } else {
   const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
-  // *** QUESTA È LA RIGA DA MODIFICARE ***
-  // Aggiunto data-match-cand-btn="${matchId}"
+  // FIX: Aggiunto data-match-cand-btn
   candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
 }
     ul.innerHTML += `
@@ -1105,7 +1104,9 @@ if(risultatoValido){
         <div class="player-title">${escapeHtml(m.avversaria||'')}</div>
         <div class="player-sub">${m.data} - ${m.orario}</div>
         <div class="player-sub">${m.campo}</div>
-        <div style="margin-top:10px;font-weight:bold">Candidati: ${candCount}</div>
+        <div style="margin-top:10px;font-weight:bold">
+            Candidati: <span data-match-count="${matchId}">${candCount}</span>
+        </div>
         <div class="row" style="margin-top:14px;">
           ${candButton}
           ${prestazioniBtn}
@@ -2621,9 +2622,12 @@ window.toggleCandidatura = async function(matchId){
     return;
   }
 
-  // FIX HTML: Seleziona il pulsante usando l'attributo data
+  // Seleziona il pulsante
   const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
-  if (btn) btn.disabled = true; // Disabilita per evitare doppi click
+  // Seleziona il contatore dei candidati (NUOVO!)
+  const countEl = document.querySelector(`[data-match-count="${matchId}"]`);
+
+  if (btn) btn.disabled = true;
 
   try {
     const uid = auth.currentUser.uid;
@@ -2631,19 +2635,28 @@ window.toggleCandidatura = async function(matchId){
 
     const snap = await get(candRef);
     const isCandidato = snap.exists() && snap.val() === true;
-    const nuovoValore = !isCandidato;
+    const nuovoValore = !isCandidato; 
 
     await set(candRef, nuovoValore); // SCRITTURA NEL DATABASE
 
-    // FIX AGGIORNAMENTO: AGGIORNAMENTO IMMEDIATO DEL DOM
+    // FIX 1: AGGIORNAMENTO IMMEDIATO DEL PULSANTE
     if (btn) {
         btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
         btn.classList.toggle('btn--accent', nuovoValore); 
     }
 
-    // *** PUNTO CRUCIALE: RIMOSSA la riga await loadProssimeGiornate(false); ***
-    // Questa riga non deve esserci, altrimenti sovrascrive il FIX.
+    // FIX 2: AGGIORNAMENTO IMMEDIATO DEL CONTATORE
+    if (countEl) {
+        let currentCount = parseInt(countEl.innerText);
+        if (isNaN(currentCount)) currentCount = 0; 
 
+        // Incrementa o decrementa in base all'azione
+        const newCount = nuovoValore ? currentCount + 1 : currentCount - 1;
+        countEl.innerText = newCount < 0 ? 0 : newCount; 
+    }
+    
+    // Rimuoviamo loadProssimeGiornate(false) per garantire l'aggiornamento istantaneo.
+    
     // Se è admin, aggiorna solo la vista admin
     if(window.isAdmin){
       await loadProssimeGiornate(true);
@@ -2651,13 +2664,12 @@ window.toggleCandidatura = async function(matchId){
   } catch (error) {
     console.error("Errore candidatura:", error);
     alert("Si è verificato un errore durante l'operazione.");
-    // In caso di errore, ricarica solo come fallback
+    // In caso di errore, ricarica come fallback estremo
     await loadProssimeGiornate(false); 
   } finally {
-    if (btn) btn.disabled = false; // Riabilita il pulsante
+    if (btn) btn.disabled = false;
   }
 };
-
 window.loadCandidatureForMatch = async function(matchId){
   const tbody = byId('crud-candidature-body');
   const panel = byId('crud-candidature-panel');
