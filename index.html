@@ -414,27 +414,38 @@ window.toggleCandidatura = async function(matchId){
     return;
   }
 
-  const uid = auth.currentUser.uid;
-  const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
-
-  const snap = await get(candRef);
-  const isCandidato = snap.exists() && snap.val() === true;
-  const nuovoValore = !isCandidato; // Calcola il nuovo stato
-
-  await set(candRef, nuovoValore);
-
-  // FIX: Aggiorna immediatamente il testo del pulsante
   const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
-  if (btn) {
-      btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
-  }
+  if (btn) btn.disabled = true; // Disabilita subito il pulsante
 
-  // ricarico subito calendario attuale IN LOCO (mantenuto per eventuale logica admin)
-  await loadProssimeGiornate(false);
+  try {
+    const uid = auth.currentUser.uid;
+    const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
 
-  // se è admin aggiorno anche la vista admin
-  if(window.isAdmin){
-    await loadProssimeGiornate(true);
+    const snap = await get(candRef);
+    const isCandidato = snap.exists() && snap.val() === true;
+    const nuovoValore = !isCandidato; // Calcola il nuovo stato
+
+    await set(candRef, nuovoValore); // SCRITTURA NEL DATABASE
+
+    // AGGIORNAMENTO IMMEDIATO DEL DOM (FIX)
+    // Rimuovendo loadProssimeGiornate(false), l'aggiornamento è stabile.
+    if (btn) {
+        btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
+        // Opzionale: Se il pulsante è rosso (btn--accent) quando si è candidati:
+        // btn.classList.toggle('btn--accent', nuovoValore); 
+    }
+
+    // Se è admin, aggiorna solo la vista admin (questa non è visibile all'utente pubblico)
+    if(window.isAdmin){
+      await loadProssimeGiornate(true);
+    }
+  } catch (error) {
+    console.error("Errore candidatura:", error);
+    alert("Si è verificato un errore durante l'operazione.");
+    // In caso di errore, si può ricaricare per ripristinare lo stato corretto
+    await loadProssimeGiornate(false); 
+  } finally {
+    if (btn) btn.disabled = false; // Riabilita il pulsante
   }
 };
 
