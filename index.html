@@ -408,7 +408,6 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
 
 
 window.toggleCandidatura = async function(matchId){
-
   if(!auth.currentUser){
     alert("Devi effettuare il login per candidarti");
     showLogin();
@@ -417,24 +416,27 @@ window.toggleCandidatura = async function(matchId){
 
   const uid = auth.currentUser.uid;
   const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
-
-  // leggo condizione attuale
   const snap = await get(candRef);
   const isCandidato = snap.exists() && snap.val() === true;
 
-  // aggiorno valore DB
-  if(isCandidato){
-    await set(candRef, false);
-  } else {
-    await set(candRef, true);
+  await set(candRef, !isCandidato);
+
+  // force realtime UI refresh senza cambiare pagina
+  await window.loadProssimeGiornate(false); // pubblico
+
+  // se admin e sei dentro admin ricarica anche la versione admin
+  if(window.isAdmin === true){
+    await window.loadProssimeGiornate(true);
   }
 
-  // aggiorno UI in tempo reale senza cambiare pagina
-  if (typeof window.loadProssimeGiornate === "function") {
-    window.loadProssimeGiornate(false);
-    if (window.isAdmin) window.loadProssimeGiornate(true);
+  // forza ridisegno reale DOM - TRIGGER
+  const sec = document.querySelector('.content-section.active');
+  if(sec && sec.id === 'calendario-section'){
+    sec.style.display = 'none';
+    setTimeout(()=>{ sec.style.display = ''; }, 20);
   }
 };
+
 
 
     // ordina correttamente date in formato dd/mm/yyyy
