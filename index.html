@@ -1021,6 +1021,8 @@ if(user){
     window.loadProssimeGiornate = async function(asAdmin){
       const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
       const ul = byId(listId); if(!ul) return; ul.innerHTML='';
+   const uid = auth.currentUser ? auth.currentUser.uid : null;
+   const isCandidato = uid && candidatiUID.includes(uid);
 
       // *** MODIFICA: Aggiunto snapUtenti ***
       const [snapCalendar, snapRosa, snapUtenti] = await Promise.all([
