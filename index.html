@@ -1090,15 +1090,35 @@ if(user){
 
         // Candidatura Button: only active if no result is entered AND not expired
         // Candidatura Button: only active if no result is entered AND not expired
+// --- Calcolo risultato valido
+const risultatoValido = !!(m.risultato && /\d+\s*-\s*\d+/.test(m.risultato));
+
+// --- Calcolo candidature utente corrente
+const snapCand = await get(ref(db, `calendario/${matchId}/candidature`));
+const candidature = snapCand.val() || {};
+const candidatiUID = Object.entries(candidature).filter(([,v])=>v===true).map(([uid])=>uid);
+const uid = auth.currentUser ? auth.currentUser.uid : null;
+const isCandidato = uid && candidatiUID.includes(uid);
+
+// --- BOTTONE PRESTAZIONI ---
+let prestazioniBtn = '';
+if (risultatoValido) {
+  prestazioniBtn = `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`;
+} else {
+  prestazioniBtn = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
+}
+
+// --- BOTTONE CANDIDATURA ---
 let candButton = '';
 if (risultatoValido) {
-   candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
+  candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
 } else if (isPast) {
-   candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
+  candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
 } else {
-   const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
-   candButton = `<button class="btn btn--accent" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
+  const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
+  candButton = `<button class="btn btn--accent" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
 }
+
 
         
         // ** Preparazione della stringa JSON per l'Admin Button **
@@ -2137,6 +2157,10 @@ tit = newFormat;
       }
     }
     
+
+
+
+
     
     /* ========================================================================= */
     /* === FIX: IMPLEMENTAZIONE FUNZIONI ADMIN (CRUD/READ) === */
@@ -2231,7 +2255,54 @@ window.saveNewMatch = async function(){
   byId('match-casa-trasferta').value="true";
 };
 
+// ===================== TOGGLE CANDIDATURA =====================
+window.toggleCandidatura = async function(matchId) {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Effettua il login per candidarti!");
+    showLogin();
+    return;
+  }
 
+  const uid = user.uid;
+  const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
+
+  try {
+    const snap = await get(candRef);
+    const alreadyCandidato = snap.exists() && snap.val() === true;
+
+    if (alreadyCandidato) {
+      // l’utente è già candidato → rimuovi candidatura
+      await set(candRef, false);
+      alert("Hai annullato la tua candidatura per questa partita.");
+    } else {
+      // l’utente non è candidato → aggiungi candidatura
+      await set(candRef, true);
+      alert("Hai confermato la tua candidatura per questa partita!");
+    }
+
+    // ricarica elenco partite per riflettere lo stato aggiornato
+    if (typeof window.loadProssimeGiornate === "function") {
+      window.loadProssimeGiornate(false);
+    }
+
+  } catch (e) {
+    console.error("Errore durante l'aggiornamento candidatura:", e);
+    alert("Errore durante l'aggiornamento della candidatura.");
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+    
     window.crudUpdateGiocatore = async function(pid){
 
   const pSnap = await get(ref(db, 'rosa/'+pid));
