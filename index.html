@@ -1018,107 +1018,101 @@ if(user){
      * FUNZIONE loadProssimeGiornate (AGGIORNATA PER LISTA CANDIDATI)
      * IMPLEMENTAZIONE FIX: Logica di join /candidature -> /utenti -> /rosa (FIX RICHIESTO)
      */
-    window.loadProssimeGiornate = async function(asAdmin){
-      const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
-      const ul = byId(listId); if(!ul) return; ul.innerHTML='';
-   const uid = auth.currentUser ? auth.currentUser.uid : null;
-   const isCandidato = uid && candidatiUID.includes(uid);
+window.loadProssimeGiornate = async function(asAdmin){
+  const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
+  const ul = byId(listId); if(!ul) return; ul.innerHTML='';
 
-      // *** MODIFICA: Aggiunto snapUtenti ***
-      const [snapCalendar, snapRosa, snapUtenti] = await Promise.all([
-          get(ref(db,'calendario')),
-          get(ref(db, 'rosa')),
-          get(ref(db, 'utenti')) // <-- NUOVO: Carica dati utenti
-      ]);
-      const val = snapCalendar.val() || {};
-      const rosa = snapRosa.val() || {}; 
-      const utenti = snapUtenti.val() || {}; // <-- NUOVO: Dati utenti
-      
-      // Trasformo la rosa in un array [ { ...playerData } ] per cercare più facilmente
-      const rosaArray = Object.values(rosa); 
-      
-      let entries = Object.entries(val);
-      const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
-      const today = new Date(); today.setHours(0,0,0,0);
-      entries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
-      if(!entries.length){ ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>'; return; }
-      ul.className='grid cols-3';
-      
-      for(const [matchId,m] of entries){
-        const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
-        const cand = candSnap.val() || {};
-        
-        // *** INIZIO FIX (Logica Join) ***
-        
-        // 1. Estrae gli Auth UID dei candidati (le chiavi di 'cand')
-        const candidatiAuthUIDs = Object.keys(cand).filter(uid => cand[uid] === true);
-        const candCount = candidatiAuthUIDs.length;
+  // carico calendario + rosa + utenti
+  const [snapCalendar, snapRosa, snapUtenti] = await Promise.all([
+    get(ref(db,'calendario')),
+    get(ref(db,'rosa')),
+    get(ref(db,'utenti'))
+  ]);
 
-        // 2. Mappa gli Auth UID ai giocatori della rosa tramite /utenti e join per Nome/Cognome
-        const candidatiTrovati = [];
-        
-        for (const authUid of candidatiAuthUIDs) {
-            const utente = utenti[authUid]; // Prende l'utente da /utenti/{authUid}
-            
-            if (utente && utente.nome && utente.cognome) {
-                // 3. Cerca in /rosa usando nome e cognome da /utenti
-                const nomeUtente = utente.nome;
-                const cognomeUtente = utente.cognome;
-                
-                // Cerca nel nostro array della rosa
-                const giocatoreInRosa = rosaArray.find(p => 
-                    p.nome === nomeUtente && p.cognome === cognomeUtente
-                );
-                
-                if (giocatoreInRosa) {
-                    candidatiTrovati.push(giocatoreInRosa); // Aggiunge l'intero oggetto giocatore da /rosa
-                }
-            }
-        }
-        
-        // 4. Ordina i giocatori trovati per numero
-        const sortedCandidati = candidatiTrovati.sort((a, b) => (a.numero || 0) - (b.numero || 0));
-        
-        // *** FINE FIX (Logica Join) ***
+  const val = snapCalendar.val() || {};
+  const rosa = snapRosa.val() || {};
+  const utenti = snapUtenti.val() || {};
 
-        const isPublished = m.formazionePubblicata === true;
-        const matchDate = toDate(m.data);
-        const isPast = matchDate < today;
+  const rosaArray = Object.values(rosa);
 
-        // Check for valid result (determines if match is "concluded")
-        const risultatoValido = (m.risultato && m.risultato !== 'N/D');
+  let entries = Object.entries(val);
+  const toDate = (d)=>{ const [dd,mm,yyyy]=String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+  const today = new Date(); today.setHours(0,0,0,0);
 
-        // Candidatura Button: only active if no result is entered AND not expired
-        // Candidatura Button: only active if no result is entered AND not expired
-// --- Calcolo risultato valido
-const risultatoValido = !!(m.risultato && /\d+\s*-\s*\d+/.test(m.risultato));
+  entries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
 
-// --- Calcolo candidature utente corrente
-const snapCand = await get(ref(db, `calendario/${matchId}/candidature`));
-const candidature = snapCand.val() || {};
-const candidatiUID = Object.entries(candidature).filter(([,v])=>v===true).map(([uid])=>uid);
-const uid = auth.currentUser ? auth.currentUser.uid : null;
-const isCandidato = uid && candidatiUID.includes(uid);
+  if(!entries.length){
+    ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>';
+    return;
+  }
 
-// --- BOTTONE PRESTAZIONI ---
-let prestazioniBtn = '';
-if (risultatoValido) {
-  prestazioniBtn = `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`;
-} else {
-  prestazioniBtn = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
-}
+  ul.className='grid cols-3';
 
-// --- BOTTONE CANDIDATURA ---
+  for(const [matchId,m] of entries){
 
-let candButton = '';
-if (risultatoValido) {
-  candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
-} else if (isPast) {
-  candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
-} else {
-  const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
-  candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
-}
+    // Leggi candidature match
+    const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
+    const cand = candSnap.val() || {};
+
+    const candidatiAuthUIDs = Object.keys(cand).filter(uid => cand[uid] === true);
+    const candCount = candidatiAuthUIDs.length;
+
+    const candidatiTrovati = [];
+    for(const authUid of candidatiAuthUIDs){
+      const utente = utenti[authUid];
+      if(utente && utente.nome && utente.cognome){
+        const giocatore = rosaArray.find(p => p.nome === utente.nome && p.cognome === utente.cognome);
+        if(giocatore) candidatiTrovati.push(giocatore);
+      }
+    }
+    const sortedCandidati = candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
+
+    const matchDate = toDate(m.data);
+    const isPast = matchDate < today;
+
+    const risultatoValido = !!(m.risultato && /\d+\s*-\s*\d+/.test(m.risultato));
+
+    // cand utente corrente
+    const candidature = cand || {};
+    const candidatiUID = Object.entries(candidature).filter(([,v])=>v===true).map(([uid])=>uid);
+    const uid = auth.currentUser ? auth.currentUser.uid : null;
+    const isCandidato = uid && candidatiUID.includes(uid);
+
+    // ---- BTN Prestazioni
+    let prestazioniBtn='';
+    if(risultatoValido){
+      prestazioniBtn = `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`;
+    } else {
+      prestazioniBtn = `<button class="btn" disabled style="opacity:0.6;">Prestazioni</button>`;
+    }
+
+    // ---- BTN Candidatura
+    let candButton='';
+    if(risultatoValido){
+      candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura terminata</button>`;
+    } else if(isPast){
+      candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura scaduta</button>`;
+    } else {
+      const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
+      candButton = `<button class="btn btn--accent" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
+    }
+
+    ul.innerHTML += `
+      <div class="card">
+        <div class="player-title">${escapeHtml(m.avversaria||'')}</div>
+        <div class="player-sub">${m.data} - ${m.orario}</div>
+        <div class="player-sub">${m.campo}</div>
+        <div style="margin-top:10px;font-weight:bold">Candidati: ${candCount}</div>
+        <div class="row" style="margin-top:14px;">
+          ${candButton}
+          ${prestazioniBtn}
+        </div>
+      </div>
+    `;
+  }
+};
+
+
 
 
 
