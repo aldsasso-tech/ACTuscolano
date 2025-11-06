@@ -2624,7 +2624,7 @@ window.toggleCandidatura = async function(matchId){
 
   // Seleziona il pulsante
   const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
-  // Seleziona il contatore dei candidati (NUOVO!)
+  // Seleziona il contatore dei candidati
   const countEl = document.querySelector(`[data-match-count="${matchId}"]`);
 
   if (btn) btn.disabled = true;
@@ -2635,9 +2635,13 @@ window.toggleCandidatura = async function(matchId){
 
     const snap = await get(candRef);
     const isCandidato = snap.exists() && snap.val() === true;
-    const nuovoValore = !isCandidato; 
+    const nuovoValore = !isCandidato; // true = candidato (confermata), false = annulla (annullata)
 
     await set(candRef, nuovoValore); // SCRITTURA NEL DATABASE
+
+    // Messaggio di conferma per l'utente
+    const messaggio = nuovoValore ? "Candidatura confermata" : "Candidatura annullata";
+    alert(messaggio); // <-- NUOVO POPUP AGGIUNTO QUI
 
     // FIX 1: AGGIORNAMENTO IMMEDIATO DEL PULSANTE
     if (btn) {
@@ -2655,8 +2659,6 @@ window.toggleCandidatura = async function(matchId){
         countEl.innerText = newCount < 0 ? 0 : newCount; 
     }
     
-    // Rimuoviamo loadProssimeGiornate(false) per garantire l'aggiornamento istantaneo.
-    
     // Se è admin, aggiorna solo la vista admin
     if(window.isAdmin){
       await loadProssimeGiornate(true);
@@ -2664,7 +2666,6 @@ window.toggleCandidatura = async function(matchId){
   } catch (error) {
     console.error("Errore candidatura:", error);
     alert("Si è verificato un errore durante l'operazione.");
-    // In caso di errore, ricarica come fallback estremo
     await loadProssimeGiornate(false); 
   } finally {
     if (btn) btn.disabled = false;
