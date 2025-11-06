@@ -1123,50 +1123,73 @@ window.loadProssimeGiornate = async function(asAdmin){
 
     // --- LISTA CANDIDATI (Cognome, Ruolo, Stato) -- SOLO PUBBLICO e SOLO se non c'è risultato ---
     let candidatiListHtml = '';
-    if (!asAdmin && !risultatoValido) {
-      if (candCount > 0) {
-        let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
-        // intestazione
-        playersHtml += `
-          <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
-            <div>Cognome</div>
-            <div>Ruolo</div>
-            <div style="text-align:right;">Stato</div>
-          </li>
-        `;
-        if (candidatiTrovati.length > 0) {
-          playersHtml += candidatiTrovati.map(p=>{
-            const cognome = escapeHtml(p.cognome || '?');
-            const ruolo = escapeHtml(p.ruolo || 'N/D');
-            const stato = escapeHtml(p.stato || 'N/D');
-            const statoColor = stato === 'Titolare' ? '#0e7a0d'
-                              : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
-            return `
-              <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;border-bottom:1px dotted #eee;padding:4px 0;">
-                <div style="font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>${cognome}</b></div>
-                <div style="color:var(--ink-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.85rem;">${ruolo}</div>
-                <div style="text-align:right;">
-                  <span class="pill" style="background:${statoColor};color:#fff;padding:2px 6px;font-size:.75rem;">${stato}</span>
-                </div>
-              </li>
-            `;
-          }).join('');
-        }
-        if (candCount > candidatiTrovati.length) {
-          const mancanti = candCount - candidatiTrovati.length;
-          playersHtml += `<li style="padding:4px 0;color:var(--red);font-weight:600;">${mancanti} candidati non trovati in /rosa (verifica allineamento Nome/Cognome).</li>`;
-        }
-        playersHtml += '</ul>';
-        candidatiListHtml = `
-          <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px;">
-            <div style="font-weight:700;color:#0e7a0d;margin-bottom:4px;">Disponibilità Confermate (${candCount}):</div>
-            ${playersHtml}
-          </div>
-        `;
-      } else {
-        candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (0).</div>`;
-      }
+if (!asAdmin && !risultatoValido) {
+
+  // FUTURO → NO DETTAGLIO CANDIDATI
+  if (!isPast) {
+    if (candCount > 0) {
+      candidatiListHtml = `
+        <div class="pill" style="margin-top:8px;font-size:0.85rem;">
+          Disponibilità Confermate (${candCount})
+        </div>
+      `;
+    } else {
+      candidatiListHtml = `
+        <div class="pill" style="margin-top:8px;font-size:0.85rem;">
+          Nessuna disponibilità confermata (0).
+        </div>
+      `;
     }
+
+  // PASSATO SENZA RISULTATO → MOSTRO DETTAGLIO
+  } else {
+
+    if (candCount > 0) {
+      let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
+      
+      // intestazione
+      playersHtml += `
+        <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
+          <div>Cognome</div>
+          <div>Ruolo</div>
+          <div style="text-align:right;">Stato</div>
+        </li>
+      `;
+
+      if (candidatiTrovati.length > 0) {
+        playersHtml += candidatiTrovati.map(p=>{
+          const cognome = escapeHtml(p.cognome || '?');
+          const ruolo = escapeHtml(p.ruolo || 'N/D');
+          const stato = escapeHtml(p.stato || 'N/D');
+          const statoColor = stato === 'Titolare' ? '#0e7a0d'
+                            : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
+          return `
+            <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;border-bottom:1px dotted #eee;padding:4px 0;">
+              <div style="font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>${cognome}</b></div>
+              <div style="color:var(--ink-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.85rem;">${ruolo}</div>
+              <div style="text-align:right;">
+                <span class="pill" style="background:${statoColor};color:#fff;padding:2px 6px;font-size:.75rem;">${stato}</span>
+              </div>
+            </li>
+          `;
+        }).join('');
+      }
+
+      playersHtml += '</ul>';
+
+      candidatiListHtml = `
+        <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px;">
+          <div style="font-weight:700;color:#0e7a0d;margin-bottom:4px;">Disponibilità Confermate (${candCount}):</div>
+          ${playersHtml}
+        </div>
+      `;
+
+    } else {
+      candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (0).</div>`;
+    }
+
+  }
+}
 
     htmlAll += `
       <div class="card" data-match-id="${matchId}">
