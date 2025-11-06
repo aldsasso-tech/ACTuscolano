@@ -1021,7 +1021,8 @@ if(user){
      */
 window.loadProssimeGiornate = async function(asAdmin){
   const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
-  const ul = byId(listId); if(!ul) return; ul.innerHTML='';
+  const ul = byId(listId); if(!ul) return;
+  ul.innerHTML='';
 
   // carico calendario + rosa + utenti
   const [snapCalendar, snapRosa, snapUtenti] = await Promise.all([
@@ -1033,7 +1034,6 @@ window.loadProssimeGiornate = async function(asAdmin){
   const val = snapCalendar.val() || {};
   const rosa = snapRosa.val() || {};
   const utenti = snapUtenti.val() || {};
-
   const rosaArray = Object.values(rosa);
 
   let entries = Object.entries(val);
@@ -1048,17 +1048,17 @@ window.loadProssimeGiornate = async function(asAdmin){
   }
 
   ul.className='grid cols-3';
-ul.innerHTML = "";
+
+  let htmlAll = '';
 
   for(const [matchId,m] of entries){
-
-    // Leggi candidature match
+    // --- CANDIDATURE MATCH ---
     const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
     const cand = candSnap.val() || {};
-
     const candidatiAuthUIDs = Object.keys(cand).filter(uid => cand[uid] === true);
     const candCount = candidatiAuthUIDs.length;
 
+    // Join tramite /utenti (nome/cognome) → /rosa
     const candidatiTrovati = [];
     for(const authUid of candidatiAuthUIDs){
       const utente = utenti[authUid];
@@ -1067,66 +1067,143 @@ ul.innerHTML = "";
         if(giocatore) candidatiTrovati.push(giocatore);
       }
     }
-    const sortedCandidati = candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
+    candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
 
     const matchDate = toDate(m.data);
     const isPast = matchDate < today;
-
     const risultatoValido = !!(m.risultato && /\d+\s*-\s*\d+/.test(m.risultato));
 
-    // cand utente corrente
-    const candidature = cand || {};
-    const candidatiUID = Object.entries(candidature).filter(([,v])=>v===true).map(([uid])=>uid);
+    // utente corrente candidato?
     const uid = auth.currentUser ? auth.currentUser.uid : null;
-    const isCandidato = uid && candidatiUID.includes(uid);
+    const isCandidato = !!(uid && candidatiAuthUIDs.includes(uid));
 
-    // ---- BTN Prestazioni
-    let prestazioniBtn='';
-    if(risultatoValido){
-      prestazioniBtn = `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`;
-    } else {
-      prestazioniBtn = `<button class="btn" disabled style="opacity:0.6;">Prestazioni</button>`;
-    }
+    // --- BTN Prestazioni ---
+    const prestazioniBtn = risultatoValido
+      ? `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`
+      : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
 
-    // ---- BTN Candidatura (Mantiene i FIX)
+    // --- BTN Candidatura (usa toggleCandidatura) ---
     let candButton='';
     if(risultatoValido){
-      candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura terminata</button>`;
+      candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
     } else if(isPast){
-      candButton = `<button class="btn" disabled style="opacity:0.6;">Candidatura scaduta</button>`;
+      candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
     } else {
       const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
-      // FIX: Aggiunto data-match-cand-btn
-      candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
+      candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" data-candidate-state="${isCandidato ? '1':'0'}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
     }
 
-    // ---- BTN Formazione (NUOVO: RIPRISTINATO)
-    let formazioneBtn = '';
-    // nuova logica corretta
-    if (m.formazioni && Object.keys(m.formazioni).length > 0) {
-      // button attivo
-      formazioneBtn = `<button class="btn" onclick="showFormazionePubblica('${matchId}')">Formazione</button>`;
-    } else {
-      formazioneBtn = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Formazione</button>`;
+    // --- BTN Formazione (verifica struttura attuale m.formazioni["0"].formazione) ---
+    const hasFormazione =
+      m.formazioni &&
+      m.formazioni["0"] &&
+      m.formazioni["0"].formazione &&
+      Object.keys(m.formazioni["0"].formazione).length > 0;
+
+    const formazioneBtn = hasFormazione
+      ? `<button class="btn" onclick="showFormazionePubblica('${matchId}','${escapeHtml(m.avversaria||'')}')">Formazione</button>`
+      : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Formazione</button>`;
+
+    // --- Esito pill se hai risultato ---
+    let esitoPill = '';
+    if (m.risultato && m.risultato !== 'N/D') {
+      const [scoreCasaStr, scoreOspiteStr] = m.risultato.split('-').map(s => s.trim());
+      const scoreCasa = parseInt(scoreCasaStr);
+      const scoreOspite = parseInt(scoreOspiteStr);
+      if (!isNaN(scoreCasa) && !isNaN(scoreOspite)) {
+        const scoreTuscolano = m.casa ? scoreCasa : scoreOspite;
+        const scoreAvversaria = m.casa ? scoreOspite : scoreCasa;
+        let esito = '', esitoColor = '';
+        if (scoreTuscolano > scoreAvversaria) { esito='VITTORIA'; esitoColor='background:#0e7a0d;color:#fff;'; }
+        else if (scoreTuscolano < scoreAvversaria) { esito='SCONFITTA'; esitoColor='background:var(--red);color:#fff;'; }
+        else { esito='PAREGGIO'; esitoColor='background:var(--yellow);color:#111;'; }
+        esitoPill = `<span class="pill" style="${esitoColor} margin-left:8px;">${esito}</span>`;
+      }
     }
 
-    ul.innerHTML += `
-      <div class="card">
-        <div class="player-title">${escapeHtml(m.avversaria||'')}</div>
-        <div class="player-sub">${m.data} - ${m.orario}</div>
-        <div class="player-sub">${m.campo}</div>
-        <div style="margin-top:10px;font-weight:bold">
-            Candidati: <span data-match-count="${matchId}">${candCount}</span>
-        </div>
-        <div class="row" style="margin-top:14px;">
-          ${candButton}
-          ${formazioneBtn}
-          ${prestazioniBtn}
+    // --- LISTA CANDIDATI (Cognome, Ruolo, Stato) -- SOLO PUBBLICO e SOLO se non c'è risultato ---
+    let candidatiListHtml = '';
+    if (!asAdmin && !risultatoValido) {
+      if (candCount > 0) {
+        let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
+        // intestazione
+        playersHtml += `
+          <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
+            <div>Cognome</div>
+            <div>Ruolo</div>
+            <div style="text-align:right;">Stato</div>
+          </li>
+        `;
+        if (candidatiTrovati.length > 0) {
+          playersHtml += candidatiTrovati.map(p=>{
+            const cognome = escapeHtml(p.cognome || '?');
+            const ruolo = escapeHtml(p.ruolo || 'N/D');
+            const stato = escapeHtml(p.stato || 'N/D');
+            const statoColor = stato === 'Titolare' ? '#0e7a0d'
+                              : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
+            return `
+              <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;border-bottom:1px dotted #eee;padding:4px 0;">
+                <div style="font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>${cognome}</b></div>
+                <div style="color:var(--ink-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.85rem;">${ruolo}</div>
+                <div style="text-align:right;">
+                  <span class="pill" style="background:${statoColor};color:#fff;padding:2px 6px;font-size:.75rem;">${stato}</span>
+                </div>
+              </li>
+            `;
+          }).join('');
+        }
+        if (candCount > candidatiTrovati.length) {
+          const mancanti = candCount - candidatiTrovati.length;
+          playersHtml += `<li style="padding:4px 0;color:var(--red);font-weight:600;">${mancanti} candidati non trovati in /rosa (verifica allineamento Nome/Cognome).</li>`;
+        }
+        playersHtml += '</ul>';
+        candidatiListHtml = `
+          <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px;">
+            <div style="font-weight:700;color:#0e7a0d;margin-bottom:4px;">Disponibilità Confermate (${candCount}):</div>
+            ${playersHtml}
+          </div>
+        `;
+      } else {
+        candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (0).</div>`;
+      }
+    }
+
+    htmlAll += `
+      <div class="card" data-match-id="${matchId}">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
+          <div>
+            <div class="player-title" style="display:flex;align-items:center;">
+              vs ${escapeHtml(m.avversaria||'')}
+              ${m.risultato && m.risultato!=='N/D' ? `&nbsp;(${m.risultato})` : ''}
+              ${esitoPill}
+            </div>
+            <div class="player-sub">
+              ${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
+              Campo: ${escapeHtml(m.campo||'')} • ${m.casa ? 'Casa' : 'Trasferta'}
+            </div>
+            ${candidatiListHtml}
+          </div>
+          <div class="actions" style="margin:0;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;">
+            ${asAdmin ? `
+              <button class="btn btn--admin" onclick="showResultForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Risultato/Video</button>
+              <button class="btn btn--admin" onclick="showFormazioneForm('${matchId}','${escapeHtml(m.avversaria||'')}', '${escapeHtml(JSON.stringify(m.formazioni || null))}')">Formazione/Sost.</button>
+              <button class="btn btn--admin" onclick="showCandidatureEditor('${matchId}','${escapeHtml(m.avversaria||'')}')">Candidature (${candCount})</button>
+              ${risultatoValido ? `<button class="btn btn--admin" onclick="showValutazionePartitaForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Valuta Prestazioni</button>` : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Valuta Prestazioni</button>`}
+              <button class="btn" onclick="crudDeletePartita('${matchId}')">Elimina Partita</button>
+            ` : `
+              ${formazioneBtn}
+              ${prestazioniBtn}
+              ${candButton}
+            `}
+          </div>
         </div>
       </div>
     `;
   }
+
+  ul.innerHTML = htmlAll;
 };
+
 
     /**
      * CORREZIONE 1: Implementazione del layout a blocchi/griglia per i risultati (Risultati squadra)
