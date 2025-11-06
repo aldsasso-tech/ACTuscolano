@@ -406,6 +406,32 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
         return;
     }
 
+
+  window.toggleCandidatura = async function(matchId){
+  if(!auth.currentUser){
+    alert("Devi effettuare il login per candidarti");
+    showLogin();
+    return;
+  }
+
+  const uid = auth.currentUser.uid;
+
+  const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
+
+  const snap = await get(candRef);
+  const isCandidato = snap.exists() && snap.val() === true;
+
+  if(isCandidato){
+    await set(candRef, false);
+  } else {
+    await set(candRef, true);
+  }
+
+  // dopo modifica candidature ricarico calendario
+  window.loadProssimeGiornate(false);
+  if(isAdmin) window.loadProssimeGiornate(true);
+};
+
     // ordina correttamente date in formato dd/mm/yyyy
     rows.sort((a,b)=>{
        const pa = a.data.split('/');
