@@ -407,7 +407,8 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
     }
 
 
-  window.toggleCandidatura = async function(matchId){
+window.toggleCandidatura = async function(matchId){
+
   if(!auth.currentUser){
     alert("Devi effettuare il login per candidarti");
     showLogin();
@@ -415,22 +416,26 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
   }
 
   const uid = auth.currentUser.uid;
-
   const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
 
+  // leggo condizione attuale
   const snap = await get(candRef);
   const isCandidato = snap.exists() && snap.val() === true;
 
+  // aggiorno valore DB
   if(isCandidato){
     await set(candRef, false);
   } else {
     await set(candRef, true);
   }
 
-  // dopo modifica candidature ricarico calendario
-  window.loadProssimeGiornate(false);
-  if(isAdmin) window.loadProssimeGiornate(true);
+  // aggiorno UI in tempo reale senza cambiare pagina
+  if (typeof window.loadProssimeGiornate === "function") {
+    window.loadProssimeGiornate(false);
+    if (window.isAdmin) window.loadProssimeGiornate(true);
+  }
 };
+
 
     // ordina correttamente date in formato dd/mm/yyyy
     rows.sort((a,b)=>{
