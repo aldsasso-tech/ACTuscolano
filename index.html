@@ -878,12 +878,17 @@ if(user){
         const partite = snapshot.val() || {};
         let html = '';
 
-        const sortedKeys = Object.keys(partite).sort((a, b) => {
-          const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
-          const dateA = toDate(partite[a].data);
-          const dateB = toDate(partite[b].data);
-          return dateB - dateA;
-        });
+const sortedKeys = Object.keys(partite).sort((a, b) => {
+  const toDate = (d)=>{
+    if(!d) return new Date(2100,0,1);
+    const [dd,mm,yyyy] = d.split('/');
+    return new Date(Number(yyyy), Number(mm)-1, Number(dd));
+  };
+  const dateA = toDate(partite[a].data);
+  const dateB = toDate(partite[b].data);
+  return dateB - dateA;
+});
+
 
         sortedKeys.forEach(key => {
           const p = partite[key];
