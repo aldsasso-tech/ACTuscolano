@@ -1109,6 +1109,7 @@ if (risultatoValido) {
 }
 
 // --- BOTTONE CANDIDATURA ---
+
 let candButton = '';
 if (risultatoValido) {
   candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
@@ -1116,8 +1117,9 @@ if (risultatoValido) {
   candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
 } else {
   const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
-  candButton = `<button class="btn btn--accent" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
+  candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
 }
+
 
 
         
@@ -2272,25 +2274,22 @@ window.toggleCandidatura = async function(matchId) {
     const alreadyCandidato = snap.exists() && snap.val() === true;
 
     if (alreadyCandidato) {
-      // l’utente è già candidato → rimuovi candidatura
       await set(candRef, false);
-      alert("Hai annullato la tua candidatura per questa partita.");
+      alert("Hai annullato la candidatura!");
     } else {
-      // l’utente non è candidato → aggiungi candidatura
       await set(candRef, true);
-      alert("Hai confermato la tua candidatura per questa partita!");
+      alert("Hai confermato la candidatura!");
     }
 
-    // ricarica elenco partite per riflettere lo stato aggiornato
-    if (typeof window.loadProssimeGiornate === "function") {
-      window.loadProssimeGiornate(false);
-    }
+    const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
+    if (btn) btn.innerText = alreadyCandidato ? "Candidati" : "Annulla Candidatura";
 
-  } catch (e) {
-    console.error("Errore durante l'aggiornamento candidatura:", e);
-    alert("Errore durante l'aggiornamento della candidatura.");
+  } catch(e) {
+    console.error("Errore candidatura:", e);
+    alert("Errore aggiornamento candidatura.");
   }
 };
+
 
 
 
