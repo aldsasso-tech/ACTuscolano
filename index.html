@@ -407,15 +407,10 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
     }
 
 
-window.toggleCandidatura = async function(matchId){
-  if(!auth.currentUser){
-    alert("Devi effettuare il login per candidarti");
-    showLogin();
-    return;
-  }
 
+  // Seleziona il pulsante usando l'attributo data
   const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
-  if (btn) btn.disabled = true; // Disabilita subito il pulsante
+  if (btn) btn.disabled = true; // Disabilita subito per prevenire doppi click
 
   try {
     const uid = auth.currentUser.uid;
@@ -423,32 +418,33 @@ window.toggleCandidatura = async function(matchId){
 
     const snap = await get(candRef);
     const isCandidato = snap.exists() && snap.val() === true;
-    const nuovoValore = !isCandidato; // Calcola il nuovo stato
+    const nuovoValore = !isCandidato;
 
     await set(candRef, nuovoValore); // SCRITTURA NEL DATABASE
 
-    // AGGIORNAMENTO IMMEDIATO DEL DOM (FIX)
-    // Rimuovendo loadProssimeGiornate(false), l'aggiornamento è stabile.
+    // FIX 1: AGGIORNAMENTO IMMEDIATO DEL DOM (QUESTO DEVE BASTARE)
     if (btn) {
         btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
-        // Opzionale: Se il pulsante è rosso (btn--accent) quando si è candidati:
-        // btn.classList.toggle('btn--accent', nuovoValore); 
+        // Toggla la classe CSS, se necessario:
+        btn.classList.toggle('btn--accent', nuovoValore); 
     }
 
-    // Se è admin, aggiorna solo la vista admin (questa non è visibile all'utente pubblico)
+    // FIX 2 (CRUCIALE): RIMOSSA la chiamata a await loadProssimeGiornate(false);
+    // In questo modo, il tuo aggiornamento del DOM NON viene sovrascritto.
+
+    // Se è admin, aggiorna solo la vista admin
     if(window.isAdmin){
       await loadProssimeGiornate(true);
     }
   } catch (error) {
     console.error("Errore candidatura:", error);
     alert("Si è verificato un errore durante l'operazione.");
-    // In caso di errore, si può ricaricare per ripristinare lo stato corretto
-    await loadProssimeGiornate(false); 
+    // In caso di errore, ricarica per ripristinare lo stato corretto
+    await loadProssimeGiornate(false);
   } finally {
     if (btn) btn.disabled = false; // Riabilita il pulsante
   }
 };
-
 
 
 
