@@ -1102,12 +1102,12 @@ ul.innerHTML = "";
 
     // ---- BTN Formazione (NUOVO: RIPRISTINATO)
     let formazioneBtn = '';
-    // Assumiamo che la formazione sia un oggetto non vuoto in m.formazione
-    if (m.formazione && Object.keys(m.formazione).length > 0) {
-      // Si assume esista la funzione showFormazionePubblica
+    // nuova logica corretta
+    if (m.formazioni && Object.keys(m.formazioni).length > 0) {
+      // button attivo
       formazioneBtn = `<button class="btn" onclick="showFormazionePubblica('${matchId}')">Formazione</button>`;
     } else {
-      formazioneBtn = `<button class="btn" disabled style="opacity:0.6;">Formazione</button>`;
+      formazioneBtn = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Formazione</button>`;
     }
 
     ul.innerHTML += `
