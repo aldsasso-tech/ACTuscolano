@@ -1140,13 +1140,19 @@ if (!asAdmin && !risultatoValido) {
         </div>
       `;
     } else {
-      candidatiListHtml = `
-        <div class="pill" style="margin-top:8px;font-size:0.85rem;">
-          Nessuna disponibilità confermata (0).
-        </div>
+    candidatiListHtml = `
+  <div class="pill" style="margin-top:8px;font-size:0.85rem;">
+    Disponibilità Confermate (${candCount})
+  </div>
       `;
     }
-
+// SE LA PARTITA È PASSATA -> mostra SOLO totale disponibilità, NON dettaglio giocatori
+if (isPast) {
+  candidatiListHtml = `
+    <div class="pill" style="margin-top:8px;font-size:0.85rem;">
+      Disponibilità Confermate (${candCount})
+    </div>`;
+}
   // PARTITE FUTURE → MOSTRA DETTAGLIO
   } else {
 
