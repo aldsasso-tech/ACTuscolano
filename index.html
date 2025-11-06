@@ -1087,22 +1087,17 @@ if(user){
         const risultatoValido = (m.risultato && m.risultato !== 'N/D');
 
         // Candidatura Button: only active if no result is entered AND not expired
-        let candButton = '';
-        if (risultatoValido) {
-           candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
-        } else if (isPast) {
-           candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
-        } else {
-          candButton = `<button class="btn btn--accent" onclick="candidati('${matchId}')">Candidatura</button>`; 
-        }
+        // Candidatura Button: only active if no result is entered AND not expired
+let candButton = '';
+if (risultatoValido) {
+   candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
+} else if (isPast) {
+   candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
+} else {
+   const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
+   candButton = `<button class="btn btn--accent" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
+}
 
-        // Prestazioni Button: active only if result is valid
-        let prestazioniBtn = '';
-        if (risultatoValido) {
-          prestazioniBtn = `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`;
-        } else {
-          prestazioniBtn = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
-        }
         
         // ** Preparazione della stringa JSON per l'Admin Button **
         const jsonFormazioni = JSON.stringify(m.formazioni || null); 
@@ -1896,7 +1891,14 @@ window.saveFormazione = async function(matchId){
     const snapCand = await get(ref(db, `calendario/${matchId}/candidature`));
     const candidature = snapCand.val() || {};
     const candidatiUID = Object.entries(candidature).filter(([,v])=>v===true).map(([uid])=>uid);
+const uid = auth.currentUser ? auth.currentUser.uid : null;
 
+// controlla se utente già candidato
+const isCandidato = uid && candidatiUID.includes(uid);
+
+
+
+    
     // Esclusi = candidati - (titolari ∪ panchina)
     const used = new Set(Object.values(formazione).filter(Boolean));
     panchina.forEach(uid => used.add(uid));
@@ -2060,6 +2062,11 @@ tit = newFormat;
   box.innerHTML = html.join('');
 }
 
+
+
+
+
+    
 
     /**
      * FIX: Esposto a window per essere accessibile dall'onclick HTML
@@ -2713,11 +2720,41 @@ byId('btn-salva-permessi').onclick = async function(){
     };
 
     
-    // Funzioni Pubbliche placeholder (candidati)
-    window.candidati = (matchId) => {
-        if(!auth.currentUser) return alert("Devi fare il login per candidarti.");
-        alert("La logica per la candidatura (salvataggio disponibilità utente) non è stata ancora implementata. Match ID: " + matchId);
-    };
+     /**
+     * funzione toggle candidatura
+     */
+window.toggleCandidatura = async function(matchId) {
+  if(!auth.currentUser){
+    return showLogin();
+  }
+
+  const user = auth.currentUser;
+  const snapMatch = await get(ref(db, `calendario/${matchId}`));
+  const match = snapMatch.val() || {};
+
+  // --- BLOCCO 48h solo non admin ---
+  if(window.currentUserRole !== 'admin' && window.currentUserRole !== 'superadmin'){
+    if(match.data){
+      const [dd,mm,yy] = match.data.split('/');
+      const matchDate = new Date(`${yy}-${mm}-${dd}T00:00:00`);
+      const diffHours = (matchDate - new Date()) / 36e5;
+      if(diffHours < 48){
+        alert("Candidature bloccate. Mancano meno di 48 ore alla partita.");
+        return;
+      }
+    }
+  }
+
+  const candRef = ref(db, `calendario/${matchId}/candidature/${user.uid}`);
+  const snap = await get(candRef);
+  const curr = snap.exists() ? snap.val() : false;
+  const nuovoValore = !curr;
+
+  await set(candRef, nuovoValore);
+
+  // refresh UI
+  if(window.loadCalendario) window.loadCalendario(); 
+}
     
   
 
