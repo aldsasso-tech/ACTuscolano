@@ -419,10 +419,17 @@ window.toggleCandidatura = async function(matchId){
 
   const snap = await get(candRef);
   const isCandidato = snap.exists() && snap.val() === true;
+  const nuovoValore = !isCandidato; // Calcola il nuovo stato
 
-  await set(candRef, !isCandidato);
+  await set(candRef, nuovoValore);
 
-  // ricarico subito calendario attuale IN LOCO
+  // FIX: Aggiorna immediatamente il testo del pulsante
+  const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
+  if (btn) {
+      btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
+  }
+
+  // ricarico subito calendario attuale IN LOCO (mantenuto per eventuale logica admin)
   await loadProssimeGiornate(false);
 
   // se è admin aggiorno anche la vista admin
@@ -2142,47 +2149,6 @@ window.saveNewMatch = async function(){
   byId('match-campo').value="";
   byId('match-casa-trasferta').value="true";
 };
-
-// ===================== TOGGLE CANDIDATURA =====================
-window.toggleCandidatura = async function(matchId) {
-  const user = auth.currentUser;
-  if (!user) {
-    alert("Effettua il login per candidarti!");
-    showLogin();
-    return;
-  }
-
-  const uid = user.uid;
-  const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
-
-  try {
-    const snap = await get(candRef);
-    const alreadyCandidato = snap.exists() && snap.val() === true;
-
-    if (alreadyCandidato) {
-      await set(candRef, false);
-      alert("Hai annullato la candidatura!");
-    } else {
-      await set(candRef, true);
-      alert("Hai confermato la candidatura!");
-    }
-
-    const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
-    if (btn) btn.innerText = alreadyCandidato ? "Candidati" : "Annulla Candidatura";
-
-  } catch(e) {
-    console.error("Errore candidatura:", e);
-    alert("Errore aggiornamento candidatura.");
-  }
-};
-
-
-
-
-
-
-
-
 
 
 
