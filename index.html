@@ -1127,35 +1127,22 @@ window.loadProssimeGiornate = async function(asAdmin){
     }
 
     // --- LISTA CANDIDATI (Cognome, Ruolo, Stato) -- SOLO PUBBLICO e SOLO se non c'è risultato ---
-    let candidatiListHtml = '';
+  let candidatiListHtml = '';
 if (!asAdmin && !risultatoValido) {
 
-  // PARTITE PASSATE → SOLO TOTALE
+  // PARTITE PASSATE → SOLO TOTALE (FIX: logica semplificata)
   if (isPast) {
-
-    if (candCount > 0) {
-      candidatiListHtml = `
-        <div class="pill" style="margin-top:8px;font-size:0.85rem;">
-          Disponibilità Confermate (${candCount})
-        </div>
-      `;
-    } else {
+    // Per le partite passate, mostriamo sempre il totale.
+    
+    // Potresti voler distinguere tra zero e >0, ma per ora usiamo il formato più semplice:
     candidatiListHtml = `
-  <div class="pill" style="margin-top:8px;font-size:0.85rem;">
-    Disponibilità Confermate (${candCount})
-  </div>
-      `;
-    }
-// SE LA PARTITA È PASSATA -> mostra SOLO totale disponibilità, NON dettaglio giocatori
-if (isPast) {
-  candidatiListHtml = `
-    <div class="pill" style="margin-top:8px;font-size:0.85rem;">
-      Disponibilità Confermate (${candCount})
-    </div>`;
-}
+      <div class="pill" style="margin-top:8px;font-size:0.85rem;">
+        Disponibilità Confermate (${candCount})
+      </div>`;
+
   // PARTITE FUTURE → MOSTRA DETTAGLIO
   } else {
-
+    // L'intera sezione qui è corretta, ma la includo per completezza del blocco
     if (candCount > 0) {
       let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
 
@@ -1173,7 +1160,7 @@ if (isPast) {
         const ruolo = escapeHtml(p.ruolo || 'N/D');
         const stato = escapeHtml(p.stato || 'N/D');
         const statoColor = stato === 'Titolare' ? '#0e7a0d'
-                        : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
+                           : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
         return `
           <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;border-bottom:1px dotted #eee;padding:4px 0;">
             <div style="font-weight:700;"><b>${cognome}</b></div>
@@ -1196,7 +1183,6 @@ if (isPast) {
     } else {
       candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (0).</div>`;
     }
-
   }
 }
 
