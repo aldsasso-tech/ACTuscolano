@@ -1024,35 +1024,38 @@ const sortedKeys = Object.keys(partite).sort((a, b) => {
      * FUNZIONE loadProssimeGiornate (AGGIORNATA PER LISTA CANDIDATI)
      * IMPLEMENTAZIONE FIX: Logica di join /candidature -> /utenti -> /rosa (FIX RICHIESTO)
      */
+/**
+ * FUNZIONE loadProssimeGiornate (COMPLETA E CORRETTA)
+ */
 window.loadProssimeGiornate = async function(asAdmin){
-  const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
-  const ul = byId(listId); if(!ul) return;
-  ul.innerHTML='';
+  const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
+  const ul = byId(listId); if(!ul) return;
+  ul.innerHTML='';
 
-  // carico calendario + rosa + utenti
-  const [snapCalendar, snapRosa, snapUtenti] = await Promise.all([
-    get(ref(db,'calendario')),
-    get(ref(db,'rosa')),
-    get(ref(db,'utenti'))
-  ]);
+  // carico calendario + rosa + utenti
+  const [snapCalendar, snapRosa, snapUtenti] = await Promise.all([
+    get(ref(db,'calendario')),
+    get(ref(db,'rosa')),
+    get(ref(db,'utenti'))
+  ]);
 
-  const val = snapCalendar.val() || {};
-  const rosa = snapRosa.val() || {};
-  const utenti = snapUtenti.val() || {};
-  const rosaArray = Object.values(rosa);
+  const val = snapCalendar.val() || {};
+  const rosa = snapRosa.val() || {};
+  const utenti = snapUtenti.val() || {};
+  const rosaArray = Object.values(rosa);
 
-  let entries = Object.entries(val);
-  const toDate = (d)=>{ const [dd,mm,yyyy]=String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
-  const today = new Date(); today.setHours(0,0,0,0);
+  let entries = Object.entries(val);
+  const toDate = (d)=>{ const [dd,mm,yyyy]=String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+  const today = new Date(); today.setHours(0,0,0,0);
 
-  entries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
+  entries.sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
 
-  if(!entries.length){
-    ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>';
-    return;
-  }
+  if(!entries.length){
+    ul.innerHTML = '<div class="help">Nessuna partita a calendario.</div>';
+    return;
+  }
 
-ul.className='grid cols-3';
+ ul.className='grid cols-3'; // IMPOSTA LAYOUT A 3 COLONNE
 
   let htmlAll = '';
 
@@ -1072,7 +1075,9 @@ ul.className='grid cols-3';
         if(giocatore) candidatiTrovati.push(giocatore);
       }
     }
-    candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
+    // LA VARIABILE CANDIDATITROVATI VIENE ORDINATA E RINOMINATA PER CHIAREZZA
+    const sortedCandidati = candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
+
 
     const matchDate = toDate(m.data);
     const isPast = matchDate < today;
@@ -1126,68 +1131,103 @@ ul.className='grid cols-3';
       }
     }
 
-    // --- LISTA CANDIDATI (Logica Corretta) ---
-    // --- LISTA CANDIDATI (LOGICA DEFINITIVA)
-    let candidatiListHtml = '';
+    // --- LISTA CANDIDATI (Logica Corretta e FIX Visualizzazione) ---
+    let candidatiListHtml = '';
+    if (!asAdmin) { // SOLO VISTA PUBBLICA
 
-    if (!asAdmin) {
+        // 1. PARTITE PASSATE: Mostra SEMPRE il totale.
+        if (isPast) {
+          const safeCount = Number.isFinite(candCount) ? candCount : 0;
+            candidatiListHtml = `
+                <div class="pill" style="margin-top:8px;font-size:0.85rem;">
+                    Disponibilità Confermate: <span data-match-count="${matchId}">${safeCount}</span>
+                </div>`;
+        } 
+        
+        // 2. PARTITE FUTURE: Mostra il dettaglio solo se il risultato NON è valido.
+        else if (!risultatoValido) {
 
-      // PARTITE PASSATE → SOLO totale candidature
-      if (isPast) {
-        candidatiListHtml = `
-          <div class="pill" style="margin-top:8px;font-size:0.85rem;">
-            Disponibilità Confermate: <b>${candCount}</b>
-          </div>`;
-      }
+            if (candCount > 0) {
+                // playersHtml usa display:flex per il contenitore UL e grid per gli LI
+                let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
 
-      // PARTITE FUTURE e risultato NON valido → mostra dettaglio giocatori
-      else if (!risultatoValido) {
+                // intestazione (Ordine Cognome, Ruolo, Stato e allineamento GRID unificato)
+                playersHtml += `
+                    <li style="display:grid; grid-template-columns: 1.5fr 1fr 1fr; gap:8px; align-items:center; padding:4px 0; font-weight:700; color:var(--ink-sub); border-bottom:1px solid var(--line); margin-bottom:4px; height:auto; line-height:1.2;">
+                        <div>Cognome</div>
+                        <div>Ruolo</div>
+                        <div style="text-align:right;">Stato</div>
+                    </li>
+                `;
 
-        if (candCount > 0) {
+                playersHtml += sortedCandidati.map(p => {
+                    const cognome = escapeHtml(p.cognome || '?');
+                    const ruolo = escapeHtml(p.ruolo || 'Ruolo N/D');
+                    const stato = escapeHtml(p.stato || 'Stato N/D'); // Stato da Rosa
+                    
+                    const statoColor = stato === 'Titolare' ? '#0e7a0d' : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
+                    
+                    return `
+                        <li style="display:grid; grid-template-columns: 1.5fr 1fr 1fr; gap:8px; align-items:center; border-bottom:1px dotted #eee; padding:4px 0; height:auto; line-height:1.2;">
+                            <div style="font-weight:700; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>${cognome}</b></div>
+                            <div style="color:var(--ink-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.85rem;">${ruolo}</div>
+                            <div style="text-align:right;">
+                                <span class="pill" style="background:${statoColor}; color:#fff; padding:2px 6px; font-size:.75rem;">${stato}</span>
+                            </div>
+                        </li>
+                    `;
+                }).join('');
 
-          let playersHtml = `
-            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">
-              <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
-                  <div>Cognome</div>
-                  <div>Ruolo</div>
-                  <div style="text-align:right;">Stato</div>
-              </li>
-          `;
+                playersHtml += '</ul>';
 
-          playersHtml += candidatiTrovati.map(p=>{
-            const cognome = escapeHtml(p.cognome||'?');
-            const ruolo   = escapeHtml(p.ruolo||'N/D');
-            const stato   = escapeHtml(p.stato||'N/D');
-            const statoColor = stato === 'Titolare' ? '#0e7a0d' :
-                              (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
+                candidatiListHtml = `
+                    <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px;">
+                        <div style="font-weight:700;color:#0e7a0d;margin-bottom:4px;">Disponibilità Confermate (<span data-match-count="${matchId}">${candCount}</span>):</div>
+                        ${playersHtml}
+                    </div>
+                `;
+            } else {
+                candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (<span data-match-count="${matchId}">0</span>).</div>`;
+            }
+        } // Chiusura: else if (!risultatoValido)
+    } // <--- CHIUSURA: if (!asAdmin)
 
-            return `
-              <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;border-bottom:1px dotted #eee;padding:4px 0;">
-                <div style="font-weight:700;"><b>${cognome}</b></div>
-                <div style="color:var(--ink-sub);font-size:0.85rem;">${ruolo}</div>
-                <div style="text-align:right;">
-                  <span class="pill" style="background:${statoColor};color:#fff;padding:2px 6px;font-size:.75rem;">${stato}</span>
-                </div>
-              </li>
-            `;
-          }).join('');
+    // --- INSERIMENTO CARD HTML (Questa div.card è l'elemento che va nel grid) ---
+    htmlAll += `
+      <div class="card" data-match-id="${matchId}">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
+          <div>
+            <div class="player-title" style="display:flex;align-items:center;">
+              vs ${escapeHtml(m.avversaria||'')}
+              ${m.risultato && m.risultato!=='N/D' ? `&nbsp;(${m.risultato})` : ''}
+              ${esitoPill}
+            </div>
+            <div class="player-sub">
+              ${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
+              Campo: ${escapeHtml(m.campo||'')} • ${m.casa ? 'Casa' : 'Trasferta'}
+            </div>
+            ${candidatiListHtml}
+          </div>
+          <div class="actions" style="margin:0;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;">
+            ${asAdmin ? `
+              <button class="btn btn--admin" onclick="showResultForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Risultato/Video</button>
+              <button class="btn btn--admin" onclick="showFormazioneForm('${matchId}','${escapeHtml(m.avversaria||'')}', '${escapeHtml(JSON.stringify(m.formazioni || null))}')">Formazione/Sost.</button>
+              <button class="btn btn--admin" onclick="showCandidatureEditor('${matchId}','${escapeHtml(m.avversaria||'')}')">Candidature (${candCount})</button>
+              ${risultatoValido ? `<button class="btn btn--admin" onclick="showValutazionePartitaForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Valuta Prestazioni</button>` : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Valuta Prestazioni</button>`}
+              <button class="btn" onclick="crudDeletePartita('${matchId}')">Elimina Partita</button>
+            ` : `
+              ${formazioneBtn}
+              ${prestazioniBtn}
+              ${candButton}
+            `}
+          </div>
+        </div>
+      </div>
+    `;
+  } // Chiusura del ciclo for
 
-          playersHtml += '</ul>';
-
-          candidatiListHtml = `
-          <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px;">
-            <div style="font-weight:700;color:#0e7a0d;margin-bottom:4px;">
-              Disponibilità Confermate (${candCount}):
-            </div>
-            ${playersHtml}
-          </div>`;
-        } else {
-          candidatiListHtml = `
-            <div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (0)</div>`;
-    }
-
-    } // Chiusura: else if (!risultatoValido)
-} // <--- CHIUSURA CRUCIALE: if (!asAdmin)
+  ul.innerHTML = htmlAll;
+}; // Chiusura della funzione
 
 // --- INSERIMENTO CARD HTML (Deve essere FUORI dai condizionali candidati) ---
     htmlAll += `
