@@ -1149,28 +1149,31 @@ window.loadProssimeGiornate = async function(asAdmin){
                 let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
 
                 // intestazione (Ordine Cognome, Ruolo, Stato e allineamento GRID unificato)
-              playersHtml += `
-  <li style="display:grid; grid-template-columns: 1.5fr 1.5fr 1fr; gap:8px; align-items:center; padding:4px 0; font-weight:700; color:var(--ink-sub); border-bottom:1px solid var(--line); margin-bottom:4px;">
-                        <div>Cognome</div>
-                        <div>Ruolo</div>
-                        <div style="text-align:right;">Stato</div>
-                    </li>
+             playersHtml += `
+  <li style="display:grid;grid-template-columns:1.3fr 1.2fr 0.8fr;gap:6px;align-items:center;padding:3px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
+    <div>Cognome</div>
+    <div>Ruolo</div>
+    <div style="text-align:right;">Stato</div>
+  </li>
 `;
-                playersHtml += sortedCandidati.map(p => {
-                    const cognome = escapeHtml(p.cognome || '?');
-                    const ruolo = escapeHtml(p.ruolo || 'Ruolo N/D');
-                    const stato = escapeHtml(p.stato || 'Stato N/D'); // Stato da Rosa
-                    
-                    const statoColor = stato === 'Titolare' ? '#0e7a0d' : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
-                    
-                    return `
-       <li style="display:grid; grid-template-columns: 1.5fr 1.5fr 1fr; gap:8px; align-items:center; border-bottom:1px dotted #eee; padding:4px 0;">
-                                <div style="font-weight:700; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>${cognome}</b></div>
-                                <div style="color:var(--ink-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.85rem;">${ruolo}</div>
-                                <div style="text-align:right;">
-                                    <span class="pill" style="background:${statoColor}; color:#fff; padding:2px 6px; font-size:.75rem;">${stato}</span>
-                                </div>
-                            </li>
+
+// righe tabella giocatori
+playersHtml += sortedCandidati.map(p => {
+  const cognome = escapeHtml(p.cognome || '?');
+  const ruolo = escapeHtml(p.ruolo || 'Ruolo N/D');
+  const stato = escapeHtml(p.stato || 'Stato N/D');
+
+  const statoColor = stato === 'Titolare' ? '#0e7a0d' :
+                    (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
+
+  return `
+    <li style="display:grid;grid-template-columns:1.3fr 1.2fr 0.8fr;gap:6px;align-items:center;border-bottom:1px dotted #ddd;padding:2px 0;line-height:1.05;">
+      <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><b>${cognome}</b></div>
+      <div style="color:var(--ink-sub);font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ruolo}</div>
+      <div style="text-align:right;">
+        <span class="pill" style="background:${statoColor};color:#fff;padding:2px 6px;font-size:.73rem;">${stato}</span>
+      </div>
+    </li>
                     `;
                 }).join('');
                 playersHtml += '</ul>';
