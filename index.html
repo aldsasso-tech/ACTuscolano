@@ -1127,7 +1127,7 @@ window.loadProssimeGiornate = async function(asAdmin){
     }
 
     // --- LISTA CANDIDATI (Logica Corretta) ---
-  let candidatiListHtml = '';
+let candidatiListHtml = '';
 if (!asAdmin) { // SOLO VISTA PUBBLICA
 
     // 1. PARTITE PASSATE: Mostra SEMPRE il totale.
@@ -1139,7 +1139,6 @@ if (!asAdmin) { // SOLO VISTA PUBBLICA
     } 
     
     // 2. PARTITE FUTURE: Mostra il dettaglio solo se il risultato NON è valido.
-   // 2. PARTITE FUTURE: Mostra il dettaglio solo se il risultato NON è valido (cioè, non è ancora stata giocata o il risultato non è stato messo).
     else if (!risultatoValido) {
 
         if (candCount > 0) {
@@ -1182,42 +1181,45 @@ if (!asAdmin) { // SOLO VISTA PUBBLICA
         } else {
             candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (<span data-match-count="${matchId}">0</span>).</div>`;
         }
-    }
-    htmlAll += `
-      <div class="card" data-match-id="${matchId}">
-        <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
-          <div>
-            <div class="player-title" style="display:flex;align-items:center;">
-              vs ${escapeHtml(m.avversaria||'')}
-              ${m.risultato && m.risultato!=='N/D' ? `&nbsp;(${m.risultato})` : ''}
-              ${esitoPill}
-            </div>
-            <div class="player-sub">
-              ${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
-              Campo: ${escapeHtml(m.campo||'')} • ${m.casa ? 'Casa' : 'Trasferta'}
-            </div>
-            ${candidatiListHtml}
-          </div>
-          <div class="actions" style="margin:0;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;">
-            ${asAdmin ? `
-              <button class="btn btn--admin" onclick="showResultForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Risultato/Video</button>
-              <button class="btn btn--admin" onclick="showFormazioneForm('${matchId}','${escapeHtml(m.avversaria||'')}', '${escapeHtml(JSON.stringify(m.formazioni || null))}')">Formazione/Sost.</button>
-              <button class="btn btn--admin" onclick="showCandidatureEditor('${matchId}','${escapeHtml(m.avversaria||'')}')">Candidature (${candCount})</button>
-              ${risultatoValido ? `<button class="btn btn--admin" onclick="showValutazionePartitaForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Valuta Prestazioni</button>` : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Valuta Prestazioni</button>`}
-              <button class="btn" onclick="crudDeletePartita('${matchId}')">Elimina Partita</button>
-            ` : `
-              ${formazioneBtn}
-              ${prestazioniBtn}
-              ${candButton}
-            `}
-          </div>
-        </div>
-      </div>
-    `;
-  }
+    } // Chiusura: else if (!risultatoValido)
+} // <--- CHIUSURA CRUCIALE: if (!asAdmin)
 
-  ul.innerHTML = htmlAll;
-};
+// --- INSERIMENTO CARD HTML (Deve essere FUORI dai condizionali candidati) ---
+    htmlAll += `
+      <div class="card" data-match-id="${matchId}">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
+          <div>
+            <div class="player-title" style="display:flex;align-items:center;">
+              vs ${escapeHtml(m.avversaria||'')}
+              ${m.risultato && m.risultato!=='N/D' ? `&nbsp;(${m.risultato})` : ''}
+              ${esitoPill}
+            </div>
+            <div class="player-sub">
+              ${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
+              Campo: ${escapeHtml(m.campo||'')} • ${m.casa ? 'Casa' : 'Trasferta'}
+            </div>
+            ${candidatiListHtml}
+          </div>
+          <div class="actions" style="margin:0;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;">
+            ${asAdmin ? `
+              <button class="btn btn--admin" onclick="showResultForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Risultato/Video</button>
+              <button class="btn btn--admin" onclick="showFormazioneForm('${matchId}','${escapeHtml(m.avversaria||'')}', '${escapeHtml(JSON.stringify(m.formazioni || null))}')">Formazione/Sost.</button>
+              <button class="btn btn--admin" onclick="showCandidatureEditor('${matchId}','${escapeHtml(m.avversaria||'')}')">Candidature (${candCount})</button>
+              ${risultatoValido ? `<button class="btn btn--admin" onclick="showValutazionePartitaForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Valuta Prestazioni</button>` : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Valuta Prestazioni</button>`}
+              <button class="btn" onclick="crudDeletePartita('${matchId}')">Elimina Partita</button>
+            ` : `
+              ${formazioneBtn}
+              ${prestazioniBtn}
+              ${candButton}
+            `}
+          </div>
+        </div>
+      </div>
+    `;
+  } // Chiusura del ciclo for
+
+  ul.innerHTML = htmlAll;
+}; // Chiusura della funzione
 
 
     /**
