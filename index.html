@@ -1020,10 +1020,7 @@ const sortedKeys = Object.keys(partite).sort((a, b) => {
       });
     }
 
-    /**
-     * FUNZIONE loadProssimeGiornate (AGGIORNATA PER LISTA CANDIDATI)
-     * IMPLEMENTAZIONE FIX: Logica di join /candidature -> /utenti -> /rosa (FIX RICHIESTO)
-     */
+
 /**
  * FUNZIONE loadProssimeGiornate (COMPLETA E CORRETTA)
  */
@@ -1075,7 +1072,7 @@ window.loadProssimeGiornate = async function(asAdmin){
         if(giocatore) candidatiTrovati.push(giocatore);
       }
     }
-    // LA VARIABILE CANDIDATITROVATI VIENE ORDINATA E RINOMINATA PER CHIAREZZA
+    // LA VARIABILE CANDIDATITROVATI VIENE ORDINATA
     const sortedCandidati = candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
 
 
@@ -1192,44 +1189,7 @@ window.loadProssimeGiornate = async function(asAdmin){
         } // Chiusura: else if (!risultatoValido)
     } // <--- CHIUSURA: if (!asAdmin)
 
-    // --- INSERIMENTO CARD HTML (Questa div.card è l'elemento che va nel grid) ---
-    htmlAll += `
-      <div class="card" data-match-id="${matchId}">
-        <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
-          <div>
-            <div class="player-title" style="display:flex;align-items:center;">
-              vs ${escapeHtml(m.avversaria||'')}
-              ${m.risultato && m.risultato!=='N/D' ? `&nbsp;(${m.risultato})` : ''}
-              ${esitoPill}
-            </div>
-            <div class="player-sub">
-              ${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
-              Campo: ${escapeHtml(m.campo||'')} • ${m.casa ? 'Casa' : 'Trasferta'}
-            </div>
-            ${candidatiListHtml}
-          </div>
-          <div class="actions" style="margin:0;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;">
-            ${asAdmin ? `
-              <button class="btn btn--admin" onclick="showResultForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Risultato/Video</button>
-              <button class="btn btn--admin" onclick="showFormazioneForm('${matchId}','${escapeHtml(m.avversaria||'')}', '${escapeHtml(JSON.stringify(m.formazioni || null))}')">Formazione/Sost.</button>
-              <button class="btn btn--admin" onclick="showCandidatureEditor('${matchId}','${escapeHtml(m.avversaria||'')}')">Candidature (${candCount})</button>
-              ${risultatoValido ? `<button class="btn btn--admin" onclick="showValutazionePartitaForm('${matchId}','${escapeHtml(m.avversaria||'')}')">Valuta Prestazioni</button>` : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Valuta Prestazioni</button>`}
-              <button class="btn" onclick="crudDeletePartita('${matchId}')">Elimina Partita</button>
-            ` : `
-              ${formazioneBtn}
-              ${prestazioniBtn}
-              ${candButton}
-            `}
-          </div>
-        </div>
-      </div>
-    `;
-  } // Chiusura del ciclo for
-
-  ul.innerHTML = htmlAll;
-}; // Chiusura della funzione
-
-// --- INSERIMENTO CARD HTML (Deve essere FUORI dai condizionali candidati) ---
+    // --- INSERIMENTO CARD HTML (Questa LI è l'elemento che va nel grid UL) ---
     htmlAll += `
       <li class="card" data-match-id="${matchId}">
         <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
