@@ -1086,10 +1086,12 @@ window.loadProssimeGiornate = async function(asAdmin){
     const uid = auth.currentUser ? auth.currentUser.uid : null;
     const isCandidato = !!(uid && candidatiAuthUIDs.includes(uid));
 
-    // --- BTN Prestazioni ---
-    const prestazioniBtn = risultatoValido
-      ? `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`
-      : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
+  // --- BTN Prestazioni ---
+// cliccabile solo se partita passata E risultato valido
+const prestazioniBtn = (isPast && risultatoValido)
+  ? `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`
+  : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
+
 
     // --- BTN Candidatura (usa toggleCandidatura) ---
     let candButton='';
@@ -1318,120 +1320,112 @@ playersHtml += sortedCandidati.map(p => {
     /**
      * CORREZIONE 2: Esposizione a window e logica per mostrare i dati del Riepilogo Giocatori
      */
-    window.loadPrestazioniAggregato = function(){
-        // Logica omessa per brevità, resta invariata rispetto alla precedente versione corretta.
-        // Assumo che la logica di calcolo e visualizzazione sia corretta.
-        const cont = byId('prestazioni-aggregate-content');
-        if(!cont) return;
-        cont.innerHTML = '<h3>Riepilogo Giocatori</h3><div class="help">Calcolo media voti e goal in corso…</div>';
-      
-        // Funzione asincrona interna per non bloccare il DOM, ma non usiamo await qui
-        (async () => {
-          try {
-            const [snapRosa, snapPrests] = await Promise.all([
-              get(ref(db, 'rosa')),
-              get(ref(db, 'prestazioni'))
-            ]);
-            const rosa = snapRosa.val() || {};
-            const prestazioniByMatch = snapPrests.val() || {};
-            
-            // 1. Aggrega dati
-            const aggregato = {};
-            Object.keys(rosa).forEach(pid => {
-  aggregato[pid] = { 
-     pid, // la chiave rosa
-     uid: rosa[pid].uid || pid,
-     totalVoto: 0, 
-     countVoto: 0, 
-     goal: 0, 
-     nome: `${rosa[pid].nome} ${rosa[pid].cognome}`, 
-     numero: rosa[pid].numero, 
-     cognome: rosa[pid].cognome 
-  };
-});
+   window.loadPrestazioniAggregato = function(){
+  const cont = byId('prestazioni-aggregate-content');
+  if(!cont) return;
+  cont.innerHTML = '<h3>Riepilogo Giocatori</h3><div class="help">Calcolo media voti e goal in corso…</div>';
 
+  (async () => {
+    try {
+      const [snapRosa, snapPrests] = await Promise.all([
+        get(ref(db, 'rosa')),
+        get(ref(db, 'prestazioni'))
+      ]);
 
-            Object.values(prestazioniByMatch).forEach(matchPrests => {
-              Object.entries(matchPrests).forEach(([pid, data]) => {
-                if (aggregato[pid]) {
-                  // Assicurati che data.voto sia un numero e non NaN
-                  if (data.voto !== null && typeof data.voto === 'number' && !Number.isNaN(data.voto)) {
-                    aggregato[pid].totalVoto += data.voto;
-                    aggregato[pid].countVoto += 1;
-                  }
-                  aggregato[pid].goal += data.goal || 0;
-                }
-              });
-            });
+      const rosa = snapRosa.val() || {};
+      const prestazioniByMatch = snapPrests.val() || {};
 
-            // 2. Calcola media e prepara righe
-            const rows = Object.values(aggregato).map(a => {
-              const media = a.countVoto > 0 ? a.totalVoto / a.countVoto : null;
-              
- return { pid: a.pid, uid: a.uid, nome: a.nome, cognome: a.cognome, numero: a.numero, 
-         partite: a.countVoto, 
-         mediaVoto: media !== null ? Number(media.toFixed(2)) : null, 
-         goal: a.goal };
-              
-            }).sort((a,b)=> {
-              // Ordina per media voto (decrescente), poi goal (decrescente)
-              const am = a.mediaVoto===null ? -1 : a.mediaVoto;
-              const bm = b.mediaVoto===null ? -1 : b.mediaVoto;
-              if (bm !== am) return bm - am;
-              if (b.goal !== a.goal) return b.goal - a.goal;
-              return a.nome.localeCompare(b.nome);
-            });
+      // aggregato iniziale
+      const aggregato = {};
+      for(const pid in rosa){
+        aggregato[pid] = {
+          pid,
+          numero: rosa[pid].numero,
+          nome: `${rosa[pid].nome} ${rosa[pid].cognome}`,
+          cognome: rosa[pid].cognome,
+          totalVoto: 0,
+          countVoto: 0,
+          goal: 0
+        }
+      }
 
-            // 3. Genera HTML
-            const rowsHtml = rows.map(r => {
-              let mediaVotoDisplay = '—';
-              let bar = '';
-              if (r.mediaVoto !== null) {
-                const votoNum = r.mediaVoto;
-                mediaVotoDisplay = `<b>${votoNum.toFixed(2)}</b>`;
-                // Calcolo barra
-                const perc = Math.max(0, Math.min(100, Math.round((votoNum/10)*100)));
-                const color = (votoNum >= 7 ? 'green' : (votoNum >= 6 ? 'yellow' : 'red'));
-                bar = `
-                  <div class="voto-bar-container">
-                    <div class="voto-bar ${color}" style="width:${perc}%;"></div>
-                  </div>`;
-              }
-              
-         
-              const clickAttr = r.partite > 0 ? `onclick="showDettaglioPrestazioniGiocatore('${r.pid}','${escapeHtml(r.nome)}','${escapeHtml(r.cognome)}')"` : '';
-
-
-return `
-  <li class="card" ${clickAttr} style="cursor:${r.partite > 0 ? 'pointer' : 'default'}">
-    <div class="row" style="justify-content:space-between; align-items:flex-start;">
-      <div>
-        <div class="player-title">${r.nome} ${r.numero ? `<span class="pill">#${r.numero}</span>` : ''}</div>
-        <div class="player-sub">Partite con voto: <b>${r.partite}</b></div>
-      </div>
-      <div style="text-align:right;">
-        <div class="player-title">Voto Medio: ${mediaVotoDisplay}</div>
-        <div class="player-sub" style="margin-top:6px;">Goal: <b>${r.goal}</b></div>
-      </div>
-    </div>
-    ${bar}
-  </li>
-              `;
-            }).join('');
-            
-            cont.innerHTML = `
-              <h3>Riepilogo Giocatori</h3>
-              <div class="help">Media voto calcolata solo sulle partite con voto assegnato.</div>
-              <ul class="grid cols-2" style="margin-top:14px;">
-                ${rowsHtml}
-              </ul>
-            `;
-          } catch (e) {
-            console.error("Errore caricamento prestazioni aggregate:", e);
-            cont.innerHTML = `<h3>Riepilogo Giocatori</h3><div class="help" style="color:red">Errore durante il caricamento dei dati. Controlla la console per i dettagli.</div>`;
+      // loop match
+      for(const matchId in prestazioniByMatch){
+        const matchPrests = prestazioniByMatch[matchId];
+        for(const pid in matchPrests){
+          const data = matchPrests[pid];
+          if(aggregato[pid]){
+            if(data.voto !== null && typeof data.voto === 'number' && !Number.isNaN(data.voto)){
+              aggregato[pid].totalVoto += data.voto;
+              aggregato[pid].countVoto += 1;
+            }
+            aggregato[pid].goal += data.goal || 0;
           }
-        })();
+        }
+      }
+
+      // calcolo media + array finale
+      const rows = Object.values(aggregato).map(a=>{
+        return {
+          pid:a.pid,
+          numero:a.numero,
+          nome:a.nome,
+          cognome:a.cognome,
+          goal:a.goal,
+          partite:a.countVoto,
+          mediaVoto: a.countVoto>0 ? Number((a.totalVoto/a.countVoto).toFixed(2)) : null
+        };
+      }).sort((a,b)=>{
+        const am = a.mediaVoto===null ? -1 : a.mediaVoto;
+        const bm = b.mediaVoto===null ? -1 : b.mediaVoto;
+        if (bm !== am) return bm - am;
+        if (b.goal !== a.goal) return b.goal - a.goal;
+        return a.cognome.localeCompare(b.cognome);
+      });
+
+      const rowsHtml = rows.map(r=>{
+        let mediaVotoDisplay = '—';
+        let bar = '';
+        if(r.mediaVoto !== null){
+          mediaVotoDisplay = `<b>${r.mediaVoto.toFixed(2)}</b>`;
+          const perc = Math.max(0, Math.min(100, Math.round((r.mediaVoto/10)*100)));
+          const color = (r.mediaVoto >=7 ? 'green' : (r.mediaVoto>=6?'yellow':'red'));
+          bar = `<div class="voto-bar-container"><div class="voto-bar ${color}" style="width:${perc}%;"></div></div>`;
+        }
+
+        const clickAttr = r.partite>0 ? `onclick="showDettaglioPrestazioniGiocatore('${r.pid}','${escapeHtml(r.nome)}','${escapeHtml(r.cognome)}')"` : '';
+
+        return `
+          <li class="card" ${clickAttr} style="cursor:${r.partite>0 ? 'pointer':'default'}">
+            <div class="row" style="justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div class="player-title">${r.nome} <span class="pill">#${r.numero}</span></div>
+                <div class="player-sub">Partite con voto: <b>${r.partite}</b></div>
+              </div>
+              <div style="text-align:right;">
+                <div class="player-title">Voto Medio: ${mediaVotoDisplay}</div>
+                <div class="player-sub" style="margin-top:6px;">Goal: <b>${r.goal}</b></div>
+              </div>
+            </div>
+            ${bar}
+          </li>
+        `;
+      }).join('');
+
+      cont.innerHTML = `
+        <h3>Riepilogo Giocatori</h3>
+        <div class="help">Media voto calcolata solo sulle partite con voto assegnato.</div>
+        <ul class="grid cols-2" style="margin-top:14px;">
+          ${rowsHtml}
+        </ul>
+      `;
+    } catch (e) {
+      console.error("Errore caricamento prestazioni aggregate:", e);
+      cont.innerHTML = `<h3>Riepilogo Giocatori</h3><div class="help" style="color:red">Errore</div>`;
     }
+  })();
+}
+
 // ================== ADMIN: FORMATION EDITOR ==================
 window.showFormazioneForm = async function(matchId, avv, formazioneJsonString){
   window.showAdminSection('admin-formazione-section');
@@ -2069,70 +2063,87 @@ tit = newFormat;
     /**
      * FIX: Esposto a window per essere accessibile dall'onclick HTML
      */
-    window.showPrestazioniPubbliche = async function(matchId, avv){
-      window.showPublicSection('prestazioni-partita-section');
-      const content = byId('prestazioni-partita-content');
-      content.innerHTML = 'Caricamento prestazioni...';
+window.showPrestazioniPubbliche = async function(matchId, avv){
 
-      try {
-        const [snapRosa, snapPrests, snapMatch] = await Promise.all([
-          get(ref(db, 'rosa')),
-          get(ref(db, `prestazioni/${matchId}`)),
-          get(ref(db, `calendario/${matchId}`))
-        ]);
-        
-        const rosa = snapRosa.val() || {};
-        const prestazioni = snapPrests.val() || {};
-        const match = snapMatch.val() || {};
-        
-        // Determina quali giocatori erano candidati (ou titolari/riserve) per la partita
-        const cand = match.candidature || {};
-        const titolariIds = Object.values(match.formazioni?.['0']?.formazione || {});
-        const panchinaIds = match.formazioni?.['0']?.panchina || [];
-        const availablePids = new Set([...titolariIds, ...panchinaIds, ...Object.keys(cand)]);
-        
-        const finalRows = Object.entries(prestazioni)
-          .filter(([pid, data]) => availablePids.has(pid)) // FILTRA PER CANDIDATURA/FORMAZIONE
-          .map(([pid, data]) => {
-            const player = rosa[pid] || { nome: 'Giocatore', cognome: 'Sconosciuto', numero: '?' };
-            let voto = data.voto;
-            // Formatta il voto
-            if (voto === null || Number.isNaN(voto)) {
-              voto = '—';
-            }
-            return { 
-              nome: `${player.nome} ${player.cognome}`, 
-              numero: player.numero, 
-              voto: voto, 
-              goal: data.goal || 0 // goal is always a number (or 0)
-            };
-          })
-          // Ordina per Voto (numeri prima, '—' dopo), poi Goal
-          .sort((a, b) => {
-            const votoA = a.voto === '—' ? -1 : a.voto;
-            const votoB = b.voto === '—' ? -1 : b.voto;
-            if (votoB !== votoA) return votoB - votoA;
-            return (b.goal || 0) - (a.goal || 0);
-          });
+  window.showPublicSection('prestazioni-pubbliche-section');
 
-        if (finalRows.length === 0) {
-          content.innerHTML = `<h3>vs ${escapeHtml(avv)}</h3><p>Nessun giocatore ha ricevuto prestazioni per questa partita.</p>`;
-          return;
-        }
+  const container = byId('prestazioni-public-container');
+  if(!container){
+    alert("Container prestazioni pubbliche non trovato");
+    return;
+  }
 
-        let tableHtml = `<table class="table"><thead><tr><th>#</th><th>Giocatore</th><th>Voto</th><th>Goal</th></tr></thead><tbody>`;
-        finalRows.forEach(r => {
-          tableHtml += `<tr><td>${r.numero}</td><td>${escapeHtml(r.nome)}</td><td><b>${r.voto}</b></td><td>${r.goal}</td></tr>`;
-        });
-        tableHtml += `</tbody></table>`;
+  container.innerHTML = "Caricamento prestazioni...";
 
-        content.innerHTML = `<h3>Prestazioni vs ${escapeHtml(avv)}</h3>` + tableHtml;
-      } catch (err) {
-        console.error('Errore caricamento prestazioni partita:', err);
-        content.innerHTML = `<h3>Prestazioni vs ${escapeHtml(avv)}</h3><p style="color:red">Impossibile caricare le prestazioni.</p>`;
-      }
-    }
-    
+  const [snapRosa, snapPrests, snapMatch] = await Promise.all([
+    get(ref(db, 'rosa')),
+    get(ref(db, `prestazioni/${matchId}`)),
+    get(ref(db, `calendario/${matchId}`))
+  ]);
+
+  const rosa = snapRosa.val() || {};
+  const prestazioni = snapPrests.val() || {};
+  const partita = snapMatch.val() || {};
+
+  // se non c'è formazione → niente prestazioni
+  if(!partita.formazioni || !partita.formazioni["0"]){
+    container.innerHTML = `<div class="help">Nessuna formazione salvata.</div>`;
+    return;
+  }
+
+  const form = partita.formazioni["0"].formazione || {};
+  const panchina = partita.formazioni["0"].panchina || [];
+
+  // 1) lista valori grezzi dalla formazione/panchina
+  const rawList = [...Object.values(form), ...Array.from(panchina)];
+
+  // 2) normalizza → UID o PID → PID
+  const UIDsToPID = {}; 
+  Object.entries(rosa).forEach(([pid,p])=>{
+      if(p.uid) UIDsToPID[p.uid] = pid;
+  });
+
+  const giocatoriPIDPresenti = rawList
+    .map(val => rosa[val] ? val : UIDsToPID[val])  // se è pid ok, se è uid converti
+    .filter(Boolean);
+
+  // 3) estrai solo quelli presenti + con eventuali voti
+  const listaFinale = giocatoriPIDPresenti
+    .filter(pid => rosa[pid]) // esiste in rosa
+    .sort((a,b)=> (rosa[a].numero||0)-(rosa[b].numero||0));
+
+  // 4) genera rows
+  let rowsHtml = listaFinale.map(pid=>{
+    const p = rosa[pid];
+    const pData = prestazioni[pid] || {};
+    const voto = pData.voto !== undefined ? pData.voto : "N/D";
+    const goal = pData.goal !== undefined ? pData.goal : "N/D";
+
+    return `
+      <tr>
+        <td>#${p.numero}</td>
+        <td>${escapeHtml(p.cognome)}</td>
+        <td>${voto}</td>
+        <td>${goal}</td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <h3>Prestazioni vs ${escapeHtml(avv)}</h3>
+    <div style="overflow-x:auto;margin-bottom:12px;">
+      <table class="table">
+        <thead><tr><th>#</th><th>Cognome</th><th>Voto</th><th>Goal</th></tr></thead>
+        <tbody>${rowsHtml || `<tr><td colspan="4">Nessun giocatore ha ricevuto prestazioni per questa partita.</td></tr>`}</tbody>
+      </table>
+    </div>
+    <button class="btn" onclick="window.showPublicSection('calendario-section')">Torna al Calendario &amp; Partite</button>
+  `;
+};
+
+
+
+
 
 
 
@@ -2398,48 +2409,51 @@ window.crudDeletePartita = async function(matchId){
     /**
      * FIX: Carica la lista delle partite per il CRUD (Admin - Gestione Dati)
      */
-    window.loadCrudPartite = async function(){
-      const tbody = byId('crud-partite-body'); if(!tbody) return; 
-      tbody.innerHTML='<tr><td colspan="7">Caricamento partite...</td></tr>';
-      
-      try {
-        const snap = await get(ref(db,'calendario'));
-        const val = snap.val() || {};
-        const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
-        const rows = Object.entries(val).sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
-        
-        if(!rows.length){ tbody.innerHTML = '<tr><td colspan="7">Nessuna partita inserita.</td></tr>'; return; }
-        
-        let html = rows.map(([id, m]) => {
-          const isCasa = m.casa === true || m.casa === 'true';
-          return `
-            <tr>
-              <td><input type="text" value="${escapeHtml(m.data)}" data-field="data" data-id="${id}"/></td>
-              <td><input type="time" value="${escapeHtml(m.orario||'')}" data-field="orario" data-id="${id}"/></td>
-              <td><input type="text" value="${escapeHtml(m.avversaria)}" data-field="avversaria" data-id="${id}"/></td>
-              <td><input type="text" value="${escapeHtml(m.risultato||'N/D')}" data-field="risultato" data-id="${id}"/></td>
-              <td><input type="text" value="${escapeHtml(m.campo)}" data-field="campo" data-id="${id}"/></td>
-              <td>
-                <select data-field="casa" data-id="${id}">
-                  <option value="true" ${isCasa ? 'selected' : ''}>Casa</option>
-                  <option value="false" ${!isCasa ? 'selected' : ''}>Trasferta</option>
-                </select>
-              </td>
-              <td>
-                <button class="btn btn--accent" onclick="crudUpdatePartita('${id}')" style="padding:4px 8px; font-size:.8rem;">Salva</button>
-                <button class="btn" onclick="crudDeletePartita('${id}')" style="padding:4px 8px; font-size:.8rem; background:var(--ink-sub); color:#fff;">Elimina</button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-        
-        tbody.innerHTML = html;
+  window.loadCrudPartite = async function(){
+  const tbody = byId('crud-partite-body'); if(!tbody) return; 
+  tbody.innerHTML='<tr><td colspan="7">Caricamento partite...</td></tr>';
+  
+  try {
+    const snap = await get(ref(db,'calendario'));
+    const val = snap.val() || {};
+    const toDate = (d)=>{ const [dd,mm,yyyy] = String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+    const rows = Object.entries(val).sort((a,b)=> toDate(b[1].data)-toDate(a[1].data));
+    
+    if(!rows.length){ tbody.innerHTML = '<tr><td colspan="7">Nessuna partita inserita.</td></tr>'; return; }
+    
+    let html = rows.map(([id, m]) => {
+      const isCasa = m.casa === true || m.casa === 'true';
+      return `
+        <tr>
+          <td><input type="text" value="${escapeHtml(m.data)}" data-field="data" data-id="${id}"/></td>
+          <td><input type="time" value="${escapeHtml(m.orario||'')}" data-field="orario" data-id="${id}"/></td>
+          <td><input type="text" value="${escapeHtml(m.avversaria)}" data-field="avversaria" data-id="${id}"/></td>
+          <td><input type="text" value="${escapeHtml(m.risultato||'N/D')}" data-field="risultato" data-id="${id}"/></td>
+          <td><input type="text" value="${escapeHtml(m.campo)}" data-field="campo" data-id="${id}"/></td>
+          <td>
+            <select data-field="casa" data-id="${id}">
+              <option value="true" ${isCasa ? 'selected' : ''}>Casa</option>
+              <option value="false" ${!isCasa ? 'selected' : ''}>Trasferta</option>
+            </select>
+          </td>
+          <td style="display:flex;flex-direction:column;gap:4px;">
+            <button class="btn btn--accent" onclick="crudUpdatePartita('${id}')">Salva</button>
+            <button class="btn" onclick="showResultForm('${id}','${escapeHtml(m.avversaria)}')">Risultato/Video</button>
+            <button class="btn" onclick="showFormazioneForm('${id}','${escapeHtml(m.avversaria)}', '${escapeHtml(JSON.stringify(m.formazioni || null))}')">Formazione/Sost.</button>
+            <button class="btn" onclick="showCandidatureEditor('${id}','${escapeHtml(m.avversaria)}')">Candidature</button>
+            <button class="btn btn--danger" onclick="crudDeletePartita('${id}')">Elimina</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    tbody.innerHTML = html;
 
-      } catch(e) {
-        console.error("Errore caricamento CRUD Partite:", e);
-        tbody.innerHTML = '<tr><td colspan="7" style="color:red">Errore durante il caricamento dei dati.</td></tr>';
-      }
-    }
+  } catch(e) {
+    console.error("Errore caricamento CRUD Partite:", e);
+    tbody.innerHTML = '<tr><td colspan="7" style="color:red">Errore durante il caricamento dei dati.</td></tr>';
+  }
+}
 
 
     // Helper per popolare il selettore delle candidature
@@ -2595,86 +2609,241 @@ byId('btn-salva-permessi').onclick = async function(){
     /**
      * FIX: Carica dati esistenti per il form Risultato/Video.
      */
-    window.showResultForm = async function(matchId, avv) {
-      window.showAdminSection('admin-statistiche-section');
-      const container = byId('risultato-form-container');
-      container.innerHTML = 'Caricamento dati partita...';
-      
-      const snap = await get(ref(db, `calendario/${matchId}`));
-      const m = snap.val() || {};
-      
-      const risultatoValue = escapeHtml(m.risultato || '');
-      const linkVideoValue = escapeHtml(m.linkVideo || '');
+   window.showResultForm = async function(matchId, avv) {
+  window.showAdminSection('admin-statistiche-section');
+  const container = byId('risultato-form-container');
+  container.innerHTML = 'Caricamento dati partita...';
 
-      container.innerHTML = `
-        <h3>Inserimento Risultato/Video vs ${escapeHtml(avv)}</h3>
-        <div class="help">**Attenzione:** La funzione di salvataggio del risultato e del video è da implementare.</div>
-        <form id="result-entry-form" data-match-id="${matchId}">
-            <label>Risultato (Esempio: 5-3)</label>
-            <input type="text" id="risultato" placeholder="X-Y" value="${risultatoValue}" required>
-            <label>Link YouTube (Facoltativo)</label>
-            <input type="url" id="linkVideo" placeholder="https://www.youtube.com/watch?v=..." value="${linkVideoValue}" />
-            <p class="help">ID Partita: <b>${matchId}</b></p>
-            <div class="actions">
-                <button type="submit" class="btn btn--accent" onclick="alert('Funzione di salvataggio da implementare!')">Salva Risultato e Video</button>
-            </div>
-        </form>
-      `;
-    };
-    
+  const snap = await get(ref(db, `calendario/${matchId}`));
+  const m = snap.val() || {};
+
+  const risultatoValue = escapeHtml(m.risultato || '');
+  const linkVideoValue = escapeHtml(m.linkVideo || '');
+
+  container.innerHTML = `
+    <h3>Risultato / Video vs ${escapeHtml(avv)}</h3>
+    <form id="result-entry-form" data-match-id="${matchId}">
+        <label>Risultato (es: 5-3)</label>
+        <input type="text" id="risultato" placeholder="X-Y" value="${risultatoValue}" required>
+
+        <label>Link YouTube (facoltativo)</label>
+        <input type="url" id="linkVideo" placeholder="https://www.youtube.com/watch?v=..." value="${linkVideoValue}" />
+
+        <div class="actions" style="margin-top:12px;">
+            <button type="submit" class="btn btn--accent">Salva</button>
+        </div>
+    </form>
+  `;
+
+  const form = byId("result-entry-form");
+  form.onsubmit = async (e)=>{
+     e.preventDefault();
+
+     const risultato = byId('risultato').value.trim();
+     const linkVideo = byId('linkVideo').value.trim();
+
+     await update(ref(db, `calendario/${matchId}`), {
+        risultato,
+        linkVideo
+     });
+
+     alert("Risultato aggiornato!");
+
+     // ricarico admin partite
+     if(window.loadCrudPartite) window.loadCrudPartite();
+
+     // aggiorno immediatamente calendario pubblico se era visibile
+     if(typeof window.lastCalendarioAdminView !== 'undefined'){
+        loadProssimeGiornate(window.lastCalendarioAdminView);
+     }
+  }
+};
 
     
     /**
      * FIX: Carica dati esistenti per il form Valutazione Prestazioni.
      */
-    window.showValutazionePartitaForm = async function(matchId, avv) {
-      window.showAdminSection('admin-prestazioni-partita-section');
-      const container = byId('prestazioni-form-container');
-      container.innerHTML = 'Caricamento dati prestazioni...';
-      
-      const [snapRosa, snapPrests] = await Promise.all([
-          get(ref(db, 'rosa')),
-          get(ref(db, `prestazioni/${matchId}`))
-      ]);
-      
-      const rosa = snapRosa.val() || {};
-      const prestazioni = snapPrests.val() || {};
-      
-      // Get all players, sort by number
-      const players = Object.entries(rosa).sort((a,b)=> (a[1].numero||0)-(b[1].numero||0));
-      
-      let rowsHtml = players.map(([pid, p]) => {
-          const data = prestazioni[pid] || {};
-          // Usa Number.isFinite per controllare che voto sia un numero finito prima di mostrarlo
-          const voto = (data.voto !== null && Number.isFinite(data.voto)) ? data.voto : '';
-          const goal = data.goal || 0;
-          return `
-            <tr>
-              <td>${p.numero}</td>
-              <td>${escapeHtml(p.nome)} ${escapeHtml(p.cognome)}</td>
-              <td><input type="number" min="4" max="10" step="0.5" value="${voto}" data-id="${pid}" data-field="voto" style="width:70px;"></td>
-              <td><input type="number" min="0" value="${goal}" data-id="${pid}" data-field="goal" style="width:50px;"></td>
-              <td><input type="text" value="${escapeHtml(data.note || '')}" data-id="${pid}" data-field="note" placeholder="Note"></td>
-            </tr>
-          `;
-      }).join('');
-      
-      let tableHtml = `<table class="table"><thead><tr><th>#</th><th>Giocatore</th><th>Voto</th><th>Goal</th><th>Note</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+window.showValutazionePartitaForm = async function(matchId, avv) {
+  window.showAdminSection('admin-prestazioni-partita-section');
+  const container = byId('prestazioni-form-container');
+  container.innerHTML = 'Caricamento dati prestazioni...';
 
-      container.innerHTML = `
-        <h3>Valutazione Prestazioni vs ${escapeHtml(avv)}</h3>
-        <div class="help">**Attenzione:** La funzione di salvataggio dei dati non è implementata. I valori mostrati sono quelli attualmente salvati.</div>
-        <form id="prestazioni-valutazione-form" data-match-id="${matchId}">
-            <h4>Assegna Voti e Goal (Giocatori nella Rosa: ${players.length})</h4>
-            <div style="overflow-x:auto; margin-bottom:14px;">${tableHtml}</div>
-            <p class="help">ID Partita: <b>${matchId}</b></p>
-            <div class="actions">
-                <button type="submit" class="btn btn--accent" onclick="alert('Funzione di salvataggio da implementare!')">Salva Prestazioni</button>
-            </div>
-        </form>
-      `;
-    };
-    
+  // Carico rosa + prestazioni match
+  const [snapRosa, snapPrests] = await Promise.all([
+    get(ref(db, 'rosa')),
+    get(ref(db, `prestazioni/${matchId}`))
+  ]);
+
+  const rosa = snapRosa.val() || {};
+  const prestazioni = snapPrests.val() || {};
+
+  // Ordino giocatori per numero di maglia
+  const players = Object.entries(rosa).sort((a,b)=> (a[1].numero||0)-(b[1].numero||0));
+
+  // Righe della tabella
+  const rowsHtml = players.map(([pid, p]) => {
+    const data = prestazioni[pid] || {};
+    const votoVal = (data.voto !== null && Number.isFinite(data.voto)) ? data.voto : '';
+    const goalVal = Number.isFinite(data.goal) ? data.goal : 0;
+
+    return `
+      <tr>
+        <td>${p.numero ?? ''}</td>
+        <td>${escapeHtml(p.nome)} ${escapeHtml(p.cognome)}</td>
+        <td><input type="number" min="4" max="10" step="0.5" value="${votoVal}" data-id="${pid}" data-field="voto" style="width:70px;"></td>
+        <td><input type="number" min="0" step="1" value="${goalVal}" data-id="${pid}" data-field="goal" style="width:60px;"></td>
+      </tr>
+    `;
+  }).join('');
+
+  const tableHtml = `
+    <table class="table">
+      <thead><tr><th>#</th><th>Giocatore</th><th>Voto</th><th>Goal</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  `;
+
+  container.innerHTML = `
+    <h3>Valutazione Prestazioni vs ${escapeHtml(avv)}</h3>
+    <form id="prestazioni-valutazione-form" data-match-id="${matchId}" data-avv="${escapeHtml(avv)}">
+      <div style="overflow-x:auto; margin-bottom:14px;">${tableHtml}</div>
+      <div class="actions">
+        <button type="submit" class="btn btn--accent">Salva Prestazioni</button>
+      </div>
+    </form>
+  `;
+
+  // Wiring submit → salva
+  const form = byId('prestazioni-valutazione-form');
+  form.onsubmit = (e)=> window.savePrestazioniPartita(e);
+};
+  /**
+     * FIX: salvataggio delta, presenza unica
+     */
+    window.savePrestazioniPartita = async function(e){
+  e.preventDefault();
+
+  const form = e.target;
+  const matchId = form.dataset.matchId;
+  if(!matchId){ alert('Match non valido'); return; }
+
+  // Leggo tutti gli input della tabella
+  const inputs = form.querySelectorAll('input[data-id][data-field]');
+  // Costruisco mappa { pid: {voto: (num|null), goal: num} }
+  const nuovi = {};
+  inputs.forEach(inp=>{
+    const pid = inp.dataset.id;
+    const field = inp.dataset.field; // 'voto' | 'goal'
+    const raw = inp.value.trim();
+
+    if(!nuovi[pid]) nuovi[pid] = { voto: null, goal: 0 };
+
+    if(field === 'voto'){
+      // voto: allow blank = null, otherwise number
+      if(raw === '') {
+        nuovi[pid].voto = null;
+      } else {
+        const v = parseFloat(raw.replace(',', '.'));
+        nuovi[pid].voto = Number.isFinite(v) ? v : null;
+      }
+    } else if(field === 'goal'){
+      const g = parseInt(raw,10);
+      nuovi[pid].goal = Number.isFinite(g) && g >= 0 ? g : 0;
+    }
+  });
+
+  // Carico prestazioni correnti del match, rosa correnti, e formazione+panchina del match
+  const [snapPreMatch, snapRosa, snapMatch] = await Promise.all([
+    get(ref(db, `prestazioni/${matchId}`)),
+    get(ref(db, 'rosa')),
+    get(ref(db, `calendario/${matchId}`))
+  ]);
+
+  const preMatch = snapPreMatch.val() || {};         // prestazioni/<matchId>/<pid>
+  const rosa = snapRosa.val() || {};
+  const m = snapMatch.val() || {};
+
+  // Costruisco set dei presenti (in formazione o panchina)
+  const presenti = new Set();
+  if(m.formazioni && m.formazioni["0"]){
+    const f0 = m.formazioni["0"];
+    if(f0.formazione && typeof f0.formazione === 'object'){
+      Object.values(f0.formazione).forEach(uid => { if(uid) presenti.add(uid); });
+    }
+    if(Array.isArray(f0.panchina)){
+      f0.panchina.forEach(uid => { if(uid) presenti.add(uid); });
+    }
+  }
+
+  // Per update atomico multi-path
+  const updates = {};
+
+  // Per ogni pid con input
+  for(const [pid, nuovo] of Object.entries(nuovi)){
+    const prev = preMatch[pid] || {};
+    const rosaAtt = rosa[pid] || {};
+
+    // Valori precedenti
+    const prevVoto = Number.isFinite(prev.voto) ? prev.voto : 0;
+    const prevGoal = Number.isFinite(prev.goal) ? prev.goal : 0;
+
+    // Valori nuovi "normalizzati" (per delta: null → 0 come contributo)
+    const newVotoForDelta = Number.isFinite(nuovo.voto) ? nuovo.voto : 0;
+    const newGoalForDelta = Number.isFinite(nuovo.goal) ? nuovo.goal : 0;
+
+    // Delta da applicare ai cumulati in ROSA
+    const deltaV = newVotoForDelta - prevVoto;
+    const deltaG = newGoalForDelta - prevGoal;
+
+    // Nuovi cumulati rosa
+    const currRosaV = Number(rosaAtt.voto || 0) + deltaV;
+    const currRosaG = Number(rosaAtt.goal || 0) + deltaG;
+
+    updates[`rosa/${pid}/voto`] = currRosaV < 0 ? 0 : currRosaV;
+    updates[`rosa/${pid}/goal`] = currRosaG < 0 ? 0 : currRosaG;
+
+    // Presenza: se non già segnata e il giocatore è presente (formazione o panchina)
+    const wasPresent = !!prev.presenza;
+    const isPresentNow = presenti.has(pid); // NB: qui pid è il PID della rosa; nel tuo DB i ruoli in formazione/panchina contengono UID auth.
+    // Se in formazione/panchina salvi UID auth: serve mappa pid->uid per matchare.
+    // Se i valori in formazione/panchina sono UID AUTH, converto:
+    // se non matcha, provo a risolvere via rosa[pid].uid
+    let isInPresentList = isPresentNow;
+    if(!isInPresentList && rosaAtt && rosaAtt.uid){
+      isInPresentList = presenti.has(rosaAtt.uid);
+    }
+
+    if(!wasPresent && isInPresentList){
+      const currPres = Number(rosaAtt.presenze || 0) + 1;
+      updates[`rosa/${pid}/presenze`] = currPres;
+      updates[`prestazioni/${matchId}/${pid}/presenza`] = true;
+    }
+
+    // Scrittura prestazioni match (voto può essere null)
+    updates[`prestazioni/${matchId}/${pid}/voto`] = (nuovo.voto === null ? null : newVotoForDelta);
+    updates[`prestazioni/${matchId}/${pid}/goal`] = newGoalForDelta;
+  }
+
+  try{
+    // Applico tutti gli updates in un colpo
+    await update(ref(db), updates);
+
+    alert('Prestazioni salvate correttamente.');
+
+    // Ricarico solo il form, senza refresh pagina
+    const avv = form.dataset.avv || (m.avversaria || '');
+    window.showValutazionePartitaForm(matchId, avv);
+
+    // Se vuoi anche allineare i riepiloghi pubblici senza cambiare pagina:
+    if(typeof window.loadPrestazioniAggregato === 'function'){
+      window.loadPrestazioniAggregato(); // opzionale
+    }
+  }catch(err){
+    console.error('Errore salvataggio prestazioni:', err);
+    alert('Errore durante il salvataggio. Riprova.');
+  }
+};
+
     /**
      * FIX: Carica dati esistenti per il form Gestione Candidature (Admin Calendario).
      * NOTA: Questa funzione assume che /rosa/{pid}/uid esista e sia l'Auth UID.
@@ -2932,8 +3101,13 @@ window.loadCandidatureForMatch = async function(matchId){
     <h2>Calendario & Partite</h2>
     <div class="help">Lista ordinata dalla partita più recente. Clicca su "Candidatura" per confermare la disponibilità.</div>
     <ul id="calendario-list" class="grid cols-3"></ul>
+    <div id="public-prestazioni-container" style="display:block; margin-top:18px;"></div>
   </section>
 
+<section id="prestazioni-pubbliche-section" class="content-section" style="display:none;">
+  <div id="prestazioni-public-container"></div>
+</section>
+  
   <section id="classifica-section" class="content-section">
     <h2>Classifica</h2>
     <div id="classifica-content" style="overflow-x:auto;"> 
@@ -2964,11 +3138,6 @@ window.loadCandidatureForMatch = async function(matchId){
     <div class="actions" style="margin-top:10px"><button class="btn" onclick="showPublicSection('calendario-section')">Torna al calendario</button></div>
   </section>
 
-  <section id="prestazioni-partita-section" class="content-section">
-    <h2>Prestazioni Partita</h2>
-    <div id="prestazioni-partita-content"></div>
-    <div class="actions" style="margin-top:10px"><button onclick="showPublicSection('statistiche-section')" class="btn">Torna alle statistiche</button></div>
-  </section>
 
   <section id="admin-inserimento-giocatori-section" class="content-section">
     <h2>Admin · Inserimento giocatori</h2>
@@ -3158,6 +3327,9 @@ window.loadCandidatureForMatch = async function(matchId){
       <button id="save-video-btn" class="btn btn--accent" type="button" disabled>Salva Link Video</button>
     </div>
   </section>
+   <section id="prestazioni-partita-section" class="content-section" style="display:none">
+  <div id="prestazioni-partita-content"></div>
+</section>
 </main>
 
 <div id="bottom-nav" role="navigation" aria-label="Navigazione mobile principale">
