@@ -1132,9 +1132,10 @@ if (!asAdmin) { // SOLO VISTA PUBBLICA
 
     // 1. PARTITE PASSATE: Mostra SEMPRE il totale.
     if (isPast) {
+      const safeCount = Number.isFinite(candCount) ? candCount : 0;
         candidatiListHtml = `
             <div class="pill" style="margin-top:8px;font-size:0.85rem;">
-                Disponibilità Confermate: <span data-match-count="${matchId}">${candCount}</span>
+                Disponibilità Confermate: <span data-match-count="${matchId}">${safeCount}</span>
             </div>`;
     } 
     
