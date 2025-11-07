@@ -1146,10 +1146,12 @@ if (!asAdmin) { // SOLO VISTA PUBBLICA
 
             // intestazione
             playersHtml += `
-                <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
+                <li>
+                <div class="row" style="justify-content:space-between">
                     <div>Cognome</div>
                     <div>Ruolo</div>
                     <div style="text-align:right;">Stato</div>
+                    </div>
                 </li>
             `;
 
