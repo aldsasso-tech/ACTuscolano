@@ -1052,140 +1052,137 @@ window.loadProssimeGiornate = async function(asAdmin){
     return;
   }
 
-  ul.className='grid cols-3';
+ ul.className='grid cols-3';
 
-  let htmlAll = '';
+  let htmlAll = '';
 
-  for(const [matchId,m] of entries){
-    // --- CANDIDATURE MATCH ---
-    const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
-    const cand = candSnap.val() || {};
-    const candidatiAuthUIDs = Object.keys(cand).filter(uid => cand[uid] === true);
-    const candCount = candidatiAuthUIDs.length;
+  for(const [matchId,m] of entries){
+    // --- CANDIDATURE MATCH ---
+    const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
+    const cand = candSnap.val() || {};
+    const candidatiAuthUIDs = Object.keys(cand).filter(uid => cand[uid] === true);
+    const candCount = candidatiAuthUIDs.length;
 
-    // Join tramite /utenti (nome/cognome) → /rosa
-    const candidatiTrovati = [];
-    for(const authUid of candidatiAuthUIDs){
-      const utente = utenti[authUid];
-      if(utente && utente.nome && utente.cognome){
-        const giocatore = rosaArray.find(p => p.nome === utente.nome && p.cognome === utente.cognome);
-        if(giocatore) candidatiTrovati.push(giocatore);
-      }
-    }
-    candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
+    // Join tramite /utenti (nome/cognome) → /rosa
+    const candidatiTrovati = [];
+    for(const authUid of candidatiAuthUIDs){
+      const utente = utenti[authUid];
+      if(utente && utente.nome && utente.cognome){
+        const giocatore = rosaArray.find(p => p.nome === utente.nome && p.cognome === utente.cognome);
+        if(giocatore) candidatiTrovati.push(giocatore);
+      }
+    }
+    candidatiTrovati.sort((a,b)=> (a.numero||0)-(b.numero||0));
 
-    const matchDate = toDate(m.data);
-    const isPast = matchDate < today;
-    const risultatoValido = !!(m.risultato && /\d+\s*-\s*\d+/.test(m.risultato));
+    const matchDate = toDate(m.data);
+    const isPast = matchDate < today;
+    const risultatoValido = !!(m.risultato && /\d+\s*-\s*\d+/.test(m.risultato));
 
-    // utente corrente candidato?
-    const uid = auth.currentUser ? auth.currentUser.uid : null;
-    const isCandidato = !!(uid && candidatiAuthUIDs.includes(uid));
+    // utente corrente candidato?
+    const uid = auth.currentUser ? auth.currentUser.uid : null;
+    const isCandidato = !!(uid && candidatiAuthUIDs.includes(uid));
 
-    // --- BTN Prestazioni ---
-    const prestazioniBtn = risultatoValido
-      ? `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`
-      : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
+    // --- BTN Prestazioni ---
+    const prestazioniBtn = risultatoValido
+      ? `<button class="btn" onclick="showPrestazioniPubbliche('${matchId}','${escapeHtml(m.avversaria||'')}')">Prestazioni</button>`
+      : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Prestazioni</button>`;
 
-    // --- BTN Candidatura (usa toggleCandidatura) ---
-    let candButton='';
-    if(risultatoValido){
-      candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
-    } else if(isPast){
-      candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
-    } else {
-      const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
-      candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" data-candidate-state="${isCandidato ? '1':'0'}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
-    }
+    // --- BTN Candidatura (usa toggleCandidatura) ---
+    let candButton='';
+    if(risultatoValido){
+      candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura terminata</button>`;
+    } else if(isPast){
+      candButton = `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Candidatura scaduta</button>`;
+    } else {
+      const label = isCandidato ? 'Annulla Candidatura' : 'Candidati';
+      candButton = `<button class="btn btn--accent" data-match-cand-btn="${matchId}" data-candidate-state="${isCandidato ? '1':'0'}" onclick="toggleCandidatura('${matchId}')">${label}</button>`;
+    }
 
-    // --- BTN Formazione (verifica struttura attuale m.formazioni["0"].formazione) ---
-    const hasFormazione =
-      m.formazioni &&
-      m.formazioni["0"] &&
-      m.formazioni["0"].formazione &&
-      Object.keys(m.formazioni["0"].formazione).length > 0;
+    // --- BTN Formazione (verifica struttura attuale m.formazioni["0"].formazione) ---
+    const hasFormazione =
+      m.formazioni &&
+      m.formazioni["0"] &&
+      m.formazioni["0"].formazione &&
+      Object.keys(m.formazioni["0"].formazione).length > 0;
 
-    const formazioneBtn = hasFormazione
-      ? `<button class="btn" onclick="showFormazionePubblica('${matchId}','${escapeHtml(m.avversaria||'')}')">Formazione</button>`
-      : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Formazione</button>`;
+    const formazioneBtn = hasFormazione
+      ? `<button class="btn" onclick="showFormazionePubblica('${matchId}','${escapeHtml(m.avversaria||'')}')">Formazione</button>`
+      : `<button class="btn" disabled style="opacity:0.6;cursor:not-allowed">Formazione</button>`;
 
-    // --- Esito pill se hai risultato ---
-    let esitoPill = '';
-    if (m.risultato && m.risultato !== 'N/D') {
-      const [scoreCasaStr, scoreOspiteStr] = m.risultato.split('-').map(s => s.trim());
-      const scoreCasa = parseInt(scoreCasaStr);
-      const scoreOspite = parseInt(scoreOspiteStr);
-      if (!isNaN(scoreCasa) && !isNaN(scoreOspite)) {
-        const scoreTuscolano = m.casa ? scoreCasa : scoreOspite;
-        const scoreAvversaria = m.casa ? scoreOspite : scoreCasa;
-        let esito = '', esitoColor = '';
-        if (scoreTuscolano > scoreAvversaria) { esito='VITTORIA'; esitoColor='background:#0e7a0d;color:#fff;'; }
-        else if (scoreTuscolano < scoreAvversaria) { esito='SCONFITTA'; esitoColor='background:var(--red);color:#fff;'; }
-        else { esito='PAREGGIO'; esitoColor='background:var(--yellow);color:#111;'; }
-        esitoPill = `<span class="pill" style="${esitoColor} margin-left:8px;">${esito}</span>`;
-      }
-    }
+    // --- Esito pill se hai risultato ---
+    let esitoPill = '';
+    if (m.risultato && m.risultato !== 'N/D') {
+      const [scoreCasaStr, scoreOspiteStr] = m.risultato.split('-').map(s => s.trim());
+      const scoreCasa = parseInt(scoreCasaStr);
+      const scoreOspite = parseInt(scoreOspiteStr);
+      if (!isNaN(scoreCasa) && !isNaN(scoreOspite)) {
+        const scoreTuscolano = m.casa ? scoreCasa : scoreOspite;
+        const scoreAvversaria = m.casa ? scoreOspite : scoreCasa;
+        let esito = '', esitoColor = '';
+        if (scoreTuscolano > scoreAvversaria) { esito='VITTORIA'; esitoColor='background:#0e7a0d;color:#fff;'; }
+        else if (scoreTuscolano < scoreAvversaria) { esito='SCONFITTA'; esitoColor='background:var(--red);color:#fff;'; }
+        else { esito='PAREGGIO'; esitoColor='background:var(--yellow);color:#111;'; }
+        esitoPill = `<span class="pill" style="${esitoColor} margin-left:8px;">${esito}</span>`;
+      }
+    }
 
-    // --- LISTA CANDIDATI (Cognome, Ruolo, Stato) -- SOLO PUBBLICO e SOLO se non c'è risultato ---
-  let candidatiListHtml = '';
-if (!asAdmin && !risultatoValido) {
+    // --- LISTA CANDIDATI (Logica Corretta) ---
+  let candidatiListHtml = '';
+if (!asAdmin) { // SOLO VISTA PUBBLICA
 
-  // PARTITE PASSATE → SOLO TOTALE (FIX: logica semplificata)
-  if (isPast) {
-    // Per le partite passate, mostriamo sempre il totale.
-    
-    // Potresti voler distinguere tra zero e >0, ma per ora usiamo il formato più semplice:
-    candidatiListHtml = `
-      <div class="pill" style="margin-top:8px;font-size:0.85rem;">
-        Disponibilità Confermate (${candCount})
-      </div>`;
+    // 1. PARTITE PASSATE: Mostra SEMPRE il totale.
+    if (isPast) {
+        candidatiListHtml = `
+            <div class="pill" style="margin-top:8px;font-size:0.85rem;">
+                Disponibilità Confermate: <span data-match-count="${matchId}">${candCount}</span>
+            </div>`;
+    } 
+    
+    // 2. PARTITE FUTURE: Mostra il dettaglio solo se il risultato NON è valido.
+    else if (!risultatoValido) {
 
-  // PARTITE FUTURE → MOSTRA DETTAGLIO
-  } else {
-    // L'intera sezione qui è corretta, ma la includo per completezza del blocco
-    if (candCount > 0) {
-      let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
+        if (candCount > 0) {
+            let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
 
-      // intestazione
-      playersHtml += `
-        <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
-          <div>Cognome</div>
-          <div>Ruolo</div>
-          <div style="text-align:right;">Stato</div>
-        </li>
-      `;
+            // intestazione
+            playersHtml += `
+                <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
+                    <div>Cognome</div>
+                    <div>Ruolo</div>
+                    <div style="text-align:right;">Stato</div>
+                </li>
+            `;
 
-      playersHtml += candidatiTrovati.map(p=>{
-        const cognome = escapeHtml(p.cognome || '?');
-        const ruolo = escapeHtml(p.ruolo || 'N/D');
-        const stato = escapeHtml(p.stato || 'N/D');
-        const statoColor = stato === 'Titolare' ? '#0e7a0d'
-                           : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
-        return `
-          <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;border-bottom:1px dotted #eee;padding:4px 0;">
-            <div style="font-weight:700;"><b>${cognome}</b></div>
-            <div style="color:var(--ink-sub);font-size:0.85rem;">${ruolo}</div>
-            <div style="text-align:right;">
-              <span class="pill" style="background:${statoColor};color:#fff;padding:2px 6px;font-size:.75rem;">${stato}</span>
-            </div>
-          </li>
-        `;
-      }).join('');
+            playersHtml += candidatiTrovati.map(p=>{
+                const cognome = escapeHtml(p.cognome || '?');
+                const ruolo = escapeHtml(p.ruolo || 'N/D');
+                const stato = escapeHtml(p.stato || 'N/D');
+                const statoColor = stato === 'Titolare' ? '#0e7a0d'
+                                 : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
+                return `
+                    <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;border-bottom:1px dotted #eee;padding:4px 0;">
+                        <div style="font-weight:700;"><b>${cognome}</b></div>
+                        <div style="color:var(--ink-sub);font-size:0.85rem;">${ruolo}</div>
+                        <div style="text-align:right;">
+                            <span class="pill" style="background:${statoColor};color:#fff;padding:2px 6px;font-size:.75rem;">${stato}</span>
+                        </div>
+                    </li>
+                `;
+            }).join('');
 
-      playersHtml += '</ul>';
+            playersHtml += '</ul>';
 
-      candidatiListHtml = `
-        <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px;">
-          <div style="font-weight:700;color:#0e7a0d;margin-bottom:4px;">Disponibilità Confermate (${candCount}):</div>
-          ${playersHtml}
-        </div>
-      `;
-    } else {
-      candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (0).</div>`;
-    }
-  }
+            candidatiListHtml = `
+                <div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px;">
+                    <div style="font-weight:700;color:#0e7a0d;margin-bottom:4px;">Disponibilità Confermate (<span data-match-count="${matchId}">${candCount}</span>):</div>
+                    ${playersHtml}
+                </div>
+            `;
+        } else {
+            candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (<span data-match-count="${matchId}">0</span>).</div>`;
+        }
+    }
 }
-
     htmlAll += `
       <div class="card" data-match-id="${matchId}">
         <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
