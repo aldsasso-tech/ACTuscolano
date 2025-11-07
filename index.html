@@ -1165,13 +1165,14 @@ window.loadProssimeGiornate = async function(asAdmin){
                     const statoColor = stato === 'Titolare' ? '#0e7a0d' : (stato === 'Riserva' ? 'var(--red)' : 'var(--ink-sub)');
                     
                     return `
-                        <li style="display:grid; grid-template-columns: 1.5fr 1fr 1fr; gap:8px; align-items:center; border-bottom:1px dotted #eee; padding:4px 0; height:auto; line-height:1.2;">
-                            <div style="font-weight:700; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b>${cognome}</b></div>
-                            <div style="color:var(--ink-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.85rem;">${ruolo}</div>
-                            <div style="text-align:right;">
-                                <span class="pill" style="background:${statoColor}; color:#fff; padding:2px 6px; font-size:.75rem;">${stato}</span>
-                            </div>
-                        </li>
+                      <li style="display:grid;grid-template-columns:1.2fr 1.1fr 0.9fr;gap:6px;align-items:center;border-bottom:1px dotted #eee;padding:2px 0;">
+  <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cognome}</div>
+  <div style="color:var(--ink-sub);font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ruolo}</div>
+  <div style="text-align:right;">
+    <span class="pill" style="background:${statoColor};color:#fff;padding:2px 5px;font-size:.7rem;">${stato}</span>
+  </div>
+</li>
+
                     `;
                 }).join('');
 
