@@ -1139,19 +1139,18 @@ if (!asAdmin) { // SOLO VISTA PUBBLICA
     } 
     
     // 2. PARTITE FUTURE: Mostra il dettaglio solo se il risultato NON è valido.
+   // 2. PARTITE FUTURE: Mostra il dettaglio solo se il risultato NON è valido (cioè, non è ancora stata giocata o il risultato non è stato messo).
     else if (!risultatoValido) {
 
         if (candCount > 0) {
             let playersHtml = '<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;font-size:0.9rem;">';
 
-            // intestazione
+            // intestazione (CORRETTA)
             playersHtml += `
-                <li>
-                <div class="row" style="justify-content:space-between">
+                <li style="display:grid;grid-template-columns:1.5fr 1.5fr 1fr;gap:8px;align-items:center;padding:4px 0;font-weight:700;color:var(--ink-sub);border-bottom:1px solid var(--line);margin-bottom:4px;">
                     <div>Cognome</div>
                     <div>Ruolo</div>
                     <div style="text-align:right;">Stato</div>
-                    </div>
                 </li>
             `;
 
@@ -1184,7 +1183,6 @@ if (!asAdmin) { // SOLO VISTA PUBBLICA
             candidatiListHtml = `<div class="pill" style="margin-top:8px;font-size:0.85rem;">Nessuna disponibilità confermata (<span data-match-count="${matchId}">0</span>).</div>`;
         }
     }
-}
     htmlAll += `
       <div class="card" data-match-id="${matchId}">
         <div class="row" style="justify-content:space-between;align-items:flex-start;width:100%;">
