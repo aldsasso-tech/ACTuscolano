@@ -1024,7 +1024,9 @@ const sortedKeys = Object.keys(partite).sort((a, b) => {
 /**
  * FUNZIONE loadProssimeGiornate (COMPLETA E CORRETTA)
  */
+    
 window.loadProssimeGiornate = async function(asAdmin){
+  window.lastCalendarioAdminView = asAdmin;
   const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
   const ul = byId(listId); if(!ul) return;
   ul.innerHTML='';
@@ -2745,43 +2747,43 @@ window.toggleCandidatura = async function(matchId){
     const candRef = ref(db, `calendario/${matchId}/candidature/${uid}`);
 
     const snap = await get(candRef);
-    const isCandidato = snap.exists() && snap.val() === true;
-    const nuovoValore = !isCandidato; // true = candidato (confermata), false = annulla (annullata)
+    const isCandidato = (snap.exists() && snap.val() === true);
+    const nuovoValore = !isCandidato;
 
-    await set(candRef, nuovoValore); // SCRITTURA NEL DATABASE
+    await set(candRef, nuovoValore);
 
     // Messaggio di conferma per l'utente
-    const messaggio = nuovoValore ? "Candidatura confermata" : "Candidatura annullata";
-    alert(messaggio); // <-- NUOVO POPUP AGGIUNTO QUI
+    alert(nuovoValore ? "Candidatura confermata" : "Candidatura annullata");
 
-    // FIX 1: AGGIORNAMENTO IMMEDIATO DEL PULSANTE
+    // aggiorna pulsante immediatamente
     if (btn) {
-        btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
-        btn.classList.toggle('btn--accent', nuovoValore); 
+      btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
+      btn.classList.toggle('btn--accent', nuovoValore);
     }
 
-    // FIX 2: AGGIORNAMENTO IMMEDIATO DEL CONTATORE
+    // aggiorna contatore immediato sul blocco visibile
     if (countEl) {
-        let currentCount = parseInt(countEl.innerText);
-        if (isNaN(currentCount)) currentCount = 0; 
+      let currentCount = parseInt(countEl.innerText);
+      if (isNaN(currentCount)) currentCount = 0;
+      const newCount = nuovoValore ? currentCount + 1 : currentCount - 1;
+      countEl.innerText = newCount < 0 ? 0 : newCount;
+    }
 
-        // Incrementa o decrementa in base all'azione
-        const newCount = nuovoValore ? currentCount + 1 : currentCount - 1;
-        countEl.innerText = newCount < 0 ? 0 : newCount; 
+    // RICHIAMA SEMPRE la stessa vista attiva (admin o pubblica)
+    if (window.lastCalendarioAdminView === true) {
+      await window.loadProssimeGiornate(true);
+    } else {
+      await window.loadProssimeGiornate(false);
     }
-    
-    // Se è admin, aggiorna solo la vista admin
-    if(window.isAdmin){
-      await loadProssimeGiornate(true);
-    }
-  } catch (error) {
-    console.error("Errore candidatura:", error);
-    alert("Si è verificato un errore durante l'operazione.");
-    await loadProssimeGiornate(false); 
+
+  } catch (err) {
+    console.error("Errore candidatura:", err);
+    alert("Errore durante l'operazione. Riprova.");
   } finally {
     if (btn) btn.disabled = false;
   }
 };
+
 window.loadCandidatureForMatch = async function(matchId){
   const tbody = byId('crud-candidature-body');
   const panel = byId('crud-candidature-panel');
