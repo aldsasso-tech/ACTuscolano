@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
-<button class="btn" onclick="initNotifications()">Attiva Notifiche</button>
+<button id="btn-attiva-notifiche" onclick="initNotifications()">Attiva Notifiche</button>
+
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
@@ -317,7 +318,8 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getIdTokenResult, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
     import { getDatabase, ref, set, push, get, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
-    
+    //Firebase messaging
+    import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
@@ -336,29 +338,38 @@
     const db = getDatabase(app);
 
     //Firebase messaging
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js";
-
-const messaging = getMessaging(app);
+    const messaging = getMessaging(app);
 
 async function initNotifications(){
-  try {
-    // registro lo SW nella cartella del progetto ACTuscolano
-    const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm!=='granted'){
+      alert("Per ricevere le notifiche devi consentire il permesso notifiche.");
+      return;
+    }
 
     const token = await getToken(messaging, {
-      vapidKey: "BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4",
-      serviceWorkerRegistration: swReg
+      vapidKey: 'BLmO6PREEYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4'
     });
 
-    console.log("FCM Token:", token);
-    alert("Notifiche attivate correttamente!");
+    console.log("Token FCM:", token);
 
-    // Poi qui più avanti salveremo token nel nodo utenti -> /utenti/uid/notifToken
-  } catch(e){
-    console.error("Errore attivazione notifiche:", e);
+    if(auth.currentUser){
+      await update(ref(db,'utenti/'+auth.currentUser.uid),{ tokenFcm: token });
+    }
+
+    alert("Notifiche PUSH attivate correttamente!");
   }
+  catch(e){
+    console.error("ERROR initNotifications:",e);
+    alert("Errore attivazione notifiche");
+  }
+
 }
 
+// rende la funzione richiamabile dal pulsante HTML
+window.initNotifications = initNotifications;
 
 
 
