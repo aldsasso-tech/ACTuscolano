@@ -334,6 +334,53 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
 
+//Firebase messaging
+    // ---- FIREBASE MESSAGING INIT ----
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js";
+
+let messaging = null;
+
+(async ()=>{
+  try {
+
+    // registra Service Worker
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
+    messaging = getMessaging(app);
+
+    // chiede permesso notifica
+    const perm = await Notification.requestPermission();
+
+    if(perm === "granted"){
+
+      const token = await getToken(messaging, {
+        vapidKey: "BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4",
+        serviceWorkerRegistration: registration
+      });
+
+      console.log("TOKEN Notifica:", token);
+
+      if(auth.currentUser){
+        await update(ref(db, `utenti/${auth.currentUser.uid}`), { tokenNotifica: token });
+      }
+    }
+
+    // notifiche foreground
+    onMessage(messaging, payload=>{
+      console.log("Notifica Foreground Arrivata:", payload);
+      new Notification(payload.notification.title,{
+        body: payload.notification.body
+      });
+    });
+
+  }catch(e){
+    console.error("Errore init messaging:", e);
+  }
+})();
+
+
+
+    
     const ADMIN_UID = "tbHGXtpvBDfmVIrNT2QVyeBinCV2"; // Controlla il tuo UID corretto
     let isAdmin = false;
     let selectedMatchKey = null; 
