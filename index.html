@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
-
+<button id="btn-attiva-notifiche" class="btn">Attiva Notifiche Push</button>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
@@ -317,6 +317,8 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getIdTokenResult, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
     import { getDatabase, ref, set, push, get, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
+    //Firebase messaging
+    import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
@@ -334,49 +336,35 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-//Firebase messaging
-    // ---- FIREBASE MESSAGING INIT ----
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js";
+    //Firebase messaging
+    const messaging = getMessaging(app);
+    document.getElementById('btn-attiva-notifiche').addEventListener('click', async ()=>{
 
-let messaging = null;
-
-(async ()=>{
-  try {
-
-    // registra Service Worker
-    const registration = await navigator.serviceWorker.register('/ACTuscolano/firebase-messaging-sw.js');
-
-    messaging = getMessaging(app);
-
-    // chiede permesso notifica
+  try{
     const perm = await Notification.requestPermission();
-
-    if(perm === "granted"){
-
-      const token = await getToken(messaging, {
-        vapidKey: "BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4",
-        serviceWorkerRegistration: registration
-      });
-
-      console.log("TOKEN Notifica:", token);
-
-      if(auth.currentUser){
-        await update(ref(db, `utenti/${auth.currentUser.uid}`), { tokenNotifica: token });
-      }
+    if(perm!=='granted'){
+      alert("Per ricevere le notifiche devi consentire il permesso notifiche.");
+      return;
     }
 
-    // notifiche foreground
-    onMessage(messaging, payload=>{
-      console.log("Notifica Foreground Arrivata:", payload);
-      new Notification(payload.notification.title,{
-        body: payload.notification.body
-      });
-    });
+    const token = await getToken(messaging, { vapidKey: 'TUAVAPIDKEY' });
+    console.log("Token FCM:", token);
 
-  }catch(e){
-    console.error("Errore init messaging:", e);
+    if(auth.currentUser){
+      await update(ref(db,'utenti/'+auth.currentUser.uid),{ tokenFcm: token });
+    }
+
+    alert("Notifiche PUSH attivate correttamente!");
   }
-})();
+  catch(e){
+    console.error(e);
+    alert("Errore attivazione notifiche");
+  }
+
+});
+
+
+
 
 
 
@@ -385,6 +373,8 @@ let messaging = null;
     let isAdmin = false;
     let selectedMatchKey = null; 
 
+
+    
     // Seconda app per creare utenti senza sloggarci
     const adminSecondaryApp = initializeApp(firebaseConfig, "adminSecondary");
     const adminSecondaryAuth = getAuth(adminSecondaryApp);
@@ -687,7 +677,8 @@ if(user){
       }
 
     });
-    
+
+  
     
     /**
      * Funzione Classifica:
