@@ -335,7 +335,15 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
+    
+// registra service worker
+navigator.serviceWorker.register('./firebase-messaging-sw.js')
+.then(reg => {
+    console.log("SW registrato ok", reg);
+})
+.catch(err => console.error("SW registration failed:", err));
 
+    
     //Firebase messaging
     const messaging = getMessaging(app);
 
@@ -349,7 +357,7 @@ async function initNotifications(){
     }
 
     const token = await getToken(messaging, {
-      vapidKey: 'BLmO6PREEYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4'
+      vapidKey: 'BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4'
     });
 
     console.log("Token FCM:", token);
