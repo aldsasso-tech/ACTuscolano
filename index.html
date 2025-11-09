@@ -2740,7 +2740,6 @@ window.showValutazionePartitaForm = async function(matchId, avv) {
   const container = byId('prestazioni-form-container');
   container.innerHTML = 'Caricamento dati prestazioni...';
 
-  // Carico rosa + prestazioni match
   const [snapRosa, snapPrests] = await Promise.all([
     get(ref(db, 'rosa')),
     get(ref(db, `prestazioni/${matchId}`))
@@ -2749,10 +2748,8 @@ window.showValutazionePartitaForm = async function(matchId, avv) {
   const rosa = snapRosa.val() || {};
   const prestazioni = snapPrests.val() || {};
 
-  // Ordino giocatori per numero di maglia
   const players = Object.entries(rosa).sort((a,b)=> (a[1].numero||0)-(b[1].numero||0));
 
-  // Righe della tabella
   const rowsHtml = players.map(([pid, p]) => {
     const data = prestazioni[pid] || {};
     const votoVal = (data.voto !== null && Number.isFinite(data.voto)) ? data.voto : '';
@@ -2785,10 +2782,9 @@ window.showValutazionePartitaForm = async function(matchId, avv) {
     </form>
   `;
 
-  // Wiring submit → salva
   const form = byId('prestazioni-valutazione-form');
   form.onsubmit = (e)=> window.savePrestazioniPartita(e);
-};
+}; // ← ATTENZIONE QUI FINISCE LA FUNZIONE
 
     
   /**
@@ -2935,7 +2931,7 @@ window.savePrestazioniPartita = async function(e){
     alert('Errore durante il salvataggio. Riprova.');
   }
 };
-}
+
     /**
      * FIX: Carica dati esistenti per il form Gestione Candidature (Admin Calendario).
      * NOTA: Questa funzione assume che /rosa/{pid}/uid esista e sia l'Auth UID.
