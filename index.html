@@ -350,19 +350,16 @@ navigator.serviceWorker.register('/ACTuscolano/firebase-messaging-sw.js')
 async function initNotifications(){
   try{
     const perm = await Notification.requestPermission();
-    if(perm !== 'granted'){
+    if(perm!=='granted'){
       alert("Per ricevere le notifiche devi consentire il permesso notifiche.");
       return;
     }
 
-    let sub = await reg.pushManager.getSubscription();
-if(!sub){
-   sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: 'BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4'
-   });
-}
-    
+    if(!window.fcmSW){
+      console.error("Service Worker non registrato ancora");
+      return;
+    }
+
     const token = await getToken(messaging, {
       vapidKey: 'BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4',
       serviceWorkerRegistration: window.fcmSW
@@ -372,7 +369,7 @@ if(!sub){
     window.lastFcmToken = token;
 
     if(auth.currentUser){
-      await update(ref(db, 'utenti/'+auth.currentUser.uid), { tokenFcm: token });
+      await update(ref(db,'utenti/'+auth.currentUser.uid),{ tokenFcm: token });
     }
 
     alert("Notifiche PUSH attivate correttamente!");
