@@ -355,6 +355,14 @@ async function initNotifications(){
       return;
     }
 
+    let sub = await reg.pushManager.getSubscription();
+if(!sub){
+   sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: 'BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4'
+   });
+}
+    
     const token = await getToken(messaging, {
       vapidKey: 'BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4',
       serviceWorkerRegistration: window.fcmSW
