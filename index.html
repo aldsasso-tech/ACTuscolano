@@ -2799,7 +2799,6 @@ window.savePrestazioniPartita = async function(e){
   const matchId = form.dataset.matchId;
   if(!matchId){ alert('Match non valido'); return; }
 
-  // Leggo tutti gli input
   const inputs = form.querySelectorAll('input[data-id][data-field]');
   const nuovi = {};
   inputs.forEach(inp=>{
@@ -2823,24 +2822,16 @@ window.savePrestazioniPartita = async function(e){
   });
 
   try {
-    // scrittura voti partita
     const updates = {};
     Object.entries(nuovi).forEach(([pid,data])=>{
       updates[`prestazioni/${matchId}/${pid}`] = data;
     });
 
-    // 1° commit: scrivo le prestazioni
     await update(ref(db), updates);
-
-    // 2° commit: aggiorno flag partita
     await update(ref(db, `calendario/${matchId}`), { prestazioniPubblicate: true });
 
     alert("Prestazioni salvate correttamente!");
-
-    // chiudo popup
     byId('overlay-prestazioni').style.display="none";
-
-    // aggiorno calendario (no refresh) stessa vista corrente
     window.loadProssimeGiornate(isAdmin);
 
   } catch(err){
@@ -2848,6 +2839,7 @@ window.savePrestazioniPartita = async function(e){
     alert("Errore durante il salvataggio delle prestazioni.");
   }
 };
+
 
 
   // Carico prestazioni correnti del match, rosa correnti, e formazione+panchina del match
