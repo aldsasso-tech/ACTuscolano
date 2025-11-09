@@ -340,12 +340,10 @@
 navigator.serviceWorker.register('/ACTuscolano/firebase-messaging-sw.js')
 .then(reg => {
     console.log("SW registrato ok", reg);
-
-    // <<< AGGIUNGERE QUESTA RIGA QUI
-    messaging.useServiceWorker(reg);
-
+    window.fcmSW = reg; // salva per dopo
 })
 .catch(err => console.error("SW registration failed:", err));
+
 
 
     
@@ -360,9 +358,11 @@ async function initNotifications(){
       return;
     }
 
-    const token = await getToken(messaging, {
-      vapidKey: 'BLmO6PREEYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4'
-    });
+   const token = await getToken(messaging, {
+    vapidKey: 'BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4',
+    serviceWorkerRegistration: window.fcmSW
+});
+
 
     console.log("Token FCM:", token);
 
