@@ -343,10 +343,7 @@ navigator.serviceWorker.register('/ACTuscolano/firebase-messaging-sw.js')
     window.fcmSW = reg; // salva per dopo
 })
 .catch(err => console.error("SW registration failed:", err));
-
-
-
-    
+   
     //Firebase messaging
     const messaging = getMessaging(app);
 
