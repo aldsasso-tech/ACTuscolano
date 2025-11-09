@@ -3,6 +3,9 @@ self.addEventListener('install', ()=>{ self.skipWaiting() })
 self.addEventListener('activate', ()=>{ self.clients.claim() })
 importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js');
+firebase.initializeApp({...config});
+const messaging = firebase.messaging();
+
 
 firebase.initializeApp({
   apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
@@ -13,6 +16,7 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
+
 
 
 
