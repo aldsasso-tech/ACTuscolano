@@ -340,8 +340,13 @@
 navigator.serviceWorker.register('/ACTuscolano/firebase-messaging-sw.js')
 .then(reg => {
     console.log("SW registrato ok", reg);
+
+    // <<< AGGIUNGERE QUESTA RIGA QUI
+    messaging.useServiceWorker(reg);
+
 })
 .catch(err => console.error("SW registration failed:", err));
+
 
     
     //Firebase messaging
