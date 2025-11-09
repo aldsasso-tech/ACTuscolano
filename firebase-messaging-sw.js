@@ -3,8 +3,6 @@ self.addEventListener('install', ()=>{ self.skipWaiting() })
 self.addEventListener('activate', ()=>{ self.clients.claim() })
 importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js');
-firebase.initializeApp({...config});
-const messaging = firebase.messaging();
 
 
 firebase.initializeApp({
@@ -16,6 +14,18 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
+messaging.onBackgroundMessage(function(payload) {
+  console.log('BG Received:', payload);
+
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/ACTuscolano/Logo.png'
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
 
 
 
