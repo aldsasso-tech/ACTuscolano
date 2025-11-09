@@ -348,7 +348,6 @@ navigator.serviceWorker.register('./firebase-messaging-sw.js')
     const messaging = getMessaging(app);
 
 async function initNotifications(){
-
   try{
     const perm = await Notification.requestPermission();
     if(perm!=='granted'){
@@ -356,14 +355,13 @@ async function initNotifications(){
       return;
     }
 
-   const swReg = await navigator.serviceWorker.getRegistration();
-   const token = await getToken(messaging, {
-  vapidKey: 'BLmO6PREYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4',
-  serviceWorkerRegistration: swReg
-});
-
+    const token = await getToken(messaging, {
+      vapidKey: 'BLmO6PREEYvsC-b8qfMHLPc5EnMJwjJvrD0J2nTVNe09dhoxd5kz1uL3zpcaZGooDAdyf4sBmJKRBAN60xYm_Hm4'
+    });
 
     console.log("Token FCM:", token);
+
+    window.lastFcmToken = token;
 
     if(auth.currentUser){
       await update(ref(db,'utenti/'+auth.currentUser.uid),{ tokenFcm: token });
@@ -375,11 +373,9 @@ async function initNotifications(){
     console.error("ERROR initNotifications:",e);
     alert("Errore attivazione notifiche");
   }
-
 }
-
-// rende la funzione richiamabile dal pulsante HTML
 window.initNotifications = initNotifications;
+
 
 
 
@@ -593,7 +589,9 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
       // DI BASE: nessun admin
 isAdmin = false;
 window.currentUserRole = null;
-
+if(user && window.lastFcmToken) {
+  update(ref(db, 'utenti/'+user.uid), { tokenFcm: window.lastFcmToken });
+}
 if(user){
   const snapRole = await get(ref(db, 'utenti/'+user.uid));
   const uData = snapRole.val() || {};
