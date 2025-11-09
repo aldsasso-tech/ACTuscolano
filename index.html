@@ -2792,27 +2792,25 @@ window.showValutazionePartitaForm = async function(matchId, avv) {
   /**
      * FIX: salvataggio delta, presenza unica
      */
-    window.savePrestazioniPartita = async function(e){
+window.savePrestazioniPartita = async function(e){
   e.preventDefault();
 
   const form = e.target;
   const matchId = form.dataset.matchId;
   if(!matchId){ alert('Match non valido'); return; }
 
-  // Leggo tutti gli input della tabella
+  // Leggo tutti gli input
   const inputs = form.querySelectorAll('input[data-id][data-field]');
-  // Costruisco mappa { pid: {voto: (num|null), goal: num} }
   const nuovi = {};
   inputs.forEach(inp=>{
     const pid = inp.dataset.id;
-    const field = inp.dataset.field; // 'voto' | 'goal'
+    const field = inp.dataset.field;
     const raw = inp.value.trim();
 
     if(!nuovi[pid]) nuovi[pid] = { voto: null, goal: 0 };
 
     if(field === 'voto'){
-      // voto: allow blank = null, otherwise number
-      if(raw === '') {
+      if(raw===''){
         nuovi[pid].voto = null;
       } else {
         const v = parseFloat(raw.replace(',', '.'));
@@ -2820,9 +2818,37 @@ window.showValutazionePartitaForm = async function(matchId, avv) {
       }
     } else if(field === 'goal'){
       const g = parseInt(raw,10);
-      nuovi[pid].goal = Number.isFinite(g) && g >= 0 ? g : 0;
+      nuovi[pid].goal = Number.isFinite(g) && g>=0 ? g : 0;
     }
   });
+
+  try {
+    // scrittura voti partita
+    const updates = {};
+    Object.entries(nuovi).forEach(([pid,data])=>{
+      updates[`prestazioni/${matchId}/${pid}`] = data;
+    });
+
+    // 1° commit: scrivo le prestazioni
+    await update(ref(db), updates);
+
+    // 2° commit: aggiorno flag partita
+    await update(ref(db, `calendario/${matchId}`), { prestazioniPubblicate: true });
+
+    alert("Prestazioni salvate correttamente!");
+
+    // chiudo popup
+    byId('overlay-prestazioni').style.display="none";
+
+    // aggiorno calendario (no refresh) stessa vista corrente
+    window.loadProssimeGiornate(isAdmin);
+
+  } catch(err){
+    console.error("Errore salvataggio prestazioni:", err);
+    alert("Errore durante il salvataggio delle prestazioni.");
+  }
+};
+
 
   // Carico prestazioni correnti del match, rosa correnti, e formazione+panchina del match
   const [snapPreMatch, snapRosa, snapMatch] = await Promise.all([
