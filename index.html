@@ -1460,11 +1460,15 @@ playersHtml += sortedCandidati.map(p => {
 
       // calcolo media + array finale
       const rows = Object.values(aggregato).map(a=>{
+        const nomeCompleto = a.nome; 
+        const cognome = a.cognome;
+        const inizialeNome = (nomeCompleto.split(' ')[0] || '').charAt(0).toUpperCase();
         return {
           pid:a.pid,
           numero:a.numero,
-          nome:a.nome,
-          cognome:a.cognome,
+          nome:nomeCompleto,
+          cognome:cognome,
+          displayName: `${inizialeNome}. ${cognome}`,
           goal:a.goal,
           partite:a.countVoto,
           mediaVoto: a.countVoto>0 ? Number((a.totalVoto/a.countVoto).toFixed(2)) : null
@@ -1493,7 +1497,7 @@ playersHtml += sortedCandidati.map(p => {
           <li class="card" ${clickAttr} style="cursor:${r.partite>0 ? 'pointer':'default'}">
             <div class="row" style="justify-content:space-between;align-items:flex-start;">
               <div>
-                <div class="player-title">${r.nome} <span class="pill">#${r.numero}</span></div>
+                <div class="player-title">${r.displayName} <span class="pill">#${r.numero}</span></div>
                 <div class="player-sub">Partite con voto: <b>${r.partite}</b></div>
               </div>
               <div style="text-align:right;">
