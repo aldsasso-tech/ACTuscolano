@@ -2898,6 +2898,7 @@ window.savePrestazioniPartita = async function(e){
 
         // Aggiungo il flag alla partita (dalla logica semplice)
         await update(ref(db, `calendario/${matchId}`), { prestazioniPubblicate: true });
+        await update(ref(db, `events/${matchId}`), { prestazioniPubblicateAt: Date.now() });
 
         alert('Prestazioni salvate correttamente.');
 
