@@ -379,7 +379,7 @@ async function initNotifications(){
 
     console.log("Token FCM:", token);
     window.lastFcmToken = token;
-
+    localStorage.setItem("fcmToken", token);
     if(auth.currentUser){
       await update(ref(db,'utenti/'+auth.currentUser.uid),{ tokenFcm: token });
     }
@@ -607,8 +607,12 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
       // DI BASE: nessun admin
 isAdmin = false;
 window.currentUserRole = null;
-if(user && window.lastFcmToken){
-  await update(ref(db, 'utenti/'+user.uid), { tokenFcm: window.lastFcmToken });
+if(user && !window.lastFcmToken){
+   const stored = localStorage.getItem("fcmToken");
+   if(stored){
+      await update(ref(db, 'utenti/'+user.uid), { tokenFcm: stored });
+      window.lastFcmToken = stored;
+   }
 }
 if(user){
   const snapRole = await get(ref(db, 'utenti/'+user.uid));
@@ -2899,7 +2903,6 @@ window.savePrestazioniPartita = async function(e){
         // Aggiungo il flag alla partita (dalla logica semplice)
         await update(ref(db, `calendario/${matchId}`), { prestazioniPubblicate: true });
         await update(ref(db, `events/${matchId}`), { prestazioniPubblicateAt: Date.now() });
-
         alert('Prestazioni salvate correttamente.');
 
         // Ricarico solo il form (o chiudo il popup)
