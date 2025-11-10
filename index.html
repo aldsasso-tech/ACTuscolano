@@ -336,14 +336,20 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
     
-// registra service worker
+// registra service worker principale
 navigator.serviceWorker.register('/ACTuscolano/firebase-messaging-sw.js')
 .then(reg => {
     console.log("SW registrato ok", reg);
-    window.fcmSW = reg; // salva per dopo
+    window.fcmSW = reg; // salva per initNotifications
 })
 .catch(err => console.error("SW registration failed:", err));
-   
+
+// registra service worker SECONDARIO obbligatorio per mobile
+navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/firebase-cloud-messaging-push-scope' })
+.then(r => console.log("SECOND FCM SW ok", r))
+.catch(e => console.error("FCM secondary SW FAIL", e));
+
+
     //Firebase messaging
     const messaging = getMessaging(app);
 onMessage(messaging, (payload)=>{
