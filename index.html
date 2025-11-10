@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
-<button id="btn-attiva-notifiche" onclick="initNotifications()">Attiva Notifiche</button>
-
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
@@ -610,57 +608,60 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
     }
 
     /* Auth */
-    onAuthStateChanged(auth, async (user)=>{
-      // DI BASE: nessun admin
-isAdmin = false;
-window.currentUserRole = null;
-if(user && !window.lastFcmToken){
-   const stored = localStorage.getItem("fcmToken");
-   if(stored){
-      await push(ref(db, 'utenti/'+user.uid+'/tokensFcm'), stored);
-      window.lastFcmToken = stored;
-   }
-}
-if(user){
-  const snapRole = await get(ref(db, 'utenti/'+user.uid));
-  const uData = snapRole.val() || {};
-// sincronizza token locale se già loggato
-if(user){
-  const stored = localStorage.getItem("fcmToken");
-  if(stored){
-    await update(ref(db,`utenti/${user.uid}/tokensFcm`),{
-      [stored]: true
-    });
-    window.lastFcmToken = stored;
+onAuthStateChanged(auth, async (user)=>{
+
+  isAdmin = false;
+  window.currentUserRole = null;
+
+  const btnNotif = document.getElementById('btn-attiva-notifiche');
+
+  if(user){
+
+    const snapRole = await get(ref(db, 'utenti/'+user.uid));
+    const uData = snapRole.val() || {};
+
+    // ruolo
+    const role = uData.role || (user.uid === "tbHGXtpvBDfmVIrNT2QVyeBinCV2" ? "superadmin" : "user");
+    window.currentUserRole = role;
+    if(role === 'admin' || role === 'superadmin'){
+      isAdmin = true;
+    }
+
+    // sync eventuale token locale
+    const storedToken = localStorage.getItem("fcmToken");
+    if(storedToken){
+      await update(ref(db,`utenti/${user.uid}/tokensFcm`),{
+        [storedToken]: true
+      });
+      window.lastFcmToken = storedToken;
+    }
+
+    // show/hide pulsante attiva notifiche
+    if(btnNotif){
+      const uRef = ref(db,'utenti/'+user.uid+'/tokensFcm');
+      const snapTokens = await get(uRef);
+      btnNotif.style.display = snapTokens.exists() ? 'none' : 'inline-block';
+    }
+
+  } else {
+    // user non loggato
+    if(btnNotif) btnNotif.style.display = 'none';
   }
-}
 
-  // fallback: se non esiste role ma è Aldo → superadmin
-  const role = uData.role || (user.uid === "tbHGXtpvBDfmVIrNT2QVyeBinCV2" ? "superadmin" : "user");
+  setAuthButton(user);
+  toggleAdminUI();
 
-  window.currentUserRole = role;
-
-  if(role === 'admin' || role === 'superadmin'){
-    isAdmin = true;
+  const currentActiveSection = document.querySelector('.content-section.active');
+  if(!currentActiveSection || currentActiveSection.id === 'login-section') {
+    if(user && isAdmin) {
+       window.showAdminSection('admin-inserimento-giocatori-section');
+    } else {
+       window.showPublicSection('rosa-section');
+    }
   }
-}
 
-      setAuthButton(user);
-      toggleAdminUI(); // Aggiorna la UI
-      
-      // Assicura che una sezione sia visibile al cambio di stato
-      const currentActiveSection = document.querySelector('.content-section.active');
+});
 
-      // Se non c'è una sezione attiva o se la sezione attiva è il login (dopo cambio stato)
-      if(!currentActiveSection || currentActiveSection.id === 'login-section') {
-        if(user && isAdmin) {
-           window.showAdminSection('admin-inserimento-giocatori-section');
-        } else {
-           // Se non loggato o non admin, mostra la rosa
-           window.showPublicSection('rosa-section');
-        }
-      }
-    });
     
     window.handleAuthToggle = ()=>{
       const user = auth.currentUser;
@@ -3157,6 +3158,10 @@ window.loadCandidatureForMatch = async function(matchId){
       <p class="tag">Football Club</p> 
     </div> 
   </div> 
+  <button id="btn-attiva-notifiche" style="display:none;margin-right:10px; background:white; color:#b30000; border-radius:6px; padding:6px 10px; font-size:13px; font-weight:600;"
+        onclick="initNotifications()">
+    Attiva Notifiche
+</button>
 </header> 
 <nav aria-label="Navigazione principale"> 
   <div class="nav-wrap"> 
