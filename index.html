@@ -319,6 +319,7 @@
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getIdTokenResult, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js';
     import { getDatabase, ref, set, push, get, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js';
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js";
+    import { push } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAQLQYXcwyFt5luNw1iA5N2-EfnbF1Bc7U",
@@ -386,8 +387,12 @@ async function initNotifications(){
     console.log("Token FCM:", token);
     window.lastFcmToken = token;
     localStorage.setItem("fcmToken", token);
+
     if(auth.currentUser){
-      await update(ref(db,'utenti/'+auth.currentUser.uid),{ tokenFcm: token });
+      // SCRITTURA NUOVO MODELLO B
+      await update(ref(db,`utenti/${auth.currentUser.uid}/tokensFcm`),{
+        [token]: true
+      });
     }
 
     alert("Notifiche PUSH attivate correttamente!");
@@ -616,13 +621,23 @@ window.currentUserRole = null;
 if(user && !window.lastFcmToken){
    const stored = localStorage.getItem("fcmToken");
    if(stored){
-      await update(ref(db, 'utenti/'+user.uid), { tokenFcm: stored });
+      await push(ref(db, 'utenti/'+user.uid+'/tokensFcm'), stored);
       window.lastFcmToken = stored;
    }
 }
 if(user){
   const snapRole = await get(ref(db, 'utenti/'+user.uid));
   const uData = snapRole.val() || {};
+// sincronizza token locale se già loggato
+if(user){
+  const stored = localStorage.getItem("fcmToken");
+  if(stored){
+    await update(ref(db,`utenti/${user.uid}/tokensFcm`),{
+      [stored]: true
+    });
+    window.lastFcmToken = stored;
+  }
+}
 
   // fallback: se non esiste role ma è Aldo → superadmin
   const role = uData.role || (user.uid === "tbHGXtpvBDfmVIrNT2QVyeBinCV2" ? "superadmin" : "user");
