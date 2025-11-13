@@ -2239,8 +2239,25 @@ window.showPrestazioniPubbliche = async function(matchId, avv){
   `;
 };
 
+/* === Giorno Partita === */
 
+async function aggiornaGiorniPartite() {
+  const snap = await get(ref(db, 'calendario'));
+  const val = snap.val() || {};
+  const updates = {};
 
+  const giorni = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+  const toDate = (d)=>{ const [dd,mm,yyyy]=String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+
+  for (const [id, m] of Object.entries(val)) {
+    if (m.data) {
+      const date = toDate(m.data);
+      updates[`calendario/${id}/giorno`] = giorni[date.getDay()];
+    }
+  }
+  await update(ref(db), updates);
+  alert("Aggiornamento completato! Giorni aggiunti a tutte le partite.");
+}
 
 
 
@@ -3203,6 +3220,7 @@ window.loadCandidatureForMatch = async function(matchId){
   <div class="nav-wrap" style="max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px;">
     <button class="tab" data-admin-target="admin-inserimento-giocatori-section" onclick="showAdminSection('admin-inserimento-giocatori-section')">Nuovo Giocatore</button>
     <button class="tab" data-admin-target="admin-inserimento-giornate-section" onclick="showAdminSection('admin-inserimento-giornate-section')">Nuova Partita</button>
+    <button class="tab" data-admin-target="admin-inserimento-giorno-section" onclick="showAdminSection('admin-inserimento-giorno-section')">AGG Giorno</button>
     <button class="tab" data-admin-target="admin-calendario-section" onclick="showAdminSection('admin-calendario-section')">Formaz./Voti/Cand.</button>
     <button class="tab" data-admin-target="admin-video-section" onclick="showAdminSection('admin-video-section')">Gestione Video</button>
     <button class="tab" data-admin-target="admin-classifica-section" onclick="showAdminSection('admin-classifica-section')">Aggiorna Classifica</button>
@@ -3335,6 +3353,19 @@ window.loadCandidatureForMatch = async function(matchId){
     <div id="classifica-risultato-update" style="margin-top:10px;"></div>
   </section>
 
+ <section id="admin-inserimento-giorno-section" class="content-section">
+    <h2>Admin · Aggiorna il giorno</h2>
+    <div class="help">Aggiorna i giorni delle partite</div>
+    <div class="actions">
+      <button class="btn btn--accent" onclick="aggiornaGiorniPartite()">Aggiorna Ora</button>
+    </div>
+    <div id="classifica-risultato-update" style="margin-top:10px;"></div>
+  </section>
+
+
+
+
+  
   <section id="admin-statistiche-section" class="content-section">
     <h2>Admin · Inserimento Risultato/Video</h2>
     <div id="risultato-form-container"></div>
