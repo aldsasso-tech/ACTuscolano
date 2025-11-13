@@ -1298,7 +1298,7 @@ playersHtml += sortedCandidati.map(p => {
          ${esitoPill}
         </div>
         <div class="player-sub">
-          ${m.giorno}${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
+          ${m.giorno} ${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
           Campo: ${escapeHtml(m.campo||'')} • ${m.casa ? 'Casa' : 'Trasferta'}
         </div>
         ${candidatiListHtml}
@@ -2434,8 +2434,7 @@ window.crudUpdatePartita = async function(matchId){
   const data = prompt("Data (gg/mm/aaaa):", m.data || "");
   if(data===null) return;
 
-  const giornoAbbr = getDayAbbrFromDate(dataPartita):", m.giorno || "");  
-  if(giornoAbbr===null) return;
+  const giornoAbbr = getDayAbbrFromDate(nuovaData);
   
   const orario = prompt("Orario (hh:mm):", m.orario || "");
   if(orario===null) return;
@@ -2560,7 +2559,7 @@ window.crudDeletePartita = async function(matchId){
       return `
         <tr>
           <td><input type="text" value="${escapeHtml(m.data)}" data-field="data" data-id="${id}"/></td>
-          <td><input type="text" value="${escapeHtml(m.giorno||'')}" data-field="orario" data-id="${id}"/></td>
+          <td><input type="text" value="${escapeHtml(m.giorno||'')}" data-field="giorno" data-id="${id}"/></td>
           <td><input type="time" value="${escapeHtml(m.orario||'')}" data-field="orario" data-id="${id}"/></td>
           <td><input type="text" value="${escapeHtml(m.avversaria)}" data-field="avversaria" data-id="${id}"/></td>
           <td><input type="text" value="${escapeHtml(m.risultato||'N/D')}" data-field="risultato" data-id="${id}"/></td>
