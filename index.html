@@ -1298,7 +1298,7 @@ playersHtml += sortedCandidati.map(p => {
          ${esitoPill}
         </div>
         <div class="player-sub">
-          ${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
+          ${m.giorno}${m.data}${m.orario ? ` • ${m.orario}` : ''}<br>
           Campo: ${escapeHtml(m.campo||'')} • ${m.casa ? 'Casa' : 'Trasferta'}
         </div>
         ${candidatiListHtml}
@@ -2314,11 +2314,21 @@ window.saveNewMatch = async function(){
     return;
   }
 
+  // Calcolo giorno abbreviato (Lun, Mar, Mer, Gio, Ven, Sab, Dom)
+function getDayAbbrFromDate(str) {
+  const [dd, mm, yyyy] = str.split('/');
+  const date = new Date(`${mm}/${dd}/${yyyy}`);
+  const giorni = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+  return giorni[date.getDay()];
+}
+
   const calRef = ref(db, 'calendario');
   const newNode = push(calRef);
+  const giornoAbbr = getDayAbbrFromDate(dataPartita);
 
   await set(newNode, {
     data,
+    giorno: giornoAbbr,
     orario,
     avversaria: avv,
     campo,
@@ -2407,6 +2417,9 @@ window.crudUpdatePartita = async function(matchId){
   const data = prompt("Data (gg/mm/aaaa):", m.data || "");
   if(data===null) return;
 
+  const giornoAbbr = getDayAbbrFromDate(dataPartita):", m.giorno || "");  
+  if(giornoAbbr===null) return;
+  
   const orario = prompt("Orario (hh:mm):", m.orario || "");
   if(orario===null) return;
 
@@ -2417,9 +2430,15 @@ window.crudUpdatePartita = async function(matchId){
   if(campo===null) return;
 
   const casa = confirm("Partita in CASA? (OK = Casa | Cancel = Trasferta)");
-
+  
+if (nuovaData !== vecchiaData) {
+  const nuovoGiorno = getDayAbbrFromDate(nuovaData);
+  updates[`calendario/${matchId}/giorno`] = nuovoGiorno;
+}
+  
   await update(ref(db, 'calendario/'+matchId), {
     data,
+    giorno: giornoAbbr,
     orario,
     avversaria: avv,
     campo,
@@ -2524,6 +2543,7 @@ window.crudDeletePartita = async function(matchId){
       return `
         <tr>
           <td><input type="text" value="${escapeHtml(m.data)}" data-field="data" data-id="${id}"/></td>
+          <td><input type="text" value="${escapeHtml(m.giorno||'')}" data-field="orario" data-id="${id}"/></td>
           <td><input type="time" value="${escapeHtml(m.orario||'')}" data-field="orario" data-id="${id}"/></td>
           <td><input type="text" value="${escapeHtml(m.avversaria)}" data-field="avversaria" data-id="${id}"/></td>
           <td><input type="text" value="${escapeHtml(m.risultato||'N/D')}" data-field="risultato" data-id="${id}"/></td>
