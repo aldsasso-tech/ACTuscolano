@@ -400,7 +400,51 @@ window.initNotifications = initNotifications;
 
 
 
+// La funzione getDayAbbrFromDate deve essere definita in modo globale
+// function getDayAbbrFromDate(str) { ... }
 
+window.aggiornaGiorniPartite = async function() {
+    // 1. Leggi tutti i dati del calendario
+    const calendarioRef = ref(db, 'calendario');
+    const snapshot = await get(calendarioRef);
+    const partite = snapshot.val();
+    
+    if (!partite) {
+        document.getElementById('classifica-risultato-update').innerText = "Nessuna partita trovata da aggiornare.";
+        return;
+    }
+
+    const updates = {};
+    let count = 0;
+
+    // 2. Cicla su ogni partita e calcola il nuovo giorno
+    for (const matchId in partite) {
+        const partita = partite[matchId];
+        
+        // Verifica che la partita abbia il campo 'data'
+        if (partita.data) {
+            try {
+                // Calcola il giorno corretto
+                const nuovoGiornoAbbr = getDayAbbrFromDate(partita.data);
+                
+                // Prepara l'aggiornamento solo per il campo 'giorno'
+                updates[`calendario/${matchId}/giorno`] = nuovoGiornoAbbr;
+                count++;
+            } catch (e) {
+                // Gestisci date non valide
+                console.error(`Errore nel calcolo del giorno per la partita ${matchId}:`, e);
+            }
+        }
+    }
+
+    // 3. Esegui l'aggiornamento multi-path (efficiente)
+    if (count > 0) {
+        await update(ref(db, '/'), updates);
+        document.getElementById('classifica-risultato-update').innerText = `Aggiornamento completato: ${count} partite aggiornate.`;
+    } else {
+        document.getElementById('classifica-risultato-update').innerText = "Nessun aggiornamento necessario.";
+    }
+};
 
 
 
@@ -3352,14 +3396,14 @@ window.loadCandidatureForMatch = async function(matchId){
     <div id="classifica-risultato-update" style="margin-top:10px;"></div>
   </section>
 
- <section id="admin-inserimento-giorno-section" class="content-section">
+<section id="admin-inserimento-giorno-section" class="content-section">
     <h2>Admin · Aggiorna il giorno</h2>
-    <div class="help">Aggiorna i giorni delle partite</div>
+    <div class="help">Aggiorna i giorni delle partite (utile se sono state caricate vecchie partite senza il campo 'giorno').</div>
     <div class="actions">
       <button class="btn btn--accent" onclick="aggiornaGiorniPartite()">Aggiorna Ora</button>
     </div>
     <div id="classifica-risultato-update" style="margin-top:10px;"></div>
-  </section>
+</section>
 
 
 
