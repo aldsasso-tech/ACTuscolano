@@ -1429,7 +1429,7 @@ playersHtml += sortedCandidati.map(p => {
         return `
             <li class="card" style="margin-bottom:10px; padding:12px; display:grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;">
                 <div>
-                    <div style="font-size:0.9rem; color:var(--ink-sub); margin-bottom: 4px;">${p.data || 'N/D'} • ${p.casa ? 'Casa' : 'Trasferta'}</div>
+                    <div style="font-size:0.9rem; color:var(--ink-sub); margin-bottom: 4px;">${p.giorno || ''} ${p.data || 'N/D'} • ${p.casa ? 'Casa' : 'Trasferta'}</div>
                     <strong style="font-size:1.1rem; display:block;">vs ${avversario}</strong>
                     <span class="player-sub">${campo}</span>
                 </div>
