@@ -401,6 +401,13 @@ window.initNotifications = initNotifications;
 
 
 // La funzione getDayAbbrFromDate deve essere definita in modo globale
+      // Calcolo giorno abbreviato (Lun, Mar, Mer, Gio, Ven, Sab, Dom)
+function getDayAbbrFromDate(str) {
+  const [dd, mm, yyyy] = str.split('/');
+  const date = new Date(`${mm}/${dd}/${yyyy}`);
+  const giorni = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+  return giorni[date.getDay()];
+}
 // function getDayAbbrFromDate(str) { ... }
 
 window.aggiornaGiorniPartite = async function() {
@@ -2375,13 +2382,7 @@ window.saveNewMatch = async function(){
     return;
   }
 
-  // Calcolo giorno abbreviato (Lun, Mar, Mer, Gio, Ven, Sab, Dom)
-function getDayAbbrFromDate(str) {
-  const [dd, mm, yyyy] = str.split('/');
-  const date = new Date(`${mm}/${dd}/${yyyy}`);
-  const giorni = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
-  return giorni[date.getDay()];
-}
+
 
   const calRef = ref(db, 'calendario');
   const newNode = push(calRef);
