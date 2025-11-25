@@ -2408,7 +2408,7 @@ window.saveNewMatch = async function(){
 
   const calRef = ref(db, 'calendario');
   const newNode = push(calRef);
-  const giornoAbbr = getDayAbbrFromDate(dataPartita);
+  const giornoAbbr = getDayAbbrFromDate(data);
 
   await set(newNode, {
     data,
