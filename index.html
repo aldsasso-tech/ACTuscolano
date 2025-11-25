@@ -2494,14 +2494,17 @@ if(window.loadRosaAdmin) window.loadRosaAdmin?.();
     // ===================== CRUD UPDATE PARTITA =====================
 window.crudUpdatePartita = async function(matchId){
 
+  // 1. Recupero dati esistenti
   const snap = await get(ref(db, 'calendario/'+matchId));
   const m = snap.val();
   if(!m){ alert("Partita non trovata"); return; }
 
+  // 2. Prompt per i nuovi dati
   const data = prompt("Data (gg/mm/aaaa):", m.data || "");
   if(data===null) return;
 
-  const giornoAbbr = getDayAbbrFromDate(nuovaData);
+  // CORREZIONE 1: Uso "data", non "nuovaData"
+  const giornoAbbr = getDayAbbrFromDate(data);
   
   const orario = prompt("Orario (hh:mm):", m.orario || "");
   if(orario===null) return;
@@ -2514,14 +2517,13 @@ window.crudUpdatePartita = async function(matchId){
 
   const casa = confirm("Partita in CASA? (OK = Casa | Cancel = Trasferta)");
   
-if (nuovaData !== vecchiaData) {
-  const nuovoGiorno = getDayAbbrFromDate(nuovaData);
-  updates[`calendario/${matchId}/giorno`] = nuovoGiorno;
-}
-  
+  // CORREZIONE 2: Ho rimosso il blocco if(nuovaData !== vecchiaData) 
+  // perché causava errori ed era inutile visto che facciamo l'update qui sotto.
+
+  // 3. Aggiornamento su Firebase
   await update(ref(db, 'calendario/'+matchId), {
-    data,
-    giorno: giornoAbbr,
+    data,              // La nuova data inserita nel prompt
+    giorno: giornoAbbr, // Il giorno calcolato dalla nuova data
     orario,
     avversaria: avv,
     campo,
