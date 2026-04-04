@@ -169,7 +169,10 @@
       65%{transform:translateY(6px) scale(.98)}
     }
     .home-next-card-shell{
-      width:100%;max-width:min(92vw,720px);
+      width:100%;max-width:min(100%,720px);
+      margin-inline:auto;
+      box-sizing:border-box;
+      transform-origin:center center;
       animation:home-next-card-ambient 14s ease-in-out infinite;
       will-change:transform;
     }
@@ -185,6 +188,7 @@
     }
     .home-next-match-wrap{
       margin-top:0;display:flex;justify-content:center;align-items:flex-start;
+      width:100%;max-width:100%;box-sizing:border-box;align-self:stretch;
     }
     .home-next-card{
       width:100%;max-width:none;padding:10px 14px!important;
@@ -315,7 +319,8 @@
     @media (max-width:600px){
       #admin-rail-tab{top:auto;bottom:88px;transform:none}
       body.admin-drawer-open #admin-rail-tab{transform:translateX(calc(-1 * min(320px, 92vw)))}
-      body.admin-logged-in main{padding-right:48px;padding-bottom:0}
+      /* Stesso inset a sinistra e destra: evita che main+home sembrino spostati a destra (prima solo padding-right) */
+      body.admin-logged-in main{padding-left:48px;padding-right:48px;padding-bottom:0}
     }
 
     /* Table-like list */
@@ -461,14 +466,33 @@ button.classifica-mode-card.classifica-mode-card--active{
       /* 60px barra + safe area; i 10px tra card e barra sono su .home-dashboard-inner */
       padding-bottom:calc(60px + env(safe-area-inset-bottom, 0px));
     }
-    /* Home: logo a tutta larghezza area (compensa padding main), altezza da flex senza min-height in vh */
-    #home-section.home-dashboard-root{
-      margin-left:-10px;margin-right:-10px;
-      width:calc(100% + 20px);
+    /* Home mobile: niente margini negativi né calc(100%+…) — main a padding orizzontale 0, contenuto centrato nel viewport */
+    body.mobile-home-main-flush main{
+      padding-left:0!important;
+      padding-right:0!important;
+      overflow-x:hidden;
+    }
+    body.mobile-home-main-flush #home-section.home-dashboard-root{
+      margin-left:0;
+      margin-right:0;
+      width:100%;
+      max-width:100%;
+      box-sizing:border-box;
       border-radius:0;
-      padding-left:max(10px, env(safe-area-inset-left, 0px));
-      padding-right:max(10px, env(safe-area-inset-right, 0px));
+      padding-left:max(10px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+      padding-right:max(10px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
       padding-bottom:0;
+    }
+    body.mobile-home-main-flush.admin-logged-in #home-section.home-dashboard-root{
+      padding-left:max(48px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+      padding-right:max(48px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+    }
+    /* Logo: niente translateX(-50%) con width 100% (evita subpixel / shift percepito) */
+    body.mobile-home-main-flush .home-dashboard-logo-bg__img{
+      left:0;
+      width:100%;
+      transform:translate3d(0,calc(110px - 40%),0) scale(0.992);
+      transform-origin:center bottom;
     }
     main:has(#home-section.active) section#home-section.home-dashboard-root.active{
       padding-bottom:0;
@@ -912,6 +936,7 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
             next.style.pointerEvents = 'all';
             next.style.removeProperty('display');
             next.style.removeProperty('flex-direction');
+            document.body.classList.toggle('mobile-home-main-flush', id === 'home-section');
         }, 10); 
         
         // 4. Gestione evidenziazione tab/menu (Logica invariata)
@@ -3623,7 +3648,7 @@ window.toggleCandidatura = async function(matchId){
 
 </script>
 </head>
-<body> 
+<body class="mobile-home-main-flush">
 <header> 
   <div class="hero" role="banner"> 
     <img src="Logo.png" alt="Logo AC Tuscolano" /> 
