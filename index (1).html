@@ -4,6 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
+  <script>
+    (function () {
+      var p = location.pathname || "";
+      var prefix = p.indexOf("/ACTuscolano") === 0 ? "/ACTuscolano" : "";
+      var baseHref = location.origin + prefix + "/";
+      var b = document.createElement("base");
+      b.href = baseHref;
+      document.head.appendChild(b);
+    })();
+  </script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
   <script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js"></script>
@@ -48,7 +58,9 @@
     }
     .hero{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:14px 16px}
     .hero img{width:56px;height:56px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}
-    .brand{display:flex;flex-direction:column}
+    .hero-actions{margin-left:auto;display:flex;align-items:center;gap:12px;flex-shrink:0}
+    .header-user-label{font-weight:800;font-size:clamp(13px,1.65vw,15px);letter-spacing:.02em;text-shadow:0 1px 2px rgba(0,0,0,.22);white-space:nowrap;max-width:min(46vw,240px);overflow:hidden;text-overflow:ellipsis}
+    .brand{display:flex;flex-direction:column;min-width:0}
     .brand .club{margin:0;line-height:1.05;font-weight:900;letter-spacing:.2px;font-size:clamp(22px,3vw,34px)}
     .brand .tag{margin:0;opacity:.92;font-weight:600;font-size:clamp(12px,2vw,14px)}
 
@@ -72,6 +84,138 @@
     /* Layout */
     main{max-width:1200px;margin:18px auto;padding:0 16px}
     section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin:16px 0;box-shadow:var(--shadow)}
+    /* Home: niente scroll sulla pagina (riempi viewport tra header/nav e footer) */
+    html:has(#home-section.active){
+      overflow:hidden;
+      height:100%;
+      min-height:100%;
+      max-height:100vh;
+      max-height:100dvh;
+    }
+    body:has(#home-section.active){
+      overflow:hidden;
+      height:100%;
+      min-height:100%;
+      max-height:100vh;
+      max-height:100dvh;
+      display:flex;
+      flex-direction:column;
+    }
+    body:has(#home-section.active) > header{flex-shrink:0}
+    body:has(#home-section.active) > nav{flex-shrink:0}
+    body:has(#home-section.active) > main{
+      flex:1 1 0;
+      min-height:0;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      margin-top:0;
+      margin-bottom:0;
+      margin-left:auto;
+      margin-right:auto;
+    }
+    body:has(#home-section.active) > footer{flex-shrink:0}
+    main:has(#home-section.active) section#home-section.home-dashboard-root.active{
+      margin:0;
+      flex:1 1 0;
+      min-height:0!important;
+      height:auto;
+      display:flex;
+      flex-direction:column;
+      padding:clamp(6px,1.5vw,14px);
+      padding-bottom:clamp(56px,16vh,180px);
+    }
+    main:has(#home-section.active) .home-dashboard-inner{
+      flex:0 0 auto;
+      min-height:0;
+      margin-top:auto;
+    }
+    /* Home dashboard */
+    .home-dashboard-root{
+      position:relative;overflow:visible;border:none;background:transparent;box-shadow:none;
+      padding:clamp(8px,2vw,16px);margin:12px 0;
+      border-radius:var(--radius);
+      isolation:isolate;
+      display:flex;
+      flex-direction:column;
+    }
+    /* Layer logo a tutta l'area sezione (dietro la card): evita taglio overflow del flex e il "buco" chiaro sotto l'inner */
+    .home-dashboard-logo-bg{
+      position:absolute;
+      inset:0;
+      z-index:0;
+      pointer-events:none;
+      overflow:visible;
+      background:var(--bg);
+    }
+    .home-dashboard-logo-bg__img{
+      position:absolute;left:50%;bottom:0;
+      top:auto;
+      transform-origin:center bottom;
+      transform:translate3d(-50%,calc(110px - 40%),0) scale(0.992);
+      width:100%;height:100%;
+      max-width:none;max-height:none;
+      object-fit:contain;
+      object-position:center bottom;
+      opacity:.92;
+      filter:contrast(1.14) saturate(1.08);
+      image-rendering:auto;
+      mix-blend-mode:multiply;
+    }
+    /* Stessi tempi/ampiezze del logo (translateY + scale); opacità omessa per leggibilità testo */
+    @keyframes home-next-card-ambient{
+      0%,100%{transform:translateY(0) scale(1)}
+      35%{transform:translateY(-14px) scale(1.05)}
+      65%{transform:translateY(6px) scale(.98)}
+    }
+    .home-next-card-shell{
+      width:100%;max-width:min(92vw,720px);
+      animation:home-next-card-ambient 14s ease-in-out infinite;
+      will-change:transform;
+    }
+    .home-dashboard-inner{
+      position:relative;z-index:2;max-width:920px;margin:0 auto;width:100%;
+      flex:0 0 auto;
+      min-height:0;
+      margin-top:auto;
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+      padding-top:clamp(4px,1vh,12px);
+      padding-bottom:clamp(14px,3.5vh,32px);
+      background:transparent;
+    }
+    .home-next-match-wrap{
+      margin-top:0;display:flex;justify-content:center;align-items:flex-start;
+    }
+    .home-next-card{
+      width:100%;max-width:none;padding:10px 14px!important;
+      border:2px solid var(--yellow)!important;
+      border-radius:8px;
+      overflow:hidden;
+      backdrop-filter:none;
+      box-shadow:0 8px 28px rgba(16,24,40,.12);
+    }
+    .home-next-card.card:hover{transform:none;box-shadow:var(--shadow)}
+    .home-next-card-layout{
+      display:flex;flex-direction:row;align-items:center;gap:12px 16px;flex-wrap:wrap;
+    }
+    .home-next-card-main{flex:1 1 220px;min-width:0}
+    .home-next-card-aside{flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+    .home-next-card h3{
+      margin:0 0 4px 0;font-size:.95rem;color:var(--red);text-align:left;
+      border-bottom:0;padding-bottom:0;
+      text-shadow:0 1px 0 rgba(255,255,255,.95);
+    }
+    .home-next-row{margin:3px 0;font-size:.82rem;line-height:1.3;text-shadow:0 1px 2px rgba(255,255,255,.9)}
+    .home-next-row--tip{color:var(--ink-sub);font-weight:700;font-size:.78rem;margin-top:0}
+    .home-next-row--avv{font-weight:800;font-size:.92rem;color:var(--ink);margin-bottom:2px}
+    .home-next-meta{
+      margin:0;font-size:.78rem;line-height:1.35;color:var(--ink);
+      text-shadow:0 1px 2px rgba(255,255,255,.85);
+    }
+    .home-next-cand-btn{padding:8px 14px!important;font-size:.85rem!important}
+    .home-next-card--empty .home-next-card-main{text-align:center}
+    .home-next-card--empty h3{text-align:center;margin-bottom:8px;border-bottom:2px solid var(--yellow);padding-bottom:6px}
+    #mobile-home-tab::before { content: '🏠'; }
     /* Rimuovo display:none qui, lo gestirà il JS */
     section h2{margin:0 0 14px 0;color:var(--red);border-bottom:3px solid var(--yellow);padding-bottom:6px}
 
@@ -90,6 +234,15 @@
     @media (max-width:640px){.grid.cols-2,.grid.cols-3{grid-template-columns:1fr}}
 
     .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow);transition:transform var(--duration) var(--ease),box-shadow var(--duration) var(--ease),border-color var(--duration) var(--ease)}
+    .card.home-next-card{
+      background-color:transparent!important;
+      background-image:
+        linear-gradient(165deg, rgba(255,255,255,.93) 0%, rgba(255,255,255,.82) 42%, rgba(255,255,255,.76) 100%),
+        url("campo-porta-bg.jpg");
+      background-size:cover,cover;
+      background-position:center center,center 72%;
+      background-repeat:no-repeat;
+    }
     .card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(16,24,40,.08),0 14px 28px rgba(16,24,40,.07)}
     .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
     .pill{background:var(--yellow);color:#111;border-radius:999px;padding:4px 10px;font-weight:800;font-size:.8rem}
@@ -270,6 +423,9 @@ button.classifica-mode-card.classifica-mode-card--active{
     transform:none !important;
     transition:opacity 0.15s ease !important;
   }
+  .home-next-card-shell{
+    animation:none !important;
+  }
 }
 
 
@@ -299,6 +455,27 @@ button.classifica-mode-card.classifica-mode-card--active{
         max-width: 100%;
         padding: 10px 10px 80px 10px; /* Padding per il bottom nav */
     }
+    main:has(#home-section.active){
+      overflow:hidden!important;
+      padding-top:8px;
+      /* 60px barra + safe area; i 10px tra card e barra sono su .home-dashboard-inner */
+      padding-bottom:calc(60px + env(safe-area-inset-bottom, 0px));
+    }
+    /* Home: logo a tutta larghezza area (compensa padding main), altezza da flex senza min-height in vh */
+    #home-section.home-dashboard-root{
+      margin-left:-10px;margin-right:-10px;
+      width:calc(100% + 20px);
+      border-radius:0;
+      padding-left:max(10px, env(safe-area-inset-left, 0px));
+      padding-right:max(10px, env(safe-area-inset-right, 0px));
+      padding-bottom:0;
+    }
+    main:has(#home-section.active) section#home-section.home-dashboard-root.active{
+      padding-bottom:0;
+    }
+    main:has(#home-section.active) .home-dashboard-inner{
+      padding-bottom:10px;
+    }
     
     /* 2. Header Refinement */
     header {
@@ -318,6 +495,8 @@ button.classifica-mode-card.classifica-mode-card--active{
     .brand .tag {
         font-size: 10px; /* Sottotitolo ridotto */
     }
+    .hero-actions{gap:8px}
+    .header-user-label{font-size:12px;max-width:min(38vw,160px)}
     
     /* 3. Nasconde Top Nav e Footer */
     nav, footer {
@@ -577,7 +756,7 @@ window.aggiornaGiorniPartite = async function() {
     }
 
     // ** ARRAY SEZIONI AGGIORNATI E COMPLETI **
-    const PUBLIC_SECTIONS = ['rosa-section','calendario-section','statistiche-section','formazione-pubblica-section', 'prestazioni-partita-section', 'video-section', 'classifica-section'];
+    const PUBLIC_SECTIONS = ['home-section','rosa-section','calendario-section','statistiche-section','formazione-pubblica-section', 'prestazioni-partita-section', 'video-section', 'classifica-section'];
     const ADMIN_SECTIONS = [
       'admin-inserimento-giocatori-section',
       'admin-inserimento-giornate-section',
@@ -693,6 +872,13 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
         if (!next) return;
 
         const transitionDuration = 400; // Corrisponde a transition: opacity 0.4s ease;
+        if (!window.__sectionSwitchTimeouts) window.__sectionSwitchTimeouts = [];
+        window.__sectionSwitchTimeouts.forEach(clearTimeout);
+        window.__sectionSwitchTimeouts = [];
+        if (window.__sectionActivateTimeout) {
+            clearTimeout(window.__sectionActivateTimeout);
+            window.__sectionActivateTimeout = 0;
+        }
         
         // 1. Fade out la sezione corrente (se presente)
         document.querySelectorAll('.content-section.active').forEach(section => {
@@ -702,24 +888,30 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
         // 2. Gestisce il display per tutte le sezioni
         document.querySelectorAll('.content-section').forEach(section => {
             if (section.id !== id) {
-                // Imposta display: none DOPO il tempo di transizione per consentire il fade-out
-                setTimeout(() => {
+                const tid = setTimeout(() => {
                     section.style.display = 'none';
-                }, transitionDuration); 
+                }, transitionDuration);
+                window.__sectionSwitchTimeouts.push(tid);
             } else {
-                // Imposta display: block sulla sezione di destinazione immediatamente (starting opacity 0 via CSS)
-                section.style.display = 'block';
+                // La home usa layout flex nel CSS (logo + card): display:block inline
+                // sovrascriverebbe main:has(...) display:flex e collasserebbe l'area logo.
+                if (section.id === 'home-section') {
+                    section.style.display = 'flex';
+                    section.style.flexDirection = 'column';
+                } else {
+                    section.style.display = 'block';
+                }
             }
         });
         
         // 3. Aggiunge la classe 'active' alla sezione di destinazione
-        // Questo avvia la dissolvenza in entrata (opacity 0 -> 1)
-        // Usiamo un piccolo ritardo (10ms) per assicurare che 'display: block' venga letto dal browser 
-        // prima di avviare la transizione di opacità.
-        setTimeout(() => {
+        // Piccolo ritardo così il browser applica il display prima della transizione opacità
+        window.__sectionActivateTimeout = setTimeout(() => {
+            window.__sectionActivateTimeout = 0;
             next.classList.add('active');
-            // Assicuriamoci che pointer-events sia attivo per interazioni immediate
-            next.style.pointerEvents = 'all'; 
+            next.style.pointerEvents = 'all';
+            next.style.removeProperty('display');
+            next.style.removeProperty('flex-direction');
         }, 10); 
         
         // 4. Gestione evidenziazione tab/menu (Logica invariata)
@@ -746,6 +938,9 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
 
         if (!isAdminTarget && id === 'classifica-section') {
             queueMicrotask(() => window.loadClassifica());
+        }
+        if (!isAdminTarget && id === 'home-section') {
+            queueMicrotask(() => window.loadHomeDashboard());
         }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -782,6 +977,30 @@ window.showDettaglioPrestazioniGiocatore = async function(pidRosa, nome, cognome
         } 
     }
 
+    const SUPERADMIN_HEADER_UID = 'tbHGXtpvBDfmVIrNT2QVyeBinCV2';
+    function formatHeaderUserDisplayName(uData, role, uid) {
+      const r = role || (uData && uData.role) || '';
+      if (r === 'superadmin' || uid === SUPERADMIN_HEADER_UID) return 'Super Admin';
+      const nome = String((uData && uData.nome) || '').trim();
+      const cognome = String((uData && uData.cognome) || '').trim();
+      const firstNome = nome.split(/\s+/).filter(Boolean)[0] || '';
+      const ci = cognome ? cognome.charAt(0).toUpperCase() : '';
+      if (!firstNome && !ci) return 'Utente';
+      if (!ci) return firstNome;
+      return `${ci}. ${firstNome}`;
+    }
+    function updateHeaderUserDisplay(user, uData, role, uid) {
+      const el = byId('header-user-label');
+      if (!el) return;
+      if (!user) {
+        el.textContent = '';
+        el.hidden = true;
+        return;
+      }
+      el.textContent = formatHeaderUserDisplayName(uData || {}, role, uid);
+      el.hidden = false;
+    }
+
     /* Auth */
 onAuthStateChanged(auth, async (user)=>{
 
@@ -796,11 +1015,13 @@ onAuthStateChanged(auth, async (user)=>{
     const uData = snapRole.val() || {};
 
     // ruolo
-    const role = uData.role || (user.uid === "tbHGXtpvBDfmVIrNT2QVyeBinCV2" ? "superadmin" : "user");
+    const role = uData.role || (user.uid === SUPERADMIN_HEADER_UID ? "superadmin" : "user");
     window.currentUserRole = role;
     if(role === 'admin' || role === 'superadmin'){
       isAdmin = true;
     }
+
+    updateHeaderUserDisplay(user, uData, role, user.uid);
 
     // sync eventuale token locale
     const storedToken = localStorage.getItem("fcmToken");
@@ -821,6 +1042,7 @@ onAuthStateChanged(auth, async (user)=>{
   } else {
     // user non loggato
     if(btnNotif) btnNotif.style.display = 'none';
+    updateHeaderUserDisplay(null);
   }
 
   setAuthButton(user);
@@ -828,11 +1050,28 @@ onAuthStateChanged(auth, async (user)=>{
 
   const currentActiveSection = document.querySelector('.content-section.active');
   if(!currentActiveSection || currentActiveSection.id === 'login-section') {
-    if(user && isAdmin) {
-       window.showAdminSection('admin-inserimento-giocatori-section');
-    } else {
-       window.showPublicSection('rosa-section');
+    if (user) {
+      window.showPublicSection('home-section');
+    } else if (!currentActiveSection) {
+      window.showPublicSection('home-section');
     }
+  }
+
+  if(user && isAdmin){
+    sessionStorage.removeItem('pendingCandidaturaMatchId');
+  }
+  if(user && !isAdmin && sessionStorage.getItem('pendingCandidaturaMatchId')){
+    const mid = sessionStorage.getItem('pendingCandidaturaMatchId');
+    sessionStorage.removeItem('pendingCandidaturaMatchId');
+    queueMicrotask(async () => {
+      if (auth.currentUser && mid) {
+        await window.toggleCandidatura(mid);
+      }
+    });
+  }
+
+  if (user && byId('home-section')?.classList.contains('active')) {
+    queueMicrotask(() => window.loadHomeDashboard());
   }
 
 });
@@ -900,9 +1139,11 @@ onAuthStateChanged(auth, async (user)=>{
       }));
       document.querySelectorAll('#video-tab, #mobile-video-tab').forEach(el => el.addEventListener('click', loadVideoList));
       
-      // Imposto la rosa come attiva all'avvio se non c'è una sezione attiva
+      // Imposto la home come attiva all'avvio se non c'è una sezione attiva
       if (!document.querySelector('.content-section.active')) {
-            window.showPublicSection('rosa-section');
+            window.showPublicSection('home-section');
+      } else if (byId('home-section')?.classList.contains('active')) {
+            queueMicrotask(() => window.loadHomeDashboard());
       }
 
       byId('admin-rail-tab')?.addEventListener('click', () => window.toggleAdminDrawer());
@@ -910,6 +1151,13 @@ onAuthStateChanged(auth, async (user)=>{
       byId('admin-drawer-close')?.addEventListener('click', () => window.closeAdminDrawer());
       document.addEventListener('keydown', (e) => {
         if(e.key === 'Escape' && document.body.classList.contains('admin-drawer-open')) window.closeAdminDrawer();
+      });
+
+      byId('home-next-match')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-home-cand-btn="1"]');
+        if (!btn) return;
+        const mid = btn.getAttribute('data-home-match-id');
+        if (mid) window.homeRichiediCandidatura(mid);
       });
 
     });
@@ -1113,6 +1361,77 @@ onAuthStateChanged(auth, async (user)=>{
         byId('classifica-card-bronze').addEventListener('click', () => window.selezionaVistaClassifica('bronze'));
       }
       await refreshClassificaPanel();
+    };
+
+    function findNextMatchCandidatureAperte(entries, toDate, today){
+      const candidates = [];
+      for (const [id, m] of entries){
+        const matchDate = toDate(m.data);
+        const isPast = matchDate < today;
+        const risultatoValido = !!(m.risultato && /\d+\s*-\s*\d+/.test(m.risultato));
+        if (!isPast && !risultatoValido) candidates.push([id, m]);
+      }
+      candidates.sort((a,b)=> toDate(a[1].data) - toDate(b[1].data));
+      return candidates[0] || null;
+    }
+
+    window.loadHomeDashboard = async function(){
+      const nextEl = byId('home-next-match');
+      if (!nextEl) return;
+      nextEl.innerHTML = '<div class="home-next-card-shell"><div class="help" style="text-align:center;width:100%;padding:12px;">Caricamento…</div></div>';
+      const toDate = (d)=>{ const [dd,mm,yyyy]=String(d||'').split('/'); return new Date(`${mm}/${dd}/${yyyy}`); };
+      const today = new Date(); today.setHours(0,0,0,0);
+      try {
+        const snapCal = await get(ref(db, 'calendario'));
+        const calVal = snapCal.val() || {};
+        const entries = Object.entries(calVal);
+        const next = findNextMatchCandidatureAperte(entries, toDate, today);
+        if (!next){
+          nextEl.innerHTML = `<div class="home-next-card-shell"><div class="card home-next-card home-next-card--empty"><div class="home-next-card-main"><h3>Prossima partita</h3><p class="help" style="margin:0">Nessuna partita futura con candidature aperte.</p></div></div></div>`;
+          return;
+        }
+        const [mid, m] = next;
+        const giornoSett = typeof getDayAbbrFromDate === 'function' ? getDayAbbrFromDate(m.data) : '';
+        const dataLabel = giornoSett ? `${giornoSett} ${m.data}` : m.data;
+        const tipRaw = (m.tipologia && String(m.tipologia).trim()) ? String(m.tipologia).trim() : '';
+        const tipHtml = tipRaw ? escapeHtml(tipRaw) : '';
+        const uid = auth.currentUser ? auth.currentUser.uid : null;
+        const candRaw = m.candidature;
+        const cand = candRaw && typeof candRaw === 'object' && !Array.isArray(candRaw) ? candRaw : {};
+        const candidatiAuthUIDs = Object.keys(cand).filter(u => cand[u] === true);
+        const isCandidato = !!(uid && candidatiAuthUIDs.includes(uid));
+        const btnLabel = isCandidato ? 'Annulla candidatura' : 'Candidati';
+        nextEl.innerHTML = `
+          <div class="home-next-card-shell">
+          <div class="card home-next-card">
+            <div class="home-next-card-layout">
+              <div class="home-next-card-main">
+                <h3>Prossima partita</h3>
+                ${tipHtml ? `<div class="home-next-row home-next-row--tip">${tipHtml}</div>` : ''}
+                <div class="home-next-row home-next-row--avv">${escapeHtml(m.avversaria || '—')}</div>
+                <p class="home-next-meta">${escapeHtml(dataLabel)}${m.orario ? ` · ${escapeHtml(m.orario)}` : ''} · ${escapeHtml(m.campo || '—')} · ${m.casa ? 'Casa' : 'Trasferta'}</p>
+              </div>
+              <div class="home-next-card-aside">
+                <button type="button" class="btn btn--accent home-next-cand-btn" data-home-cand-btn="1" data-home-match-id="${escapeHtml(String(mid))}">${btnLabel}</button>
+              </div>
+            </div>
+          </div>
+          </div>
+        `;
+      } catch (e) {
+        console.error('loadHomeDashboard', e);
+        nextEl.innerHTML = `<div class="home-next-card-shell"><div class="card home-next-card home-next-card--empty"><div class="home-next-card-main"><p class="help" style="margin:0;color:var(--red)">Errore caricamento dati.</p></div></div></div>`;
+      }
+    };
+
+    window.homeRichiediCandidatura = async function(matchId){
+      if (!matchId) return;
+      if (!auth.currentUser){
+        sessionStorage.setItem('pendingCandidaturaMatchId', matchId);
+        showLogin();
+        return;
+      }
+      await window.toggleCandidatura(matchId);
     };
 
     window.updateClassificaFromSito = async () => {
@@ -1372,9 +1691,10 @@ window.loadProssimeGiornate = async function(asAdmin){
   window.lastCalendarioAdminView = asAdmin;
   const listId = asAdmin ? 'admin-calendario-list' : 'calendario-list';
   const ul = byId(listId); if(!ul) return;
-  ul.innerHTML='';
+  ul.className = 'grid cols-3';
+  ul.innerHTML = '<li class="help" style="grid-column:1/-1;text-align:center;padding:20px;">Caricamento partite…</li>';
 
-  // carico calendario + rosa + utenti
+  // carico calendario + rosa + utenti (parallelo)
   const [snapCalendar, snapRosa, snapUtenti] = await Promise.all([
     get(ref(db,'calendario')),
     get(ref(db,'rosa')),
@@ -1397,14 +1717,12 @@ window.loadProssimeGiornate = async function(asAdmin){
     return;
   }
 
- ul.className='grid cols-3'; // IMPOSTA LAYOUT A 3 COLONNE
-
   let htmlAll = '';
 
   for(const [matchId,m] of entries){
-    // --- CANDIDATURE MATCH ---
-    const candSnap = await get(ref(db,`calendario/${matchId}/candidature`));
-    const cand = candSnap.val() || {};
+    // Candidature: già incluse nello snapshot `calendario` (niente N round-trip in sequenza)
+    const candRaw = m.candidature;
+    const cand = candRaw && typeof candRaw === 'object' && !Array.isArray(candRaw) ? candRaw : {};
     const candidatiAuthUIDs = Object.keys(cand).filter(uid => cand[uid] === true);
     const candCount = candidatiAuthUIDs.length;
 
@@ -3246,12 +3564,14 @@ window.toggleCandidatura = async function(matchId){
     return;
   }
 
-  // Seleziona il pulsante
+  // Seleziona il pulsante (calendario o home)
   const btn = document.querySelector(`[data-match-cand-btn="${matchId}"]`);
+  const btnHome = document.querySelector('[data-home-cand-btn="1"]');
   // Seleziona il contatore dei candidati
   const countEl = document.querySelector(`[data-match-count="${matchId}"]`);
 
   if (btn) btn.disabled = true;
+  if (btnHome) btnHome.disabled = true;
 
   try {
     const uid = auth.currentUser.uid;
@@ -3271,6 +3591,10 @@ window.toggleCandidatura = async function(matchId){
       btn.innerText = nuovoValore ? "Annulla Candidatura" : "Candidati";
       btn.classList.toggle('btn--accent', nuovoValore);
     }
+    if (btnHome) {
+      btnHome.textContent = nuovoValore ? "Annulla candidatura" : "Candidati";
+      btnHome.classList.toggle('btn--accent', nuovoValore);
+    }
 
     // aggiorna contatore immediato sul blocco visibile
     if (countEl) {
@@ -3286,12 +3610,14 @@ window.toggleCandidatura = async function(matchId){
     } else {
       await window.loadProssimeGiornate(false);
     }
+    if (window.loadHomeDashboard) await window.loadHomeDashboard();
 
   } catch (err) {
     console.error("Errore candidatura:", err);
     alert("Errore durante l'operazione. Riprova.");
   } finally {
     if (btn) btn.disabled = false;
+    if (btnHome) btnHome.disabled = false;
   }
 };
 
@@ -3305,16 +3631,18 @@ window.toggleCandidatura = async function(matchId){
       <h1 class="club">AC Tuscolano</h1> 
       <p class="tag">Football Club</p> 
     </div> 
-      <button id="btn-attiva-notifiche" style="display:none;margin-right:10px; background:white; color:#b30000; border-radius:6px; padding:6px 10px; font-size:13px; font-weight:600;"
-        onclick="initNotifications()">
-    Attiva Notifiche
-</button>
+    <div class="hero-actions">
+      <span id="header-user-label" class="header-user-label" hidden aria-live="polite"></span>
+      <button id="btn-attiva-notifiche" type="button" style="display:none;background:white;color:#b30000;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:600;"
+        onclick="initNotifications()">Attiva Notifiche</button>
+    </div>
   </div> 
 
 </header> 
 <nav aria-label="Navigazione principale"> 
   <div class="nav-wrap"> 
-    <button id="rosa-tab" class="tab" data-target="rosa-section" aria-current="page" onclick="showPublicSection('rosa-section')">La nostra Rosa</button> 
+    <button id="home-tab" class="tab" data-target="home-section" aria-current="page" onclick="showPublicSection('home-section')">Home</button> 
+    <button id="rosa-tab" class="tab" data-target="rosa-section" onclick="showPublicSection('rosa-section')">La nostra Rosa</button> 
     <button id="calendario-tab" class="tab" data-target="calendario-section" onclick="showPublicSection('calendario-section')">Calendario & Partite</button> 
     <button id="classifica-tab" class="tab" data-target="classifica-section" onclick="showPublicSection('classifica-section')">Classifica</button> 
     <button id="statistiche-tab" class="tab" data-target="statistiche-section" onclick="showPublicSection('statistiche-section')">Statistiche & Voti</button> 
@@ -3345,7 +3673,7 @@ window.toggleCandidatura = async function(matchId){
 </button>
 <main>
   <section id="login-section" class="content-section">
-    <h2>Login Amministratore</h2>
+    <h2>Login</h2>
     <form id="login-form">
       <label>Email</label><input id="login-email" type="email" required />
       <label>Password</label><input id="login-password" type="password" required />
@@ -3355,7 +3683,16 @@ window.toggleCandidatura = async function(matchId){
     </form>
   </section>
 
-  <section id="rosa-section" class="content-section active">
+  <section id="home-section" class="content-section home-dashboard-root active">
+    <div class="home-dashboard-logo-bg" aria-hidden="true">
+      <img src="Logo.png" alt="" class="home-dashboard-logo-bg__img" width="1024" height="1024" decoding="async" fetchpriority="high" />
+    </div>
+    <div class="home-dashboard-inner">
+      <div id="home-next-match" class="home-next-match-wrap"></div>
+    </div>
+  </section>
+
+  <section id="rosa-section" class="content-section">
     <h2>La nostra Rosa</h2>
     <div class="help">Lista dei giocatori, ruolo e stato. Ordinati per numero di maglia.</div>
     <ul id="rosa-list"></ul>
@@ -3619,7 +3956,8 @@ window.toggleCandidatura = async function(matchId){
 </main>
 
 <div id="bottom-nav" role="navigation" aria-label="Navigazione mobile principale">
-    <button id="mobile-rosa-tab" class="tab" data-target="rosa-section" aria-current="page" onclick="showPublicSection('rosa-section')">Rosa</button>
+    <button id="mobile-home-tab" class="tab" data-target="home-section" aria-current="page" onclick="showPublicSection('home-section')">Home</button> 
+    <button id="mobile-rosa-tab" class="tab" data-target="rosa-section" onclick="showPublicSection('rosa-section')">Rosa</button> 
     <button id="mobile-calendario-tab" class="tab" data-target="calendario-section" onclick="showPublicSection('calendario-section')">Partite</button>
     <button id="mobile-classifica-tab" class="tab" data-target="classifica-section" onclick="showPublicSection('classifica-section')">Classifica</button>
     <button id="mobile-statistiche-tab" class="tab" data-target="statistiche-section" onclick="showPublicSection('statistiche-section')">Statistiche</button>
