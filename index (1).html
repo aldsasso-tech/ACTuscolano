@@ -4,6 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AC Tuscolano | Gestione Squadra</title>
+  <!-- Google Analytics 4 (stesso ID della stream Firebase measurementId) -->
+  <link rel="preconnect" href="https://www.googletagmanager.com" />
+  <link rel="preconnect" href="https://www.google-analytics.com" />
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-TSVH8PH4RC"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-TSVH8PH4RC', {
+      send_page_view: true,
+      cookie_flags: 'SameSite=Lax;Secure'
+    });
+  </script>
   <script>
     (function () {
       var p = location.pathname || "";

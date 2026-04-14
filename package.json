@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "serve -l 5173 .",
-    "start": "serve -l 5173 ."
+    "start": "serve -l 5173 .",
+    "build": "node -e \"console.log('Build OK: progetto statico (HTML/JS/CSS), nessuna compilazione.'); process.exit(0)\""
   },
   "devDependencies": {
     "serve": "^14.2.4"
