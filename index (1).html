@@ -3577,18 +3577,62 @@ window.savePrestazioniPartita = async function(e){
         
         container.innerHTML = `
             <h3>Gestione Candidature vs ${escapeHtml(avv)}</h3>
-            <div class="help">**Attenzione:** La funzione di salvataggio è da implementare. I check/uncheck attuali riflettono lo stato del database.</div>
-            <form id="candidature-admin-form" data-match-id="${matchId}">
+            <div class="help">Spunta i giocatori candidati e premi <b>Salva</b>: le modifiche vengono scritte in <code>calendario/${escapeHtml(matchId)}/candidature</code> (come nel CRUD Gestione dati).</div>
+            <form id="candidature-admin-form" data-match-id="${escapeHtml(matchId)}">
                 <h4>Lista Candidati (Giocatori nella Rosa: ${rows.length})</h4>
                 <ul class="grid cols-2" style="margin-top:14px;">
                     ${listHtml}
                 </ul>
-                <p class="help">ID Partita: <b>${matchId}</b></p>
+                <p class="help">ID Partita: <b>${escapeHtml(matchId)}</b></p>
                 <div class="actions">
-                    <button type="submit" class="btn btn--accent" onclick="alert('Funzione di salvataggio da implementare!')">Salva Selezione Candidati</button>
+                    <button type="submit" class="btn btn--accent" id="candidature-admin-save-btn">Salva selezione candidati</button>
                 </div>
             </form>
         `;
+
+        const form = byId('candidature-admin-form');
+        if (form) {
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!auth.currentUser) {
+              alert('Devi essere autenticato per salvare.');
+              showLogin();
+              return;
+            }
+            const mid = form.getAttribute('data-match-id');
+            if (!mid) {
+              alert('ID partita mancante.');
+              return;
+            }
+            const checks = form.querySelectorAll('input[type="checkbox"][data-uid]');
+            const updates = {};
+            checks.forEach((ch) => {
+              const uid = ch.getAttribute('data-uid');
+              if (!uid) return;
+              updates[uid] = ch.checked;
+            });
+            const btn = byId('candidature-admin-save-btn');
+            if (btn) btn.disabled = true;
+            try {
+              if (Object.keys(updates).length === 0) {
+                alert('Nessun giocatore con UID: nulla da salvare.');
+                return;
+              }
+              await update(ref(db, `calendario/${mid}/candidature`), updates);
+              alert('Candidature aggiornate correttamente.');
+              if (typeof window.loadProssimeGiornate === 'function') {
+                await window.loadProssimeGiornate(!!window.lastCalendarioAdminView);
+              }
+              if (typeof window.loadHomeDashboard === 'function') await window.loadHomeDashboard();
+              await window.showCandidatureEditor(mid, avv);
+            } catch (err) {
+              console.error('Salvataggio candidature admin:', err);
+              alert('Errore durante il salvataggio. Riprova.');
+            } finally {
+              if (btn) btn.disabled = false;
+            }
+          });
+        }
     };
 
     
